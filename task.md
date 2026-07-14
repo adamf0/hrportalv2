@@ -1,0 +1,36 @@
+# Checklist - Flutter Attendance Application
+
+- [x] Initialize Flutter project in current directory
+- [x] Install dependencies (`provider`, `google_fonts`, `flutter_appauth`, `path_provider`, `http`, `camera`, `google_mlkit_face_detection`)
+- [x] Create folder structure under `lib/` (`state/`, `pages/`, `widgets/`, `core/`)
+- [x] Implement Point-in-Polygon & Strategy Pattern in `location_wifi_helper.dart`
+- [x] Add Indonesian holidays list & date predicates in `location_wifi_helper.dart`
+- [x] Refactor state variables (Year Selector, Strategy selection, Ceremony parameters) in `app_state.dart`
+- [x] Integrate Ceremony ("Presensi Upacara") rules and automatic checking logic in `app_state.dart`
+- [x] Count dashboard metrics (Total Absen, Izin, Tidak Masuk) excluding holidays in `app_state.dart`
+- [x] Build Splash Screen (`splash_page.dart`) and Permission Check Screen (`permission_page.dart`)
+- [x] Connect Splash and Permission screens in `main.dart` routing
+- [x] Modify `dashboard_page.dart` to show Ceremony check-in button and dashboard metrics section
+- [x] Integrate Unpak SSO helper configurations (`lib/core/sso_helper.dart`)
+- [x] Create `LoginPage` featuring "Masuk dengan Unpak SSO" button and HR Portal branding
+- [x] Create `DashboardPage` featuring calendar widget, summaries, quick menu, bottom navigation shell
+- [x] Expand Dashboard Quick Menu to 5 buttons (Absensi, Cuti, Izin, SPPD, Slip Gaji) and connect them to their pages
+- [x] Create `LeaveListPage` with floating action button and list of requests
+- [x] Implement tab structures on LeaveListPage (Semua, Cuti, Izin, SPPD) with Indonesian date grouping under Semua tab
+- [x] Create `LeaveFormPage` with form fields, dropdowns, and mock attachment upload
+- [x] Redesign LeaveFormPage to match Unpak Web Portal Form Cuti & Form Izin details
+- [x] Add dynamic Form SPPD tab to LeaveFormPage featuring city destination, travel dates, duration, purpose, document upload, and supervisor selectors
+- [x] Resolve Right Overflow layout warnings on form dropdowns by using `isExpanded: true`
+- [x] Refactor supervisor input field to Bottom Sheet list search with single checked status
+- [x] Merge form start/end dates into single Date Range Picker and disable Sundays and Indonesian public holidays
+- [x] Create `AttendancePage` with real front camera liveness verification (ML Kit face detection)
+- [x] Remove top navigation header and Kembali back button row from AttendancePage
+- [x] Resolve front camera head euler angle mirroring and image bytes row-stride on Android
+- [x] Create `SalarySlipPage` with month selection tabs & slip breakdown layout
+- [x] Delete Cetak Slip button and implement API parsing from `https://hrportal.unpak.ac.id/api/slip_gaji`
+- [x] Render exact dot-matrix paper style salary slip sheet matching Unpak templates (for Dosen & Pegawai layouts)
+- [x] Show visual empty state (Data Not Found) and hide PDF button if payroll is empty
+- [x] Hook Year Selector dropdown to trigger dynamic API updates based on selected period year
+- [x] Resolve Gradle merging & compilation build issues for Android/iOS
+- [x] Implement Automated Attendance Check-in based on Universitas Pakuan Wi-Fi (IP matches 103.169 / 2001:df0:3140) and GPS radius (<= 500 meters)
+- [x] Run flutter analysis and verify correctness

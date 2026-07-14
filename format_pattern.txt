@@ -1,0 +1,31 @@
+lib/modules/banksoal/
+│
+├── domain/
+│   ├── bank_soal.dart                   # Entity / Domain object utama
+│   ├── bank_soal_errors.dart            # Domain-specific failures/errors
+│   └── i_bank_soal_repository.dart       # Interface/Contract untuk Repository
+│
+├── application/                         # CQRS Pattern (Folder per Action/Task)
+│   ├── create_bank_soal/
+│   │   ├── create_bank_soal_command.dart
+│   │   ├── create_bank_soal_command_handler.dart
+│   │   ├── create_bank_soal_command_validation.dart
+│   │
+│   ├── get_all_bank_soals/
+│   │   ├── get_all_bank_soals_query.dart
+│   │   ├── get_all_bank_soals_query_handler.dart
+│   │
+│   └── [task_lainnya]/                  # CopyBankSoal, DeleteBankSoal, dll.
+│
+├── infrastructure/
+│   ├── bank_soal_mediator.dart          # Penghubung Command/Query ke Handler (bisa pakai paket mediator/custom)
+│   └── bank_soal_repository.dart        # Implementasi nyata dari IBankSoalRepository (ke API/Lokal)
+│
+└── presentation/                        # Layer UI dengan gabungan Atomic Design
+    ├── bank_soal_bloc.dart              # State Management (menjembatani UI ke Application/Mediator)
+    └── components/                      # Atomic Pattern
+        ├── atoms/                       # Widget mandiri (e.g., custom_badge.dart, search_input.dart)
+        ├── molecules/                   # Gabungan atoms (e.g., bank_soal_search_bar.dart)
+        ├── organisms/                   # Komponen kompleks (e.g., bank_soal_card_item.dart, bank_soal_list_view.dart)
+        ├── template/                    
+        └── pages/                       # Halaman utuh (e.g., bank_soal_page.dart)
