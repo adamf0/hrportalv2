@@ -6,12 +6,14 @@ class FlagCeremonyCard extends StatelessWidget {
   final bool isUpacaraCheckedIn;
   final String upacaraTime;
   final VoidCallback onVerifyTap;
+  final bool isButtonEnabled;
 
   const FlagCeremonyCard({
     super.key,
     required this.isUpacaraCheckedIn,
     required this.upacaraTime,
     required this.onVerifyTap,
+    this.isButtonEnabled = true,
   });
 
   @override
@@ -52,7 +54,9 @@ class FlagCeremonyCard extends StatelessWidget {
                     Text(
                       isUpacaraCheckedIn
                           ? 'Berhasil presensi upacara pada $upacaraTime (Tanpa absen keluar)'
-                          : 'Jadwal presensi upacara aktif. Silakan lakukan verifikasi wajah.',
+                          : isButtonEnabled
+                              ? 'Jadwal presensi upacara aktif. Silakan lakukan verifikasi wajah.'
+                              : 'Presensi hanya dibuka setiap tanggal 17 pukul 08:00 - 09:00 WIB.',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: isUpacaraCheckedIn
@@ -68,10 +72,12 @@ class FlagCeremonyCard extends StatelessWidget {
           if (!isUpacaraCheckedIn) ...[
             const SizedBox(height: 12),
             ElevatedButton(
-              onPressed: onVerifyTap,
+              onPressed: isButtonEnabled ? onVerifyTap : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.orange,
                 foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[300],
+                disabledForegroundColor: Colors.grey[600],
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),

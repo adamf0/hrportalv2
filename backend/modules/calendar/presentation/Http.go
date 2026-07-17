@@ -16,8 +16,8 @@ func ModuleCalendar(app *fiber.App) {
 
 	group.Get("/stream", func(c *fiber.Ctx) error {
 		query := &GetAllCalendar.GetAllCalendarQuery{
-			Nip:       c.Query("nip"),
-			Nidn:      c.Query("nidn"),
+			Nip:       c.FormValue("nip"),
+			Nidn:      c.FormValue("nidn"),
 			StartDate: c.Query("start_date"),
 			EndDate:   c.Query("end_date"),
 		}
@@ -38,8 +38,8 @@ func ModuleCalendar(app *fiber.App) {
 
 	group.Get("/", func(c *fiber.Ctx) error {
 		query := &GetAllCalendar.GetAllCalendarQuery{
-			Nip:       c.Query("nip"),
-			Nidn:      c.Query("nidn"),
+			Nip:       c.FormValue("nip"),
+			Nidn:      c.FormValue("nidn"),
 			StartDate: c.Query("start_date"),
 			EndDate:   c.Query("end_date"),
 		}

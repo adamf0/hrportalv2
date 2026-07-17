@@ -3,7 +3,6 @@ package infrastructure
 import (
 	"context"
 
-	common "hrportal_backend/common/domain"
 	"hrportal_backend/modules/attendance/domain"
 
 	"gorm.io/gorm"
@@ -36,9 +35,8 @@ func (r *AttendanceRepository) UpdateAbsen(ctx context.Context, absen *domain.Ab
 	return r.db.WithContext(ctx).Save(absen).Error
 }
 
-func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, page int, pageSize int) (common.Paged[domain.Absen], error) {
+func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string) ([]domain.Absen, error) {
 	var items []domain.Absen
-	var total int64
 
 	var query *gorm.DB
 	if nip != "" && nidn != "" {
@@ -48,25 +46,16 @@ func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, 
 	} else if nidn != "" {
 		query = r.db.WithContext(ctx).Model(&domain.Absen{}).Where("nidn = ?", nidn)
 	} else {
-		return common.NewPaged[domain.Absen](nil, 0, page, pageSize), nil
+		return nil, nil
 	}
 	query = query.Where("absen_masuk IS NOT NULL")
-	query.Count(&total)
 
-	if pageSize <= 0 {
-		pageSize = 10
-	}
-	if page <= 0 {
-		page = 1
-	}
-	offset := (page - 1) * pageSize
-
-	err := query.Order("tanggal desc").Offset(offset).Limit(pageSize).Find(&items).Error
+	err := query.Order("tanggal desc").Find(&items).Error
 	if err != nil {
-		return common.NewPaged[domain.Absen](nil, 0, page, pageSize), err
+		return nil, err
 	}
 
-	return common.NewPaged(items, total, page, pageSize), nil
+	return items, nil
 }
 
 func (r *AttendanceRepository) CreateKlaim(ctx context.Context, klaim *domain.KlaimAbsen) error {

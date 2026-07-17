@@ -11,8 +11,6 @@ import '../../../leave/presentation/components/pages/leave_form_page.dart';
 
 // Atomic Design Components
 import 'package:hrportalv2/core/presentation/components/molecules/quick_menu_button.dart';
-import 'package:hrportalv2/core/presentation/components/molecules/activity_item_row.dart';
-
 // Dashboard Specific Components
 import 'package:hrportalv2/modules/dashboard/presentation/components/molecules/dashboard_header.dart';
 import 'package:hrportalv2/modules/dashboard/presentation/components/molecules/greeting_banner.dart';
@@ -22,8 +20,8 @@ import 'package:hrportalv2/modules/dashboard/presentation/components/organisms/a
 import 'package:hrportalv2/modules/dashboard/presentation/components/organisms/dashboard_calendar_card.dart';
 import 'package:hrportalv2/modules/dashboard/presentation/components/organisms/attendance_stats_section.dart';
 import 'package:hrportalv2/modules/dashboard/presentation/components/organisms/leave_summary_section.dart';
+import 'package:hrportalv2/modules/dashboard/presentation/components/organisms/questionnaire_section.dart';
 import 'package:hrportalv2/modules/dashboard/presentation/components/organisms/quick_menu_section.dart';
-import 'package:hrportalv2/modules/dashboard/presentation/components/organisms/recent_activities_section.dart';
 
 class CalendarItem {
   final String nidn;
@@ -63,7 +61,28 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   DateTime _selectedCalendarDay = DateTime.now();
-  final Map<String, CalendarItem> _calendarEvents = {};
+  final Map<String, List<CalendarItem>> _calendarEvents = {};
+
+  CalendarItem? _getPriorityEvent(String key) {
+    final list = _calendarEvents[key];
+    if (list == null || list.isEmpty) return null;
+
+    // 1. Absen has the highest priority
+    for (var ev in list) {
+      if (ev.type.toLowerCase() == "absen") return ev;
+    }
+
+    // 2. Approved events have the second highest priority (disetujui/acc/terima sdm)
+    for (var ev in list) {
+      final statusLower = ev.status.toLowerCase();
+      if (statusLower == "acc" || statusLower == "disetujui" || statusLower == "terima sdm") {
+        return ev;
+      }
+    }
+
+    // 3. Otherwise return the first event (e.g. pending ones)
+    return list.first;
+  }
 
   @override
   void initState() {
@@ -110,7 +129,7 @@ class _DashboardPageState extends State<DashboardPage> {
             final tanggal = item['tanggal'] as String? ?? '';
             if (tanggal.isNotEmpty) {
               final cleanKey = tanggal.split('T')[0];
-              _calendarEvents[cleanKey] = CalendarItem.fromJson(item);
+              _calendarEvents.putIfAbsent(cleanKey, () => []).add(CalendarItem.fromJson(item));
             }
           }
         }
@@ -243,51 +262,6 @@ class _DashboardPageState extends State<DashboardPage> {
     final leaveBloc = Provider.of<LeaveBloc>(context);
 
     final background = Theme.of(context).colorScheme.surface;
-    final List<ActivityItemData> recentActivities = [];
-
-    for (var act in attendanceBloc.activities) {
-      if (act.title.toLowerCase().contains("absen masuk") && act.isSuccess) {
-        recentActivities.add(ActivityItemData(
-          title: act.title,
-          time: act.time,
-          isSuccess: true,
-          date: _parseActivityTime(act.time),
-        ));
-      }
-    }
-
-    for (var upacara in attendanceBloc.ceremonyAttendances) {
-      final date = DateTime.tryParse(upacara.tanggal) ?? DateTime.now();
-      recentActivities.add(ActivityItemData(
-        title: "Presensi Upacara Berhasil",
-        time: "${upacara.tanggal} • 07:00 AM",
-        isSuccess: true,
-        date: date,
-      ));
-    }
-
-    for (var req in leaveBloc.leaves) {
-      final statusLower = req.status.toLowerCase();
-      if (statusLower == "acc" ||
-          statusLower == "disetujui" ||
-          statusLower.contains("acc")) {
-        String titlePrefix = "Cuti";
-        if (req.type.toLowerCase().contains("izin")) {
-          titlePrefix = "Izin";
-        } else if (req.type.toLowerCase().contains("sppd")) {
-          titlePrefix = "SPPD";
-        }
-        recentActivities.add(ActivityItemData(
-          title: "$titlePrefix Disetujui (${req.type})",
-          time: req.dateRange,
-          isSuccess: true,
-          date: req.startDate,
-        ));
-      }
-    }
-
-    recentActivities.sort((a, b) => b.date.compareTo(a.date));
-    final displayActivities = recentActivities.take(5).toList();
     return Scaffold(
       backgroundColor: background,
       body: SafeArea(
@@ -333,18 +307,22 @@ class _DashboardPageState extends State<DashboardPage> {
                     }
                   },
                 ),
-                if (attendanceBloc.isUpacaraEligible() ||
-                    attendanceBloc.isUpacaraCheckedIn) ...[
-                  const SizedBox(height: 16),
-                  FlagCeremonyCard(
-                    isUpacaraCheckedIn: attendanceBloc.isUpacaraCheckedIn,
-                    upacaraTime: attendanceBloc.upacaraTime,
-                    onVerifyTap: () {
-                      attendanceBloc.isUpacaraCheckInIntent = true;
-                      attendanceBloc.setTabIndex(1);
-                    },
-                  ),
-                ],
+                const SizedBox(height: 16),
+                Builder(
+                  builder: (context) {
+                    final now = DateTime.now();
+                    final isButtonEnabled = now.day == 17 && now.hour == 8;
+                    return FlagCeremonyCard(
+                      isUpacaraCheckedIn: attendanceBloc.isUpacaraCheckedIn,
+                      upacaraTime: attendanceBloc.upacaraTime,
+                      isButtonEnabled: isButtonEnabled,
+                      onVerifyTap: () {
+                        attendanceBloc.isUpacaraCheckInIntent = true;
+                        attendanceBloc.setTabIndex(1);
+                      },
+                    );
+                  },
+                ),
                 const SizedBox(height: 16),
                 AutoCheckInStatusCard(
                   isCheckedIn: attendanceBloc.isCheckedIn,
@@ -355,6 +333,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   realLongitude: attendanceBloc.realLongitude,
                   onManualCheckInTap: () => attendanceBloc.setTabIndex(1),
                 ),
+                const SizedBox(height: 24),
+                const QuestionnaireSection(),
                 const SizedBox(height: 24),
                 DashboardCalendarCard(
                   selectedCalendarDay: _selectedCalendarDay,
@@ -491,25 +471,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                RecentActivitiesSection(
-                  onSeeAllTap: () => attendanceBloc.setTabIndex(2),
-                  activitiesList: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: displayActivities.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final act = displayActivities[index];
-                      return ActivityItemRow(
-                        title: act.title,
-                        time: act.time,
-                        isSuccess: act.isSuccess,
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -522,7 +483,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (isFaded) return const SizedBox.shrink();
 
     final key = "${day.year}-${_twoDigits(day.month)}-${_twoDigits(day.day)}";
-    final event = _calendarEvents[key];
+    final event = _getPriorityEvent(key);
 
     Color dotColor = Colors.transparent;
     if (event != null) {
@@ -555,7 +516,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Color _getCalendarDayStatusColor(DateTime day, AttendanceBloc appState) {
     final key = "${day.year}-${_twoDigits(day.month)}-${_twoDigits(day.day)}";
-    final event = _calendarEvents[key];
+    final event = _getPriorityEvent(key);
 
     if (event != null) {
       final type = event.type.toLowerCase();
@@ -583,7 +544,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String _getCalendarDayStatus(DateTime day, AttendanceBloc appState) {
     final key = "${day.year}-${_twoDigits(day.month)}-${_twoDigits(day.day)}";
-    final event = _calendarEvents[key];
+    final event = _getPriorityEvent(key);
 
     if (event != null) {
       final type = event.type.toLowerCase();
@@ -611,7 +572,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   String _getCalendarDayTimes(DateTime day, AttendanceBloc appState) {
     final key = "${day.year}-${_twoDigits(day.month)}-${_twoDigits(day.day)}";
-    final event = _calendarEvents[key];
+    final event = _getPriorityEvent(key);
 
     if (event != null) {
       if (event.type.toLowerCase() == "absen" &&
@@ -696,30 +657,4 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
-
-  DateTime _parseActivityTime(String timeStr) {
-    final parts = timeStr.split(' • ');
-    if (parts.isNotEmpty) {
-      final dateStr = parts[0];
-      if (dateStr == "Hari ini" || dateStr.startsWith("Hari")) {
-        return DateTime.now();
-      }
-      return DateTime.tryParse(dateStr) ?? DateTime.now();
-    }
-    return DateTime.now();
-  }
-}
-
-class ActivityItemData {
-  final String title;
-  final String time;
-  final bool isSuccess;
-  final DateTime date;
-
-  ActivityItemData({
-    required this.title,
-    required this.time,
-    required this.isSuccess,
-    required this.date,
-  });
 }

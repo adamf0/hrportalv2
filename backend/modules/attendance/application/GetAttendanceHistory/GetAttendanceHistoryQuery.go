@@ -8,10 +8,8 @@ import (
 )
 
 type GetAttendanceHistoryQuery struct {
-	Nidn     string
-	Nip      string
-	Page     int
-	PageSize int
+	Nidn string
+	Nip  string
 }
 
 type GetAttendanceHistoryQueryHandler struct {
@@ -22,10 +20,10 @@ func NewGetAttendanceHistoryQueryHandler(attendanceRepo domain.IAttendanceReposi
 	return &GetAttendanceHistoryQueryHandler{attendanceRepo: attendanceRepo}
 }
 
-func (h *GetAttendanceHistoryQueryHandler) Handle(ctx context.Context, query *GetAttendanceHistoryQuery) (common.ResultValue[common.Paged[domain.Absen]], error) {
-	paged, err := h.attendanceRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.Page, query.PageSize)
+func (h *GetAttendanceHistoryQueryHandler) Handle(ctx context.Context, query *GetAttendanceHistoryQuery) (common.ResultValue[[]domain.Absen], error) {
+	list, err := h.attendanceRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn)
 	if err != nil {
-		return common.FailureValue[common.Paged[domain.Absen]](domain.AttendanceNotFound()), err
+		return common.FailureValue[[]domain.Absen](domain.AttendanceNotFound()), err
 	}
-	return common.SuccessValue(paged), nil
+	return common.SuccessValue(list), nil
 }

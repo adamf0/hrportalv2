@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"sync"
+	"time"
 
 	attendanceDomain "hrportal_backend/modules/attendance/domain"
 	"hrportal_backend/modules/calendar/domain"
@@ -126,10 +127,14 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 		if a.CatatanTelat != nil && *a.CatatanTelat != "" {
 			note = *a.CatatanTelat
 		}
+		dateStr := a.Tanggal
+		if t, err := parseDateString(dateStr); err == nil {
+			dateStr = t.Format("2006-01-02")
+		}
 		results = append(results, domain.CalendarItem{
 			Nip:     a.Nip,
 			Nidn:    a.Nidn,
-			Tanggal: a.Tanggal,
+			Tanggal: dateStr,
 			Type:    "absen",
 			Catatan: note,
 			Status:  "acc",
@@ -138,39 +143,88 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 
 	// Map Izins
 	for _, i := range izins {
+		dateStr := i.TanggalPengajuan
+		if t, err := parseDateString(dateStr); err == nil {
+			dateStr = t.Format("2006-01-02")
+		}
 		results = append(results, domain.CalendarItem{
 			Nip:     i.Nip,
 			Nidn:    i.Nidn,
-			Tanggal: i.TanggalPengajuan,
+			Tanggal: dateStr,
 			Type:    "izin",
 			Catatan: i.Tujuan,
 			Status:  i.Status,
 		})
 	}
 
-	// Map Cutis
+	// Map Cutis (Flatten Date Range)
 	for _, c := range cutis {
-		results = append(results, domain.CalendarItem{
-			Nip:     c.Nip,
-			Nidn:    c.Nidn,
-			Tanggal: c.TanggalMulai,
-			Type:    "cuti",
-			Catatan: c.Alasan,
-			Status:  c.Status,
-		})
+		dates := getDatesInRange(c.TanggalMulai, c.TanggalSelesai)
+		for _, date := range dates {
+			results = append(results, domain.CalendarItem{
+				Nip:     c.Nip,
+				Nidn:    c.Nidn,
+				Tanggal: date,
+				Type:    "cuti",
+				Catatan: c.Alasan,
+				Status:  c.Status,
+			})
+		}
 	}
 
-	// Map Sppds
+	// Map Sppds (Flatten Date Range)
 	for _, s := range sppds {
-		results = append(results, domain.CalendarItem{
-			Nip:     s.Nip,
-			Nidn:    s.Nidn,
-			Tanggal: s.TanggalBerangkat,
-			Type:    "sppd",
-			Catatan: s.Keterangan,
-			Status:  s.Status,
-		})
+		dates := getDatesInRange(s.TanggalBerangkat, s.TanggalKembali)
+		for _, date := range dates {
+			results = append(results, domain.CalendarItem{
+				Nip:     s.Nip,
+				Nidn:    s.Nidn,
+				Tanggal: date,
+				Type:    "sppd",
+				Catatan: s.Keterangan,
+				Status:  s.Status,
+			})
+		}
 	}
 
 	return results, nil
+}
+
+func parseDateString(s string) (time.Time, error) {
+	// Try parsing RFC3339/ISO
+	t, err := time.Parse(time.RFC3339, s)
+	if err == nil {
+		return t, nil
+	}
+	// Try parsing YYYY-MM-DD
+	t, err = time.Parse("2006-01-02", s)
+	if err == nil {
+		return t, nil
+	}
+	return time.Time{}, err
+}
+
+func getDatesInRange(startStr, endStr string) []string {
+	start, err := parseDateString(startStr)
+	if err != nil {
+		return []string{startStr}
+	}
+	end, err := parseDateString(endStr)
+	if err != nil {
+		return []string{startStr}
+	}
+
+	if start.After(end) {
+		start, end = end, start
+	}
+
+	// Normalize to local date boundaries
+	start = time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, time.Local)
+	end = time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, time.Local)
+
+	var dates []string
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		dates = append(dates, d.Format("2006-01-02"))
+	}
+	return dates
 }

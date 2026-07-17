@@ -52,13 +52,16 @@ I have completed the requested changes for both the Go backend and Flutter appli
   - **Swipe Refresh integration**: Wrapped `LeaveListPage` inside a `RefreshIndicator` and ensured all layout states are scrollable using `AlwaysScrollableScrollPhysics` so pulling down to refresh refreshes the list instantly under any condition.
   - **Double Spinner UX Fix**: Added `isRefresh` optional parameter to `fetchLeaves()` inside `LeaveBloc` to skip setting `_isLoading = true` when refreshing. This prevents showing the center `CircularProgressIndicator` and the `RefreshIndicator` spinner simultaneously.
 - **Simplification of API Request Parameters**:
-  - **Query Parameters Simplification**: Refactored the GET endpoints for `Cuti` (`/api/leave`), `Izin` (`/api/izin`), and `SPPD` (`/api/sppd/history`) to read `nip` and `nidn` directly from `c.FormValue` instead of checking `c.Query` first.
-  - **Cuti Pagination Removal**: Refactored the `GetAllCutiQuery` and `ILeaveRepository.GetHistoryByNip` signature to completely remove pagination parameters. The `/api/leave` API now returns a flat JSON slice of `[]domain.Cuti` instead of paginated metadata.
-  - **Flutter Client Sync**: Updated the Dart `leave_repository.dart` implementation to parse `cutiData` directly as a `List` rather than navigating inside a nested `data` envelope, matching the updated backend schema.
+  - **Query Parameters Simplification**: Refactored the GET endpoints for `Cuti` (`/api/leave`), `Izin` (`/api/izin`), `SPPD` (`/api/sppd/history`), and `Attendance History` (`/api/attendance/history`) to read `nip` and `nidn` directly from `c.FormValue` instead of checking `c.Query` first.
+  - **Cuti & Attendance Pagination Removal**: Refactored `GetAllCutiQuery` and `GetAttendanceHistoryQuery` signatures and underlying repositories to completely remove pagination parameters. The `/api/leave` and `/api/attendance/history` APIs now return flat JSON slices of `[]domain.Cuti` and `[]domain.Absen` instead of paginated metadata envelopes.
+  - **Flutter Client Sync**: Updated Dart repositories (`leave_repository.dart` and `attendance_repository.dart`) to request URLs without page parameters and parse responses directly as flat Lists.
 - **Support for Keycloak RS512 / RS256 Tokens in Middleware**:
   - **Asymmetric Signature Fallback**: Updated `parseJWT` in Go backend's [Middleware.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/common/presentation/Middleware.go#L361) to support both symmetric HMAC (`HS256`) local tokens and Keycloak's asymmetric RSA (`RS512`/`RS256`) tokens. If HMAC validation fails, it falls back to parsing the JWT unverified (`ParseUnverified`) to read the OpenID Connect claims.
   - **OIDC Claims Mapping**: Refactored `injectRequestValues` in [Middleware.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/common/presentation/Middleware.go#L395) to intercept tokens from Keycloak (checking the `iss` claim). It automatically maps `employeeid` as `sid` (NIP/NIDN) and dynamically resolves the `source` based on the user's `group` (setting `"simak"` if the user is in the `"Dosen"` group, otherwise defaulting to `"simpeg"` for `"Tendik"`).
   - **Rejection of Incomplete OIDC Tokens**: Configured the middleware to enforce the presence of the `employeeid` claim on Keycloak OIDC tokens. If the claim is missing or empty, the middleware rejects the request immediately by returning an HTTP 400 Bad Request error.
+- **Calendar Parameter Enforcement**:
+  - **Strict FormValue extraction**: Updated the calendar presentation endpoints in [Http.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/calendar/presentation/Http.go#L17-L56) to read `nip` and `nidn` directly and strictly from `c.FormValue` instead of allowing query fallbacks, complying with backend design guidelines.
+
 
 
 

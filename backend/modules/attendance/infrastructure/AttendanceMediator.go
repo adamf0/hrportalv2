@@ -29,7 +29,7 @@ func RegisterModuleAttendance(db *gorm.DB) error {
 	}
 
 	historyHandler := GetAttendanceHistory.NewGetAttendanceHistoryQueryHandler(repo)
-	err = mediatr.RegisterRequestHandler[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[common.Paged[domain.Absen]]](historyHandler)
+	err = mediatr.RegisterRequestHandler[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](historyHandler)
 	if err != nil {
 		return err
 	}

@@ -80,25 +80,12 @@ func ModuleAttendance(app *fiber.App) {
 	})
 
 	group.Get("/history", func(c *fiber.Ctx) error {
-		nidn := c.Query("nidn")
-		if nidn == "" {
-			nidn = c.FormValue("nidn")
-		}
-		nip := c.Query("nip")
-		if nip == "" {
-			nip = c.FormValue("nip")
-		}
-		page, _ := strconv.Atoi(c.Query("page", "1"))
-		pageSize, _ := strconv.Atoi(c.Query("page_size", "10"))
-
 		query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
-			Nidn:     nidn,
-			Nip:      nip,
-			Page:     page,
-			PageSize: pageSize,
+			Nidn: c.FormValue("nidn"),
+			Nip:  c.FormValue("nip"),
 		}
 
-		res, err := mediatr.Send[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[common.Paged[domain.Absen]]](c.UserContext(), query)
+		res, err := mediatr.Send[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](c.UserContext(), query)
 		if err != nil {
 			return infrastructure.HandleError(c, err)
 		}

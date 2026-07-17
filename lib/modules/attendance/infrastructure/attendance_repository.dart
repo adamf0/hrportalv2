@@ -89,15 +89,13 @@ class AttendanceRepository implements IAttendanceRepository {
     try {
       final responseData = await ApiClient.get(
         Uri.parse(
-            "${ApiClient.baseUrl}/api/attendance/history?&page=1&page_size=50"),
+            "${ApiClient.baseUrl}/api/attendance/history"),
       );
 
-      if (responseData is Map<String, dynamic> &&
-          responseData['data'] != null) {
-        final items = responseData['data'] as List;
+      if (responseData is List) {
         final List<ActivityLogItem> activities = [];
 
-        for (var json in items) {
+        for (var json in responseData) {
           final tanggalStr = json['tanggal'] as String? ?? '';
           final masukStr = json['absen_masuk'] as String?;
           final keluarStr = json['absen_keluar'] as String?;
