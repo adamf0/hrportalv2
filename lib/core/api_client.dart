@@ -1,0 +1,276 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'app_theme.dart';
+import 'sso_helper.dart';
+
+/// Exception object for API errors
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final dynamic body;
+
+  ApiException(this.message, {this.statusCode, this.body});
+
+  @override
+  String toString() => message;
+}
+
+/// Robust API Client handling:
+/// - Status 200, 204, 304: SUCCESS (Parses and extracts JSON data)
+/// - Non 200/204/304 Statuses: Checks if JSON -> Extracts `message` field, else uses common error
+/// - Catches network/timeout/unpredicted exceptions -> Logs full details & displays Toast/SnackBar
+class ApiClient {
+  static const String _defaultCommonError = 'Terjadi kesalahan pada server.';
+
+  static String get baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:3000';
+    }
+    try {
+      if (Platform.isAndroid) {
+        return 'http://10.0.2.2:3000';
+      }
+    } catch (_) {}
+    return 'http://localhost:3000';
+  }
+
+  /// Global key for displaying Toast/SnackBar for API notifications
+  static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
+
+  /// Display a Toast SnackBar for API errors
+  static void showToast(String message) {
+    debugPrint('[API Toast Notification]: $message');
+    scaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppTheme.error,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  /// Process HTTP Response according to status rules
+  static dynamic processResponse(http.Response response) {
+    final statusCode = response.statusCode;
+    debugPrint('[API Log Response] Status: $statusCode | URL: ${response.request?.url} | Body: ${response.body}');
+
+    // Status 200, 204, 304 = Success
+    if (statusCode == 200 || statusCode == 204 || statusCode == 304) {
+      if (response.body.isEmpty || statusCode == 204) {
+        return <String, dynamic>{};
+      }
+      try {
+        return json.decode(response.body);
+      } catch (e, stackTrace) {
+        const errorMsg = 'Format data dari server tidak valid.';
+        debugPrint('[API Error Log] Failed to parse JSON response on success status ($statusCode): $e\n$stackTrace');
+        showToast(errorMsg);
+        throw ApiException(errorMsg, statusCode: statusCode, body: response.body);
+      }
+    }
+
+    // Status other than 200, 204, 304 -> Error Handling
+    String errorMessage = '$_defaultCommonError (Status HTTP: $statusCode)';
+    dynamic jsonBody;
+
+    try {
+      jsonBody = json.decode(response.body);
+      if (jsonBody is Map<String, dynamic>) {
+        if (jsonBody.containsKey('message') && jsonBody['message'] != null && jsonBody['message'].toString().isNotEmpty) {
+          errorMessage = jsonBody['message'].toString();
+        } else if (jsonBody.containsKey('msg') && jsonBody['msg'] != null && jsonBody['msg'].toString().isNotEmpty) {
+          errorMessage = jsonBody['msg'].toString();
+        } else if (jsonBody.containsKey('error') && jsonBody['error'] != null && jsonBody['error'].toString().isNotEmpty) {
+          errorMessage = jsonBody['error'].toString();
+        }
+      }
+    } catch (_) {
+      debugPrint('[API Error Log] Non-JSON error body on status $statusCode: ${response.body}');
+    }
+
+    debugPrint('[API Error Log] Status $statusCode Exception: $errorMessage');
+    showToast(errorMessage);
+    throw ApiException(errorMessage, statusCode: statusCode, body: jsonBody ?? response.body);
+  }
+
+  static Future<Map<String, String>> _injectAuthHeaders(Map<String, String>? headers) async {
+    final Map<String, String> finalHeaders = headers != null ? Map.from(headers) : {};
+    try {
+      final session = await SsoHelper.getSession();
+      if (session != null && session['token'] != null) {
+        final token = session['token'] as String;
+        if (token.isNotEmpty && !finalHeaders.containsKey('Authorization')) {
+          finalHeaders['Authorization'] = 'Bearer $token';
+        }
+      }
+    } catch (_) {}
+    return finalHeaders;
+  }
+
+  /// Perform POST request
+  static Future<dynamic> post(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final injectedHeaders = await _injectAuthHeaders(headers);
+    debugPrint('[API Loading State Log] Request: POST $url | State: START');
+    debugPrint('[API Request Log] POST $url | Headers: $injectedHeaders | Body: $body');
+    try {
+      final response = await http.post(
+        url,
+        headers: injectedHeaders,
+        body: body,
+      ).timeout(timeout);
+
+      debugPrint('[API Loading State Log] Request: POST $url | State: END');
+      return processResponse(response);
+    } on SocketException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST $url | State: END (SocketException)');
+      const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
+      debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on TimeoutException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST $url | State: END (TimeoutException)');
+      const msg = 'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
+      debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on FormatException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST $url | State: END (FormatException)');
+      const msg = 'Format data dari server mengalami kesalahan.';
+      debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST $url | State: END (Exception)');
+      if (e is ApiException) rethrow;
+      final msg = 'Terjadi kesalahan tidak terduga: $e';
+      debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    }
+  }
+
+  /// Perform Multipart POST request
+  static Future<dynamic> postMultipart(
+    Uri url, {
+    Map<String, String>? headers,
+    required Map<String, String> fields,
+    String? fileFieldName,
+    String? filePath,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    final injectedHeaders = await _injectAuthHeaders(headers);
+    debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: START');
+    debugPrint('[API Request Log] POST MULTIPART $url | Headers: $injectedHeaders | Fields: $fields | File: $filePath ($fileFieldName)');
+    try {
+      final request = http.MultipartRequest('POST', url);
+      request.headers.addAll(injectedHeaders);
+      request.fields.addAll(fields);
+
+      if (fileFieldName != null && filePath != null && filePath.isNotEmpty) {
+        final file = File(filePath);
+        if (await file.exists()) {
+          request.files.add(await http.MultipartFile.fromPath(fileFieldName, filePath));
+        }
+      }
+
+      final streamedResponse = await request.send().timeout(timeout);
+      final response = await http.Response.fromStream(streamedResponse);
+
+      debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END');
+      return processResponse(response);
+    } on SocketException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (SocketException)');
+      const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
+      debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on TimeoutException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (TimeoutException)');
+      const msg = 'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
+      debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on FormatException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (FormatException)');
+      const msg = 'Format data dari server mengalami kesalahan.';
+      debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (Exception)');
+      if (e is ApiException) rethrow;
+      final msg = 'Terjadi kesalahan tidak terduga: $e';
+      debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    }
+  }
+
+  /// Perform GET request
+  static Future<dynamic> get(
+    Uri url, {
+    Map<String, String>? headers,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    final injectedHeaders = await _injectAuthHeaders(headers);
+    debugPrint('[API Loading State Log] Request: GET $url | State: START');
+    debugPrint('[API Request Log] GET $url | Headers: $injectedHeaders');
+    try {
+      final response = await http.get(
+        url,
+        headers: injectedHeaders,
+      ).timeout(timeout);
+
+      debugPrint('[API Loading State Log] Request: GET $url | State: END');
+      return processResponse(response);
+    } on SocketException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: GET $url | State: END (SocketException)');
+      const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
+      debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on TimeoutException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: GET $url | State: END (TimeoutException)');
+      const msg = 'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
+      debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on FormatException catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: GET $url | State: END (FormatException)');
+      const msg = 'Format data dari server mengalami kesalahan.';
+      debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } catch (e, stackTrace) {
+      debugPrint('[API Loading State Log] Request: GET $url | State: END (Exception)');
+      if (e is ApiException) rethrow;
+      final msg = 'Terjadi kesalahan tidak terduga: $e';
+      debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    }
+  }
+}

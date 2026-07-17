@@ -31,8 +31,10 @@ class PolygonValidationStrategy implements LocationValidationStrategy {
   @override
   bool isWithinCampus(double latitude, double longitude) {
     // Check if coordinates are inside Polygon 1 or Polygon 2
-    final inPoly1 = LocationWifiHelper.isPointInPolygon(latitude, longitude, LocationWifiHelper.polygon1);
-    final inPoly2 = LocationWifiHelper.isPointInPolygon(latitude, longitude, LocationWifiHelper.polygon2);
+    final inPoly1 = LocationWifiHelper.isPointInPolygon(
+        latitude, longitude, LocationWifiHelper.polygon1);
+    final inPoly2 = LocationWifiHelper.isPointInPolygon(
+        latitude, longitude, LocationWifiHelper.polygon2);
     return inPoly1 || inPoly2;
   }
 }
@@ -83,7 +85,8 @@ class LocationWifiHelper {
   ];
 
   // Point in Polygon algorithm (Ray-Casting)
-  static bool isPointInPolygon(double lat, double lon, List<List<double>> polygon) {
+  static bool isPointInPolygon(
+      double lat, double lon, List<List<double>> polygon) {
     bool inside = false;
     int j = polygon.length - 1;
     for (int i = 0; i < polygon.length; i++) {
@@ -102,7 +105,8 @@ class LocationWifiHelper {
 
   // Indonesian National Holidays Checklist (Sundays & Mapped Holidays for 2025/2026/2027)
   static bool isIndonesianHoliday(DateTime date) {
-    if (date.weekday == DateTime.sunday || date.weekday == DateTime.saturday) return true;
+    if (date.weekday == DateTime.sunday || date.weekday == DateTime.saturday)
+      return true;
 
     final year = date.year;
     final month = date.month;
@@ -115,18 +119,19 @@ class LocationWifiHelper {
     if (month == 8 && day == 17) return true; // Kemerdekaan RI
     if (month == 12 && day == 25) return true; // Natal
 
-    final holidayKey = "$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
+    final holidayKey =
+        "$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
     const Set<String> holidays = {
       // 2025 Mapped Holidays
       "2025-01-29", "2025-01-27", "2025-03-29", "2025-03-31", "2025-04-01",
       "2025-04-18", "2025-05-12", "2025-05-29", "2025-06-06", "2025-06-27",
       "2025-09-05",
-      
+
       // 2026 Mapped Holidays
       "2026-02-17", "2026-02-15", "2026-03-19", "2026-03-20", "2026-03-21",
       "2026-04-03", "2026-05-14", "2026-05-27", "2026-05-31", "2026-06-16",
       "2026-08-25",
-      
+
       // 2027 Mapped Holidays
       "2027-02-06", "2027-02-04", "2027-03-09", "2027-03-10",
       "2027-03-26", "2027-05-06", "2027-05-16", "2027-05-20", "2027-06-06",
@@ -143,13 +148,16 @@ class LocationWifiHelper {
   }
 
   // Calculate distance in meters using Haversine formula
-  static double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  static double calculateDistance(
+      double lat1, double lon1, double lat2, double lon2) {
     const double r = 6371000; // Earth radius in meters
     final double dLat = _toRadians(lat2 - lat1);
     final double dLon = _toRadians(lon2 - lon1);
     final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRadians(lat1)) * cos(_toRadians(lat2)) *
-        sin(dLon / 2) * sin(dLon / 2);
+        cos(_toRadians(lat1)) *
+            cos(_toRadians(lat2)) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return r * c;
   }
@@ -167,7 +175,9 @@ class LocationWifiHelper {
       final interfaces = await NetworkInterface.list();
       for (var interface in interfaces) {
         final name = interface.name.toLowerCase();
-        if (name.contains('wlan') || name.contains('en') || name.contains('wifi')) {
+        if (name.contains('wlan') ||
+            name.contains('en') ||
+            name.contains('wifi')) {
           for (var addr in interface.addresses) {
             if (!addr.isLoopback) {
               return addr.address;
@@ -191,9 +201,12 @@ class LocationWifiHelper {
     if (_isFetchingPublicIp) return;
     _isFetchingPublicIp = true;
 
-    http.get(Uri.parse('https://api.ipify.org')).timeout(
-      const Duration(seconds: 2),
-    ).then((response) {
+    http
+        .get(Uri.parse('https://api.ipify.org'))
+        .timeout(
+          const Duration(seconds: 2),
+        )
+        .then((response) {
       _isFetchingPublicIp = false;
       if (response.statusCode == 200) {
         _cachedPublicIp = response.body.trim();
@@ -206,9 +219,10 @@ class LocationWifiHelper {
   // Awaits the public IP check with a short timeout
   static Future<String> getPublicIpWithTimeoutFallback() async {
     try {
-      final response = await http.get(Uri.parse('https://api.ipify.org')).timeout(
-        const Duration(milliseconds: 1500),
-      );
+      final response =
+          await http.get(Uri.parse('https://api.ipify.org')).timeout(
+                const Duration(milliseconds: 1500),
+              );
       if (response.statusCode == 200) {
         final ip = response.body.trim();
         _cachedPublicIp = ip;
@@ -246,7 +260,7 @@ class LocationWifiHelper {
           return null;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         await Geolocator.openAppSettings();
         return null;

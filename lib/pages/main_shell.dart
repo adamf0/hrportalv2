@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../state/app_state.dart';
+import 'package:hrportalv2/core/app_theme.dart';
+import '../modules/attendance/presentation/attendance_bloc.dart';
 import '../core/responsive_helper.dart';
-import 'dashboard_page.dart';
-import 'attendance_page.dart';
-import 'leave_list_page.dart';
-import 'salary_slip_page.dart';
+import '../modules/dashboard/presentation/pages/dashboard_page.dart';
+import '../modules/attendance/presentation/components/pages/attendance_page.dart';
+import '../modules/leave/presentation/components/pages/leave_list_page.dart';
+import '../modules/payroll/presentation/components/pages/salary_slip_page.dart';
 
 class MainShell extends StatelessWidget {
   const MainShell({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context);
+    final attendanceBloc = Provider.of<AttendanceBloc>(context);
     
-    // Pages corresponding to bottom nav
     final List<Widget> pages = [
       const DashboardPage(),
       const AttendancePage(),
@@ -23,11 +23,10 @@ class MainShell extends StatelessWidget {
       const SalarySlipPage(),
     ];
 
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FB),
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: IndexedStack(
-        index: appState.currentTabIndex,
+        index: attendanceBloc.currentTabIndex,
         children: pages,
       ),
       bottomNavigationBar: Container(
@@ -55,28 +54,28 @@ class MainShell extends StatelessWidget {
                 index: 0,
                 icon: Icons.dashboard,
                 label: 'Home',
-                appState: appState,
+                attendanceBloc: attendanceBloc,
               ),
               _buildBottomNavItem(
                 context,
                 index: 1,
                 icon: Icons.face_retouching_natural,
                 label: 'Attendance',
-                appState: appState,
+                attendanceBloc: attendanceBloc,
               ),
               _buildBottomNavItem(
                 context,
                 index: 2,
                 icon: Icons.assignment_outlined,
                 label: 'Requests',
-                appState: appState,
+                attendanceBloc: attendanceBloc,
               ),
               _buildBottomNavItem(
                 context,
                 index: 3,
                 icon: Icons.payments_outlined,
                 label: 'Payroll',
-                appState: appState,
+                attendanceBloc: attendanceBloc,
               ),
             ],
           ),
@@ -90,20 +89,22 @@ class MainShell extends StatelessWidget {
     required int index,
     required IconData icon,
     required String label,
-    required AppState appState,
+    required AttendanceBloc attendanceBloc,
   }) {
-    final isSelected = appState.currentTabIndex == index;
+    final isSelected = attendanceBloc.currentTabIndex == index;
     final bool isWatch = context.isWatch;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final secondaryColor = Theme.of(context).colorScheme.secondary;
     
     if (isWatch) {
       return GestureDetector(
-        onTap: () => appState.setTabIndex(index),
+        onTap: () => attendanceBloc.setTabIndex(index),
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Icon(
             icon,
-            color: isSelected ? const Color(0xFF003D9B) : const Color(0xFF535F73),
+            color: isSelected ? primaryColor : secondaryColor,
             size: 20,
           ),
         ),
@@ -111,13 +112,13 @@ class MainShell extends StatelessWidget {
     }
     
     return GestureDetector(
-      onTap: () => appState.setTabIndex(index),
+      onTap: () => attendanceBloc.setTabIndex(index),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFD7E3FB) : Colors.transparent, // Capsule background
+          color: isSelected ? AppTheme.infoContainer : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -125,7 +126,7 @@ class MainShell extends StatelessWidget {
           children: [
             Icon(
               icon,
-              color: isSelected ? const Color(0xFF101C2D) : const Color(0xFF535F73),
+              color: isSelected ? primaryColor : secondaryColor,
               size: 20,
             ),
             if (isSelected) ...[
@@ -135,7 +136,7 @@ class MainShell extends StatelessWidget {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: const Color(0xFF101C2D),
+                  color: primaryColor,
                 ),
               ),
             ],

@@ -176,6 +176,50 @@ class SsoHelper {
       return {};
     }
   }
+
+  static Future<void> saveSession({
+    required String token,
+    required String name,
+    required String nip,
+    required String email,
+    required String role,
+    required List<String> groups,
+  }) async {
+    await LocalStorageMobile.write('token', token);
+    await LocalStorageMobile.write('name', name);
+    await LocalStorageMobile.write('nip', nip);
+    await LocalStorageMobile.write('email', email);
+    await LocalStorageMobile.write('role', role);
+    await LocalStorageMobile.write('groups', jsonEncode(groups));
+  }
+
+  static Future<Map<String, dynamic>?> getSession() async {
+    final token = await LocalStorageMobile.read('token');
+    if (token == null) return null;
+    final name = await LocalStorageMobile.read('name') ?? '';
+    final nip = await LocalStorageMobile.read('nip') ?? '';
+    final email = await LocalStorageMobile.read('email') ?? '';
+    final role = await LocalStorageMobile.read('role') ?? '';
+    final groupsRaw = await LocalStorageMobile.read('groups');
+    List<String> groups = [];
+    if (groupsRaw != null) {
+      try {
+        groups = (jsonDecode(groupsRaw) as List).map((e) => e.toString()).toList();
+      } catch (_) {}
+    }
+    return {
+      'token': token,
+      'name': name,
+      'nip': nip,
+      'email': email,
+      'role': role,
+      'groups': groups,
+    };
+  }
+
+  static Future<void> clearSession() async {
+    await LocalStorageMobile.clear();
+  }
 }
 
 class LocalStorageMobile {

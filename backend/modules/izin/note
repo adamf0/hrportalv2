@@ -1,0 +1,3 @@
++ banksoal kurang peruntukan buat siapa (tendik, dosen, mahasiswa, fakultas, prodi, tendik) ->  sudah dipakai dari createdbyref, siapa yg buat situlah radius targetnya (admin = global, fakultas = spesifik fakultas, prodi = spesifik prodi)
++ change status (draf, active) 
+pemindahan tanggal aktif ke tabel lain

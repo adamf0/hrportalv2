@@ -1,0 +1,50 @@
+package infrastructure
+
+import (
+	common "hrportal_backend/common/domain"
+	"hrportal_backend/modules/report/application/CalculateReport"
+	"hrportal_backend/modules/report/application/GetAllLaporanAbsen"
+	"hrportal_backend/modules/report/application/GetSummaryReport"
+	"hrportal_backend/modules/report/application/StreamLaporanAbsen"
+	"hrportal_backend/modules/report/domain"
+
+	"github.com/mehdihadeli/go-mediatr"
+	"gorm.io/gorm"
+)
+
+var globalReportRepo domain.IReportRepository
+
+func GetReportRepository() domain.IReportRepository {
+	return globalReportRepo
+}
+
+func RegisterModuleReport(db *gorm.DB) error {
+	repo := NewReportRepository(db)
+	globalReportRepo = repo
+
+	allLaporanHandler := GetAllLaporanAbsen.NewGetAllLaporanAbsenQueryHandler(repo)
+	err := mediatr.RegisterRequestHandler[*GetAllLaporanAbsen.GetAllLaporanAbsenQuery, common.ResultValue[map[string]interface{}]](allLaporanHandler)
+	if err != nil {
+		return err
+	}
+
+	summaryHandler := GetSummaryReport.NewGetSummaryReportQueryHandler(repo)
+	err = mediatr.RegisterRequestHandler[*GetSummaryReport.GetSummaryReportQuery, common.ResultValue[*domain.RekapLaporanBulanan]](summaryHandler)
+	if err != nil {
+		return err
+	}
+
+	streamHandler := StreamLaporanAbsen.NewStreamLaporanAbsenQueryHandler(repo)
+	err = mediatr.RegisterRequestHandler[*StreamLaporanAbsen.StreamLaporanAbsenQuery, common.ResultValue[[]domain.FlatRecordItem]](streamHandler)
+	if err != nil {
+		return err
+	}
+
+	calculateHandler := CalculateReport.NewCalculateReportCommandHandler(repo)
+	err = mediatr.RegisterRequestHandler[*CalculateReport.CalculateReportCommand, common.ResultValue[map[string]interface{}]](calculateHandler)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

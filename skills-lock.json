@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "android-pentesting-tricks": {
+      "source": "yaklang/hack-skills",
+      "sourceType": "github",
+      "skillPath": "skills/android-pentesting-tricks/SKILL.md",
+      "computedHash": "1c4627b9e0d151ae81a0d5edee44e9c1278ba48b11f7622b7c7ea51fd0547ff5"
+    },
+    "dragonjar-android-pentesting-skill": {
+      "source": "aradotso/security-skills",
+      "sourceType": "github",
+      "skillPath": "skills/dragonjar-android-pentesting-skill/SKILL.md",
+      "computedHash": "30c6bf2fdb83597b0ce6f6c919d4dc4d75b6d83de7ebb86d9d0658422b30e6e2"
+    },
+    "ios-pentesting-tricks": {
+      "source": "yaklang/hack-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ios-pentesting-tricks/SKILL.md",
+      "computedHash": "02462796651bc9e4be6d5d5dea9afea68386f8396b93192b23ef6fe6e217ddd9"
+    }
+  }
+}

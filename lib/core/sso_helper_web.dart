@@ -221,4 +221,53 @@ class SsoHelper {
 
   static void initDeepLinkListener(void Function(Map<String, dynamic>) onLoginSuccess) {}
   static void disposeListener() {}
+
+  static Future<void> saveSession({
+    required String token,
+    required String name,
+    required String nip,
+    required String email,
+    required String role,
+    required List<String> groups,
+  }) async {
+    html.window.localStorage['token'] = token;
+    html.window.localStorage['name'] = name;
+    html.window.localStorage['nip'] = nip;
+    html.window.localStorage['email'] = email;
+    html.window.localStorage['role'] = role;
+    html.window.localStorage['groups'] = jsonEncode(groups);
+  }
+
+  static Future<Map<String, dynamic>?> getSession() async {
+    final token = html.window.localStorage['token'];
+    if (token == null) return null;
+    final name = html.window.localStorage['name'] ?? '';
+    final nip = html.window.localStorage['nip'] ?? '';
+    final email = html.window.localStorage['email'] ?? '';
+    final role = html.window.localStorage['role'] ?? '';
+    final groupsRaw = html.window.localStorage['groups'];
+    List<String> groups = [];
+    if (groupsRaw != null) {
+      try {
+        groups = (jsonDecode(groupsRaw) as List).map((e) => e.toString()).toList();
+      } catch (_) {}
+    }
+    return {
+      'token': token,
+      'name': name,
+      'nip': nip,
+      'email': email,
+      'role': role,
+      'groups': groups,
+    };
+  }
+
+  static Future<void> clearSession() async {
+    html.window.localStorage.remove('token');
+    html.window.localStorage.remove('name');
+    html.window.localStorage.remove('nip');
+    html.window.localStorage.remove('email');
+    html.window.localStorage.remove('role');
+    html.window.localStorage.remove('groups');
+  }
 }
