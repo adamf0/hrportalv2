@@ -98,7 +98,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     });
     try {
       final authBloc = context.read<AuthBloc>();
-      final ok = await authBloc.login("", "");
+      final ok = await authBloc.loginWithSso();
       if (ok && mounted) {
         final session = authBloc.session;
         ScaffoldMessenger.of(context).showSnackBar(

@@ -102,6 +102,8 @@ class SsoHelper {
           // Decode ID Token or Access Token to extract name and level/role
           final decoded = _decodeJwt(idToken ?? accessToken);
           final name = decoded['name'] ?? "User";
+          final email = decoded['email'] ?? "";
+          final nip = decoded['preferred_username'] ?? "";
           final groups = (decoded['group'] as List?) ?? [];
 
           String level = "Dosen";
@@ -114,6 +116,13 @@ class SsoHelper {
           } else if (groups.contains("Tendik")) {
             level = "Tendik";
           }
+
+          html.window.localStorage['name'] = name;
+          html.window.localStorage['level'] = level;
+          html.window.localStorage['nip'] = nip;
+          html.window.localStorage['email'] = email;
+          html.window.localStorage['role'] = level;
+          html.window.localStorage['groups'] = jsonEncode([level]);
 
           return {
             "name": name,

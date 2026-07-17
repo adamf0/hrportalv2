@@ -6,6 +6,7 @@ import '../application/login/login_command.dart';
 import '../application/logout/logout_command.dart';
 import '../application/permissions/check_permissions_query.dart';
 import '../application/permissions/request_permissions_command.dart';
+import '../../../../core/sso_helper.dart';
 import '../domain/auth.dart';
 
 class AuthBloc extends ChangeNotifier {
@@ -70,6 +71,41 @@ class AuthBloc extends ChangeNotifier {
       } else {
         _errorMessage = 'Gagal masuk via SSO.';
       }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return false;
+  }
+
+  Future<bool> loginWithSso() async {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      final ssoData = await SsoHelper.loginWithSso();
+      if (ssoData != null) {
+        final sessionData = await SsoHelper.getSession();
+        if (sessionData != null) {
+          _session = AuthSession(
+            name: sessionData['name'] ?? '',
+            nip: sessionData['nip'] ?? '',
+            email: sessionData['email'] ?? '',
+            role: sessionData['role'] ?? '',
+            groups: sessionData['groups'] != null
+                ? (sessionData['groups'] as List).map((e) => e.toString()).toList()
+                : [],
+            token: sessionData['token'] ?? '',
+          );
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        }
+      }
+      _errorMessage = 'Gagal masuk via SSO.';
     } catch (e) {
       _errorMessage = e.toString();
     } finally {

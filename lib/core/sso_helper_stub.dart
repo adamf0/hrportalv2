@@ -62,6 +62,8 @@ class SsoHelper {
 
         final decoded = _decodeJwt(idToken ?? accessToken);
         final name = decoded['name'] ?? "User";
+        final email = decoded['email'] ?? "";
+        final nip = decoded['preferred_username'] ?? "";
         final groups = (decoded['group'] as List?) ?? [];
 
         String level = "Dosen";
@@ -77,6 +79,10 @@ class SsoHelper {
 
         await LocalStorageMobile.write('name', name);
         await LocalStorageMobile.write('level', level);
+        await LocalStorageMobile.write('nip', nip);
+        await LocalStorageMobile.write('email', email);
+        await LocalStorageMobile.write('role', level);
+        await LocalStorageMobile.write('groups', jsonEncode([level]));
 
         return {
           "name": name,
