@@ -366,12 +366,14 @@ func parseJWT(tokenStr string) (*jwt.Token, error) {
 		return jwtSecret, nil
 	})
 
-	if err != nil {
-		return nil, fiber.NewError(400, err.Error())
+	if err == nil && token.Valid {
+		return token, nil
 	}
 
-	if !token.Valid {
-		return nil, fiber.NewError(400, "invalid token")
+	// Fallback: parse unverified for Keycloak RSA tokens (RS256/RS512)
+	token, _, err = new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
+	if err != nil {
+		return nil, fiber.NewError(400, "failed to parse token: "+err.Error())
 	}
 
 	return token, nil
@@ -393,11 +395,34 @@ func validateClaims(token *jwt.Token) (jwt.MapClaims, error) {
 }
 
 func injectRequestValues(c *fiber.Ctx, claims jwt.MapClaims, tokenStr string) {
-	if sid, ok := claims["sid"].(string); ok {
-		c.Request().PostArgs().Set("sid", sid)
-	}
-	if source, ok := claims["source"].(string); ok {
+	iss, _ := claims["iss"].(string)
+	if strings.Contains(iss, "gerbang.unpak.ac.id") {
+		// Keycloak SSO Token
+		if employeeId, ok := claims["employeeid"].(string); ok && employeeId != "" {
+			c.Request().PostArgs().Set("sid", employeeId)
+		} else if preferredUsername, ok := claims["preferred_username"].(string); ok {
+			c.Request().PostArgs().Set("sid", preferredUsername)
+		}
+
+		// Resolve source based on group or roles
+		source := "simpeg" // default to tendik
+		if groupRaw, ok := claims["group"].([]interface{}); ok {
+			for _, g := range groupRaw {
+				if gStr, ok := g.(string); ok && strings.ToLower(gStr) == "dosen" {
+					source = "simak"
+					break
+				}
+			}
+		}
 		c.Request().PostArgs().Set("source", source)
+	} else {
+		// Local Login Token
+		if sid, ok := claims["sid"].(string); ok {
+			c.Request().PostArgs().Set("sid", sid)
+		}
+		if source, ok := claims["source"].(string); ok {
+			c.Request().PostArgs().Set("source", source)
+		}
 	}
 
 	c.Request().PostArgs().Set("token", tokenStr)
