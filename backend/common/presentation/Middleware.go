@@ -330,7 +330,10 @@ func JWTMiddleware() fiber.Handler {
 			return err
 		}
 
-		injectRequestValues(c, claims, tokenStr)
+		err = injectRequestValues(c, claims, tokenStr)
+		if err != nil {
+			return err
+		}
 
 		return c.Next()
 	}
@@ -394,15 +397,15 @@ func validateClaims(token *jwt.Token) (jwt.MapClaims, error) {
 	return claims, nil
 }
 
-func injectRequestValues(c *fiber.Ctx, claims jwt.MapClaims, tokenStr string) {
+func injectRequestValues(c *fiber.Ctx, claims jwt.MapClaims, tokenStr string) error {
 	iss, _ := claims["iss"].(string)
 	if strings.Contains(iss, "gerbang.unpak.ac.id") {
 		// Keycloak SSO Token
-		if employeeId, ok := claims["employeeid"].(string); ok && employeeId != "" {
-			c.Request().PostArgs().Set("sid", employeeId)
-		} else if preferredUsername, ok := claims["preferred_username"].(string); ok {
-			c.Request().PostArgs().Set("sid", preferredUsername)
+		employeeId, ok := claims["employeeid"].(string)
+		if !ok || employeeId == "" {
+			return fiber.NewError(400, "employeeid is missing in sso token")
 		}
+		c.Request().PostArgs().Set("sid", employeeId)
 
 		// Resolve source based on group or roles
 		source := "simpeg" // default to tendik
@@ -426,6 +429,7 @@ func injectRequestValues(c *fiber.Ctx, claims jwt.MapClaims, tokenStr string) {
 	}
 
 	c.Request().PostArgs().Set("token", tokenStr)
+	return nil
 }
 
 func RBACMiddleware() fiber.Handler {
