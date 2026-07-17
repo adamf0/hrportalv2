@@ -451,6 +451,16 @@ func RBACMiddleware() fiber.Handler {
 
 		if isAdmin(user) {
 			log.Println("[RBAC] User is admin, access granted")
+			c.Request().PostArgs().Set("role", user.Role)
+			c.Request().PostArgs().Set("sid", user.SID)
+			c.Request().PostArgs().Set("nidn", user.NIDN)
+			c.Request().PostArgs().Set("nip", user.NIP)
+			c.Request().PostArgs().Set("kode_fakultas", user.KodeFakultas)
+			c.Request().PostArgs().Set("kode_prodi", user.KodeProdi)
+			c.Request().PostArgs().Set("Fakultas", user.Fakultas)
+			c.Request().PostArgs().Set("prodi", user.Prodi)
+			c.Request().PostArgs().Set("unit", user.Unit)
+			c.Request().PostArgs().Set("source", user.Source)
 			return c.Next()
 		}
 

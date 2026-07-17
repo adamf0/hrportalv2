@@ -216,7 +216,14 @@ class _DashboardPageState extends State<DashboardPage> {
       if (date != null) {
         final normalizedDate = DateTime(date.year, date.month, date.day);
         final normalizedStart = DateTime(start.year, start.month, start.day);
-        final normalizedEnd = DateTime(end.year, end.month, end.day);
+        
+        // Upacaras are held on the 17th of each month. 
+        // If it's the 15-15 cutoff, extend the end limit to the 17th to count the current month's upacara.
+        final adjustedEnd = (end.day == 14 || end.day == 15)
+            ? DateTime(end.year, end.month, 17)
+            : end;
+        final normalizedEnd = DateTime(adjustedEnd.year, adjustedEnd.month, adjustedEnd.day);
+        
         if ((normalizedDate.isAfter(normalizedStart) ||
                 normalizedDate.isAtSameMomentAs(normalizedStart)) &&
             (normalizedDate.isBefore(normalizedEnd) ||
