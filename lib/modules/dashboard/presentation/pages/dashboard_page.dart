@@ -212,16 +212,20 @@ class _DashboardPageState extends State<DashboardPage> {
       DateTime start, DateTime end, AttendanceBloc attendanceBloc) {
     int count = 0;
     for (var upacara in attendanceBloc.ceremonyAttendances) {
-      final date = DateTime.tryParse(upacara.tanggal);
+      final date = DateTime.tryParse(upacara.tanggal)?.toLocal();
       if (date != null) {
         final normalizedDate = DateTime(date.year, date.month, date.day);
-        final normalizedStart = DateTime(start.year, start.month, start.day);
         
         // Upacaras are held on the 17th of each month. 
-        // If it's the 15-15 cutoff, extend the end limit to the 17th to count the current month's upacara.
+        // Widen the check range for cutoff period (10th to 20th) to handle potential timezone shifts.
+        final adjustedStart = (end.day == 14 || end.day == 15)
+            ? DateTime(start.year, start.month, 10)
+            : start;
         final adjustedEnd = (end.day == 14 || end.day == 15)
-            ? DateTime(end.year, end.month, 17)
+            ? DateTime(end.year, end.month, 20)
             : end;
+            
+        final normalizedStart = DateTime(adjustedStart.year, adjustedStart.month, adjustedStart.day);
         final normalizedEnd = DateTime(adjustedEnd.year, adjustedEnd.month, adjustedEnd.day);
         
         if ((normalizedDate.isAfter(normalizedStart) ||
