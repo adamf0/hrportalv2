@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:hrportalv2/core/app_theme.dart';
+import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
 
 class AutoCheckInStatusCard extends StatelessWidget {
   final bool isCheckedIn;
@@ -23,6 +25,13 @@ class AutoCheckInStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final attendanceBloc = Provider.of<AttendanceBloc>(context);
+    final isG = attendanceBloc.isFakeGps;
+    final isV = attendanceBloc.isVpn;
+    final noteList = <String>[];
+    if (isG) noteList.add('G');
+    if (isV) noteList.add('V');
+    final noteStr = noteList.isEmpty ? '' : ' | Note: ${noteList.map((e) => '[$e]').join(', ')}';
 
     if (isCheckedIn) {
       return Container(
@@ -59,7 +68,7 @@ class AutoCheckInStatusCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}',
+                    'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}$noteStr',
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
@@ -164,7 +173,7 @@ class AutoCheckInStatusCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}',
+                      'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}$noteStr',
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,

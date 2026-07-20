@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:detect_fake_location/detect_fake_location.dart';
 import '../../../../core/location_wifi_helper.dart';
 import '../../../../core/mediator/mediator.dart';
 import '../../../../core/sso_helper.dart';
@@ -56,6 +57,9 @@ class AttendanceBloc extends ChangeNotifier {
   String _realIp = 'Mendeteksi...';
   String get realIp => _realIp;
 
+  String _realIpLocal = '127.0.0.1';
+  String get realIpLocal => _realIpLocal;
+
   double _realLatitude = -6.2088;
   double get realLatitude => _realLatitude;
 
@@ -73,6 +77,23 @@ class AttendanceBloc extends ChangeNotifier {
 
   StreamSubscription<Position>? _gpsSubscription;
   Timer? _ipCheckTimer;
+  Timer? _gpsTimer;
+  bool _isFakeGps = false;
+  bool get isFakeGps => _isFakeGps;
+
+  bool _isVpnActive = false;
+  bool get isVpnActive => _isVpnActive;
+
+  bool get isVpn => _useRealNetworkAndGps
+      ? (LocationWifiHelper.isPakuanIp(_realIp) &&
+          !(_realIpLocal.startsWith('10.200.') ||
+              _realIpLocal.startsWith('10.201.') ||
+              _realIpLocal.startsWith('10.202.') ||
+              _realIpLocal.startsWith('10.203.') ||
+              _realIpLocal.startsWith('10.204.') ||
+              _realIpLocal.startsWith('10.205.')))
+      : (LocationWifiHelper.isPakuanIp(_simulatedIp) &&
+          !_locationStrategy.isWithinCampus(_simulatedLatitude, _simulatedLongitude));
 
   bool _isLoggedIn = false;
 
@@ -103,7 +124,24 @@ class AttendanceBloc extends ChangeNotifier {
 
       final history = await _mediator.send(GetAttendanceHistoryQuery());
       _activities.clear();
-      _activities.addAll(history);
+      _activities.addAll(history.activities);
+
+      if (history.todayCheckInTime != null) {
+        _checkInTime = history.todayCheckInTime!;
+        _isCheckedIn = true;
+      } else {
+        _checkInTime = '--:--';
+        _isCheckedIn = false;
+      }
+
+      if (history.todayCheckOutTime != null) {
+        _checkOutTime = history.todayCheckOutTime!;
+        _isCheckedOut = true;
+      } else {
+        _checkOutTime = '--:--';
+        _isCheckedOut = false;
+      }
+
       notifyListeners();
       await fetchCeremonyAttendances();
     } catch (e, stackTrace) {
@@ -126,9 +164,26 @@ class AttendanceBloc extends ChangeNotifier {
 
       if (responseData is List) {
         _ceremonyAttendances.clear();
+        final now = DateTime.now();
+        final String todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+        bool upacaraToday = false;
+        String upacaraTimeStr = '--:--';
+
         for (var json in responseData) {
-          _ceremonyAttendances.add(AbsenUpacaraData.fromJson(json));
+          final record = AbsenUpacaraData.fromJson(json);
+          _ceremonyAttendances.add(record);
+          if (record.tanggal == todayStr) {
+            upacaraToday = true;
+            if (record.createdAt.isNotEmpty) {
+              try {
+                final dt = DateTime.parse(record.createdAt).toLocal();
+                upacaraTimeStr = "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+              } catch (_) {}
+            }
+          }
         }
+        _isUpacaraCheckedIn = upacaraToday;
+        _upacaraTime = upacaraTimeStr;
         notifyListeners();
       }
     } catch (e) {
@@ -140,6 +195,7 @@ class AttendanceBloc extends ChangeNotifier {
   void dispose() {
     _gpsSubscription?.cancel();
     _ipCheckTimer?.cancel();
+    _gpsTimer?.cancel();
     super.dispose();
   }
 
@@ -207,9 +263,19 @@ class AttendanceBloc extends ChangeNotifier {
     final lon = _useRealNetworkAndGps ? _realLongitude : _simulatedLongitude;
     final ip = _useRealNetworkAndGps ? _realIp : _simulatedIp;
 
+    final noteList = <String>[];
+    if (isFakeGps) noteList.add("G");
+    if (isVpn) noteList.add("V");
+    final noteStr = noteList.join(",");
+
     final success = await _mediator.send(
       CheckInCommand(
-          latitude: lat, longitude: lon, ipAddress: ip, isUpacara: false),
+        latitude: lat,
+        longitude: lon,
+        ipAddress: ip,
+        isUpacara: false,
+        note: noteStr,
+      ),
     );
 
     if (success) {
@@ -262,9 +328,19 @@ class AttendanceBloc extends ChangeNotifier {
     final lon = _useRealNetworkAndGps ? _realLongitude : _simulatedLongitude;
     final ip = _useRealNetworkAndGps ? _realIp : _simulatedIp;
 
+    final noteList = <String>[];
+    if (isFakeGps) noteList.add("G");
+    if (isVpn) noteList.add("V");
+    final noteStr = noteList.join(",");
+
     final success = await _mediator.send(
       CheckInCommand(
-          latitude: lat, longitude: lon, ipAddress: ip, isUpacara: true),
+        latitude: lat,
+        longitude: lon,
+        ipAddress: ip,
+        isUpacara: true,
+        note: noteStr,
+      ),
     );
 
     if (success) {
@@ -331,11 +407,25 @@ class AttendanceBloc extends ChangeNotifier {
     _ipCheckTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       try {
         final ip = await LocationWifiHelper.getActiveDeviceIp();
+        final localIp = await LocationWifiHelper.getLocalInterfaceIp();
+        final vpn = await LocationWifiHelper.checkVpnActive();
+        bool changed = false;
         if (ip != _realIp) {
           _realIp = ip;
           if (_useRealNetworkAndGps) {
             _simulatedIp = ip;
           }
+          changed = true;
+        }
+        if (localIp != _realIpLocal) {
+          _realIpLocal = localIp;
+          changed = true;
+        }
+        if (vpn != _isVpnActive) {
+          _isVpnActive = vpn;
+          changed = true;
+        }
+        if (changed) {
           notifyListeners();
           evaluateAndTriggerAutoCheckIn();
         }
@@ -359,16 +449,20 @@ class AttendanceBloc extends ChangeNotifier {
       if (_useRealNetworkAndGps) {
         _simulatedIp = _realIp;
       }
+      _realIpLocal = await LocationWifiHelper.getLocalInterfaceIp();
+      _isVpnActive = await LocationWifiHelper.checkVpnActive();
       notifyListeners();
       evaluateAndTriggerAutoCheckIn();
     } catch (_) {}
 
     _gpsSubscription?.cancel();
+    _gpsTimer?.cancel();
     try {
       final pos = await LocationWifiHelper.getCurrentLocation();
       if (pos != null) {
         _realLatitude = pos.latitude;
         _realLongitude = pos.longitude;
+        _isFakeGps = await DetectFakeLocation().detectFakeLocation();
         if (_useRealNetworkAndGps) {
           _simulatedLatitude = pos.latitude;
           _simulatedLongitude = pos.longitude;
@@ -380,14 +474,33 @@ class AttendanceBloc extends ChangeNotifier {
       _isAutoCheckInEvaluating = false;
       notifyListeners();
 
+      // Periodic timer to guarantee 1-second interval updates
+      _gpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+        try {
+          final p = await LocationWifiHelper.getCurrentLocation();
+          if (p != null) {
+            _realLatitude = p.latitude;
+            _realLongitude = p.longitude;
+            _isFakeGps = await DetectFakeLocation().detectFakeLocation();
+            if (_useRealNetworkAndGps) {
+              _simulatedLatitude = p.latitude;
+              _simulatedLongitude = p.longitude;
+            }
+            notifyListeners();
+            evaluateAndTriggerAutoCheckIn();
+          }
+        } catch (_) {}
+      });
+
       _gpsSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 3,
+          distanceFilter: 0,
         ),
-      ).listen((Position position) {
+      ).listen((Position position) async {
         _realLatitude = position.latitude;
         _realLongitude = position.longitude;
+        _isFakeGps = await DetectFakeLocation().detectFakeLocation();
 
         if (_useRealNetworkAndGps) {
           _simulatedIp = _realIp;

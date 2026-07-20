@@ -5,7 +5,7 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
-	"hrportal_backend/common/infrastructure"
+	commoninfra "hrportal_backend/common/infrastructure"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
 
@@ -113,30 +113,51 @@ func (h *CreateSppdCommandHandler) Handle(ctx context.Context, cmd *CreateSppdCo
 		Files:                    dbFiles,
 	}
 
-	if err := h.sppdRepo.CreateSppd(ctx, sppd); err != nil {
-		return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
-	}
-
-	// Increment counter for report
 	nipVal := cmd.Nip
 	if nipVal == "" {
 		nipVal = cmd.Nidn
 	}
 
 	nidnVal := cmd.Nidn
-	if nidnVal == "" {
-		nidnVal = cmd.Nidn
+
+	repo := reportInfra.GetReportRepository()
+	if repo != nil && nipVal != "" {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		if err := h.sppdRepo.CreateSppd(ctxTx, sppd); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
+		}
+
+		if err := repo.IncrementCounter(ctxTx, nipVal, nidnVal, now, "sppd"); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
+		}
+
+		return common.SuccessValue(sppd), nil
 	}
 
-	if repo := reportInfra.GetReportRepository(); repo != nil && nipVal != "" {
-		_ = repo.IncrementCounter(ctx, nipVal, nidnVal, now, "sppd")
+	// Fallback if report repository is nil (should not happen in production)
+	if err := h.sppdRepo.CreateSppd(ctx, sppd); err != nil {
+		return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
 	}
 
 	return common.SuccessValue(sppd), nil
 }
 
 func init() {
-	infrastructure.RegisterValidation(func(cmd CreateSppdCommand) error {
+	commoninfra.RegisterValidation(func(cmd CreateSppdCommand) error {
 		return cmd.Validate()
 	}, "Sppd.CreateSppd.Validation")
 }

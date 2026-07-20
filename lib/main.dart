@@ -88,7 +88,7 @@ void main() {
       CheckInCommandHandler(attendanceRepo));
   mediator.registerHandler<CheckOutCommand, bool>(
       CheckOutCommandHandler(attendanceRepo));
-  mediator.registerHandler<GetAttendanceHistoryQuery, List<ActivityLogItem>>(
+  mediator.registerHandler<GetAttendanceHistoryQuery, AttendanceHistoryResult>(
       GetAttendanceHistoryQueryHandler(attendanceRepo));
 
   // 3. Leave Registrations

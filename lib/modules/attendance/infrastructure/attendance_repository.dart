@@ -8,7 +8,7 @@ import '../domain/attendance.dart';
 class AttendanceRepository implements IAttendanceRepository {
   @override
   Future<bool> checkIn(
-      double lat, double lon, String ip, bool isUpacara) async {
+      double lat, double lon, String ip, bool isUpacara, String note) async {
     final insideCampus = await isWithinCampusPolygon(lat, lon);
     if (!insideCampus) return false;
 
@@ -33,6 +33,7 @@ class AttendanceRepository implements IAttendanceRepository {
           "nidn": nidn,
           "latitude": lat.toString(),
           "longitude": lon.toString(),
+          "note": note,
         },
       );
 
@@ -85,49 +86,69 @@ class AttendanceRepository implements IAttendanceRepository {
   }
 
   @override
-  Future<List<ActivityLogItem>> fetchHistory() async {
+  Future<AttendanceHistoryResult> fetchHistory() async {
     try {
       final responseData = await ApiClient.get(
-        Uri.parse(
-            "${ApiClient.baseUrl}/api/attendance/history"),
+        Uri.parse("${ApiClient.baseUrl}/api/attendance/history"),
       );
 
       if (responseData is List) {
         final List<ActivityLogItem> activities = [];
+        String? todayCheckIn;
+        String? todayCheckOut;
+
+        final now = DateTime.now();
+        final String todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
         for (var json in responseData) {
           final tanggalStr = json['tanggal'] as String? ?? '';
           final masukStr = json['absen_masuk'] as String?;
           final keluarStr = json['absen_keluar'] as String?;
 
+          final isToday = tanggalStr == todayStr;
+
           if (masukStr != null) {
             final dt = DateTime.tryParse(masukStr);
             if (dt != null) {
+              // Convert to local time because the database stores in UTC
+              final localDt = dt.toLocal();
               activities.add(ActivityLogItem(
                 title: 'Absen Masuk Berhasil',
-                time: '$tanggalStr • ${_formatTime(dt)} AM',
+                time: '$tanggalStr • ${_formatTime(localDt)} AM',
                 isSuccess: true,
               ));
+              if (isToday) {
+                todayCheckIn = _formatTime(localDt);
+              }
             }
           }
 
           if (keluarStr != null) {
             final dt = DateTime.tryParse(keluarStr);
             if (dt != null) {
+              // Convert to local time because the database stores in UTC
+              final localDt = dt.toLocal();
               activities.add(ActivityLogItem(
                 title: 'Absen Keluar Berhasil',
-                time: '$tanggalStr • ${_formatTime(dt)} PM',
+                time: '$tanggalStr • ${_formatTime(localDt)} PM',
                 isSuccess: true,
               ));
+              if (isToday) {
+                todayCheckOut = _formatTime(localDt);
+              }
             }
           }
         }
-        return activities;
+        return AttendanceHistoryResult(
+          activities: activities,
+          todayCheckInTime: todayCheckIn,
+          todayCheckOutTime: todayCheckOut,
+        );
       }
     } catch (e, stackTrace) {
       debugPrint('[AttendanceRepository fetchHistory error]: $e\n$stackTrace');
     }
-    return [];
+    return AttendanceHistoryResult(activities: []);
   }
 
   String _formatTime(DateTime dt) {

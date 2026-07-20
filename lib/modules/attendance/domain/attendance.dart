@@ -113,3 +113,15 @@ class AbsenUpacaraData {
     );
   }
 }
+
+class AttendanceHistoryResult {
+  final List<ActivityLogItem> activities;
+  final String? todayCheckInTime;
+  final String? todayCheckOutTime;
+
+  AttendanceHistoryResult({
+    required this.activities,
+    this.todayCheckInTime,
+    this.todayCheckOutTime,
+  });
+}

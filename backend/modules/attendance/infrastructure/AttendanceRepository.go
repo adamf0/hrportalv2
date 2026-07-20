@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 
+	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
 
 	"gorm.io/gorm"
@@ -19,7 +20,7 @@ func NewAttendanceRepository(db *gorm.DB) domain.IAttendanceRepository {
 func (r *AttendanceRepository) FindByNipAndTanggal(ctx context.Context, nip string, nidn string, tanggal string) (*domain.Absen, error) {
 	var absen domain.Absen
 	err := r.db.WithContext(ctx).
-		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, tanggal).
+		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, nidn, tanggal).
 		First(&absen).Error
 	if err != nil {
 		return nil, err
@@ -28,11 +29,11 @@ func (r *AttendanceRepository) FindByNipAndTanggal(ctx context.Context, nip stri
 }
 
 func (r *AttendanceRepository) CreateAbsen(ctx context.Context, absen *domain.Absen) error {
-	return r.db.WithContext(ctx).Create(absen).Error
+	return commoninfra.GetTx(ctx, r.db).Create(absen).Error
 }
 
 func (r *AttendanceRepository) UpdateAbsen(ctx context.Context, absen *domain.Absen) error {
-	return r.db.WithContext(ctx).Save(absen).Error
+	return commoninfra.GetTx(ctx, r.db).Save(absen).Error
 }
 
 func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string) ([]domain.Absen, error) {
@@ -48,24 +49,22 @@ func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, 
 	} else {
 		return nil, nil
 	}
-	query = query.Where("absen_masuk IS NOT NULL")
 
 	err := query.Order("tanggal desc").Find(&items).Error
 	if err != nil {
 		return nil, err
 	}
-
 	return items, nil
 }
 
 func (r *AttendanceRepository) CreateKlaim(ctx context.Context, klaim *domain.KlaimAbsen) error {
-	return r.db.WithContext(ctx).Create(klaim).Error
+	return commoninfra.GetTx(ctx, r.db).Create(klaim).Error
 }
 
 func (r *AttendanceRepository) FindByNipAndTanggalUpacara(ctx context.Context, nip string, nidn string, tanggal string) (*domain.AbsenUpacara, error) {
 	var upacara domain.AbsenUpacara
 	err := r.db.WithContext(ctx).
-		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, tanggal).
+		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, nidn, tanggal).
 		First(&upacara).Error
 	if err != nil {
 		return nil, err
@@ -74,7 +73,7 @@ func (r *AttendanceRepository) FindByNipAndTanggalUpacara(ctx context.Context, n
 }
 
 func (r *AttendanceRepository) CreateAbsenUpacara(ctx context.Context, upacara *domain.AbsenUpacara) error {
-	return r.db.WithContext(ctx).Create(upacara).Error
+	return commoninfra.GetTx(ctx, r.db).Create(upacara).Error
 }
 
 func (r *AttendanceRepository) DeleteEmptyAbsen(ctx context.Context) (int64, error) {

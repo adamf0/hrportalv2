@@ -177,6 +177,9 @@ func ModuleLeave(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		return c.JSON(res.Value)
+		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		sseAdapter := &commonpresentation.SSEAdapter[domain.Cuti]{}
+
+		return sseAdapter.Send(c, pagedData)
 	})
 }

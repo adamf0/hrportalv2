@@ -5,7 +5,7 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
-	"hrportal_backend/common/infrastructure"
+	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 
@@ -17,6 +17,7 @@ type CheckInCommand struct {
 	Nidn      string  `json:"nidn"`
 	Latitude  float64 `json:"latitude"`
 	Longitude float64 `json:"longitude"`
+	Note      string  `json:"note"`
 }
 
 func (c CheckInCommand) Validate() error {
@@ -29,8 +30,8 @@ type CheckInCommandHandler struct {
 	attendanceRepo domain.IAttendanceRepository
 }
 
-func NewCheckInCommandHandler(attendanceRepo domain.IAttendanceRepository) *CheckInCommandHandler {
-	return &CheckInCommandHandler{attendanceRepo: attendanceRepo}
+func NewCheckInCommandHandler(repo domain.IAttendanceRepository) *CheckInCommandHandler {
+	return &CheckInCommandHandler{attendanceRepo: repo}
 }
 
 func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand) (common.ResultValue[*domain.Absen], error) {
@@ -41,21 +42,73 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 	}
 
 	now := time.Now()
+	repo := reportInfra.GetReportRepository()
+	if repo != nil {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		if existing == nil {
+			absen := &domain.Absen{
+				Nip:            cmd.Nip,
+				Nidn:           cmd.Nidn,
+				Tanggal:        today,
+				AbsenMasuk:     &now,
+				Note:           cmd.Note,
+				OtomatisKeluar: false,
+				CreatedAt:      &now,
+				UpdatedAt:      &now,
+			}
+			if err := h.attendanceRepo.CreateAbsen(ctxTx, absen); err != nil {
+				tx.Rollback()
+				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+			}
+			if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk"); err != nil {
+				tx.Rollback()
+				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+			}
+			if err := tx.Commit().Error; err != nil {
+				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+			}
+			return common.SuccessValue(absen), nil
+		}
+
+		existing.AbsenMasuk = &now
+		existing.Note = cmd.Note
+		existing.UpdatedAt = &now
+		if err := h.attendanceRepo.UpdateAbsen(ctxTx, existing); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+		}
+		if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk"); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+		}
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+		}
+		return common.SuccessValue(existing), nil
+	}
+
+	// Fallback if report repository is nil (should not happen in production)
 	if existing == nil {
 		absen := &domain.Absen{
 			Nip:            cmd.Nip,
 			Nidn:           cmd.Nidn,
 			Tanggal:        today,
 			AbsenMasuk:     &now,
+			Note:           cmd.Note,
 			OtomatisKeluar: false,
 			CreatedAt:      &now,
 			UpdatedAt:      &now,
 		}
 		if err := h.attendanceRepo.CreateAbsen(ctx, absen); err != nil {
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
-		}
-		if repo := reportInfra.GetReportRepository(); repo != nil {
-			_ = repo.IncrementCounter(ctx, cmd.Nip, cmd.Nidn, now, "masuk")
 		}
 		return common.SuccessValue(absen), nil
 	}
@@ -65,16 +118,11 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 	if err := h.attendanceRepo.UpdateAbsen(ctx, existing); err != nil {
 		return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 	}
-
-	if repo := reportInfra.GetReportRepository(); repo != nil {
-		_ = repo.IncrementCounter(ctx, cmd.Nip, cmd.Nidn, now, "masuk")
-	}
-
 	return common.SuccessValue(existing), nil
 }
 
 func init() {
-	infrastructure.RegisterValidation(func(cmd CheckInCommand) error {
+	commoninfra.RegisterValidation(func(cmd CheckInCommand) error {
 		return cmd.Validate()
 	}, "Attendance.CheckIn.Validation")
 }

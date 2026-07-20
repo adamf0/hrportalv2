@@ -123,6 +123,9 @@ func ModuleIzin(app *fiber.App) {
 			return commoninfra.HandleError(c, res.Error)
 		}
 
-		return c.JSON(res.Value)
+		pagedData := commondomain.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		sseAdapter := &commonpresentation.SSEAdapter[domain.Izin]{}
+
+		return sseAdapter.Send(c, pagedData)
 	})
 }

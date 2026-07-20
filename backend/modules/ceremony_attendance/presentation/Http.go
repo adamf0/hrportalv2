@@ -111,6 +111,10 @@ func ModuleCeremonyAttendance(app *fiber.App) {
 		if !res.IsSuccess {
 			return infrastructure.HandleError(c, res.Error)
 		}
-		return c.JSON(res.Value)
+
+		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		sseAdapter := &commonpresentation.SSEAdapter[domain.AbsenUpacara]{}
+
+		return sseAdapter.Send(c, pagedData)
 	})
 }

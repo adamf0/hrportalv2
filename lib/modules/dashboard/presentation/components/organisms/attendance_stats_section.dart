@@ -4,25 +4,32 @@ import 'package:hrportalv2/core/app_theme.dart';
 import 'package:hrportalv2/core/responsive_helper.dart';
 import 'package:hrportalv2/core/presentation/components/atoms/stat_card.dart';
 import 'package:hrportalv2/modules/attendance/presentation/components/pages/ceremony_attendance_list_page.dart';
+import 'package:hrportalv2/core/presentation/components/atoms/pulsing_skeleton.dart';
 
 class AttendanceStatsSection extends StatefulWidget {
+  final bool isLoading;
   final int totalAbsen1To31;
   final int totalIzin1To31;
+  final int totalSppd1To31;
   final int tidakMasuk1To31;
   final int totalUpacara1To31;
   final int totalAbsen15To15;
   final int totalIzin15To15;
+  final int totalSppd15To15;
   final int tidakMasuk15To15;
   final int totalUpacara15To15;
 
   const AttendanceStatsSection({
     super.key,
+    this.isLoading = false,
     required this.totalAbsen1To31,
     required this.totalIzin1To31,
+    required this.totalSppd1To31,
     required this.tidakMasuk1To31,
     required this.totalUpacara1To31,
     required this.totalAbsen15To15,
     required this.totalIzin15To15,
+    required this.totalSppd15To15,
     required this.tidakMasuk15To15,
     required this.totalUpacara15To15,
   });
@@ -39,8 +46,48 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
+    if (widget.isLoading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Statistik Kehadiran',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: onSurface,
+                ),
+              ),
+              const PulsingSkeleton(width: 80, height: 32, borderRadius: 8),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 5,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.isWatch ? 1 : 2,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.35,
+            ),
+            itemBuilder: (context, index) => const PulsingSkeleton(
+              width: double.infinity,
+              height: double.infinity,
+              borderRadius: 12,
+            ),
+          ),
+        ],
+      );
+    }
+
     final currentAbsen = _is15To15 ? widget.totalAbsen15To15 : widget.totalAbsen1To31;
     final currentIzin = _is15To15 ? widget.totalIzin15To15 : widget.totalIzin1To31;
+    final currentSppd = _is15To15 ? widget.totalSppd15To15 : widget.totalSppd1To31;
     final currentTidakMasuk = _is15To15 ? widget.tidakMasuk15To15 : widget.tidakMasuk1To31;
     final currentUpacara = _is15To15 ? widget.totalUpacara15To15 : widget.totalUpacara1To31;
 
@@ -84,6 +131,14 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
         value: '$currentUpacara',
         label: 'Total Upacara',
       ),
+    );
+
+    final card5 = StatCard(
+      icon: Icons.star_outline,
+      iconColor: AppTheme.warning,
+      circleColor: AppTheme.warningContainer,
+      value: '$currentSppd',
+      label: 'Total SPPD',
     );
 
     return Column(
@@ -173,6 +228,7 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
             card2,
             card3,
             card4,
+            card5,
           ],
         ),
       ],

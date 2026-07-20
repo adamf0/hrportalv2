@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 
+	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/leave/domain"
 
 	"gorm.io/gorm"
@@ -17,7 +18,7 @@ func NewLeaveRepository(db *gorm.DB) domain.ILeaveRepository {
 }
 
 func (r *LeaveRepository) CreateCuti(ctx context.Context, cuti *domain.Cuti) error {
-	return r.db.WithContext(ctx).Create(cuti).Error
+	return commoninfra.GetTx(ctx, r.db).Create(cuti).Error
 }
 
 func (r *LeaveRepository) FindByID(ctx context.Context, id uint) (*domain.Cuti, error) {
@@ -30,11 +31,11 @@ func (r *LeaveRepository) FindByID(ctx context.Context, id uint) (*domain.Cuti, 
 }
 
 func (r *LeaveRepository) UpdateCuti(ctx context.Context, cuti *domain.Cuti) error {
-	return r.db.WithContext(ctx).Save(cuti).Error
+	return commoninfra.GetTx(ctx, r.db).Save(cuti).Error
 }
 
 func (r *LeaveRepository) DeleteCuti(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&domain.Cuti{}, id).Error
+	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Cuti{}, id).Error
 }
 
 func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string) ([]domain.Cuti, error) {

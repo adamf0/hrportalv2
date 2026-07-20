@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"context"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mehdihadeli/go-mediatr"
@@ -34,9 +35,9 @@ import (
 // @Router /login [post]
 var jwtSecret = []byte("secret")
 
-func generateJWT(sid string, source string) (string, error) {
+func generateJWT(sid string, source string, duration time.Duration) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"exp":    int64(1784304276),
+		"exp":    time.Now().Add(duration).Unix(),
 		"sid":    sid,
 		"source": source,
 	})
@@ -61,12 +62,12 @@ func LoginHandlerfunc(c *fiber.Ctx) error {
 		return commoninfra.HandleError(c, result.Error)
 	}
 
-	tokenStr, errToken := generateJWT(result.Value.Sid, result.Value.Source)
+	tokenStr, errToken := generateJWT(result.Value.Sid, result.Value.Source, 3*time.Hour)
 	if errToken != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate access token"})
 	}
 
-	refreshStr, errRefresh := generateJWT(result.Value.Sid, result.Value.Source)
+	refreshStr, errRefresh := generateJWT(result.Value.Sid, result.Value.Source, 7*24*time.Hour)
 	if errRefresh != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate refresh token"})
 	}

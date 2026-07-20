@@ -5,7 +5,7 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
-	"hrportal_backend/common/infrastructure"
+	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/leave/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 
@@ -58,19 +58,44 @@ func (h *SubmitCutiCommandHandler) Handle(ctx context.Context, cmd *SubmitCutiCo
 		UpdatedAt:      &now,
 	}
 
-	if err := h.leaveRepo.CreateCuti(ctx, cuti); err != nil {
-		return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
+	repo := reportInfra.GetReportRepository()
+	if repo != nil {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		if err := h.leaveRepo.CreateCuti(ctxTx, cuti); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
+		}
+
+		if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "cuti"); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
+		}
+
+		return common.SuccessValue(cuti), nil
 	}
 
-	if repo := reportInfra.GetReportRepository(); repo != nil {
-		_ = repo.IncrementCounter(ctx, cmd.Nip, cmd.Nidn, now, "cuti")
+	// Fallback if report repository is nil (should not happen in production)
+	if err := h.leaveRepo.CreateCuti(ctx, cuti); err != nil {
+		return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
 	}
 
 	return common.SuccessValue(cuti), nil
 }
 
 func init() {
-	infrastructure.RegisterValidation(func(cmd SubmitCutiCommand) error {
+	commoninfra.RegisterValidation(func(cmd SubmitCutiCommand) error {
 		return cmd.Validate()
 	}, "Leave.SubmitCuti.Validation")
 }

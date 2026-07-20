@@ -2,6 +2,8 @@ package infrastructure
 
 import (
 	"context"
+
+	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/ceremony_attendance/domain"
 
 	"gorm.io/gorm"
@@ -16,15 +18,15 @@ func NewCeremonyAttendanceRepository(db *gorm.DB) domain.ICeremonyAttendanceRepo
 }
 
 func (r *CeremonyAttendanceRepository) Create(ctx context.Context, upacara *domain.AbsenUpacara) error {
-	return r.db.WithContext(ctx).Create(upacara).Error
+	return commoninfra.GetTx(ctx, r.db).Create(upacara).Error
 }
 
 func (r *CeremonyAttendanceRepository) Update(ctx context.Context, upacara *domain.AbsenUpacara) error {
-	return r.db.WithContext(ctx).Save(upacara).Error
+	return commoninfra.GetTx(ctx, r.db).Save(upacara).Error
 }
 
 func (r *CeremonyAttendanceRepository) Delete(ctx context.Context, id uint) error {
-	return r.db.WithContext(ctx).Delete(&domain.AbsenUpacara{}, id).Error
+	return commoninfra.GetTx(ctx, r.db).Delete(&domain.AbsenUpacara{}, id).Error
 }
 
 func (r *CeremonyAttendanceRepository) GetByID(ctx context.Context, id uint) (*domain.AbsenUpacara, error) {

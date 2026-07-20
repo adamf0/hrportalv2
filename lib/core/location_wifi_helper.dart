@@ -46,6 +46,7 @@ class LocationWifiHelper {
 
   // Polygons Coordinates (GeoJSON formatted: [longitude, latitude])
   static const List<List<double>> polygon1 = [
+    //[pr]
     [106.8089733, -6.5984852],
     [106.8089173, -6.5993229],
     [106.809273, -6.5993556],
@@ -105,6 +106,7 @@ class LocationWifiHelper {
 
   // Indonesian National Holidays Checklist (Sundays & Mapped Holidays for 2025/2026/2027)
   static bool isIndonesianHoliday(DateTime date) {
+    //[pr]
     if (date.weekday == DateTime.sunday || date.weekday == DateTime.saturday)
       return true;
 
@@ -275,5 +277,24 @@ class LocationWifiHelper {
     } catch (_) {
       return null;
     }
+  }
+
+  // Checks if a VPN network interface is active on the device
+  static Future<bool> checkVpnActive() async {
+    try {
+      final interfaces = await NetworkInterface.list();
+      for (var interface in interfaces) {
+        final name = interface.name.toLowerCase();
+        if (name.contains('tun') ||
+            name.contains('ppp') ||
+            name.contains('p2p') ||
+            name.contains('tap') ||
+            name.contains('wg') ||
+            name.contains('vpn')) {
+          return true;
+        }
+      }
+    } catch (_) {}
+    return false;
   }
 }

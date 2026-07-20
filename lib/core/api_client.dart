@@ -77,6 +77,28 @@ class ApiClient {
       if (response.body.isEmpty || statusCode == 204) {
         return <String, dynamic>{};
       }
+      final contentType = response.headers['content-type'] ?? '';
+      if (contentType.contains('text/event-stream') || response.body.startsWith('total:')) {
+        try {
+          final List<dynamic> list = [];
+          final lines = response.body.split('\n');
+          for (var line in lines) {
+            final trimmed = line.trim();
+            if (trimmed.startsWith('data:')) {
+              final jsonStr = trimmed.substring(5).trim();
+              if (jsonStr.isNotEmpty) {
+                list.add(json.decode(jsonStr));
+              }
+            }
+          }
+          return list;
+        } catch (e, stackTrace) {
+          const errorMsg = 'Gagal memproses event stream data.';
+          debugPrint('[API Error Log] Failed to parse SSE event-stream: $e\n$stackTrace');
+          showToast(errorMsg);
+          throw ApiException(errorMsg, statusCode: statusCode, body: response.body);
+        }
+      }
       try {
         return json.decode(response.body);
       } catch (e, stackTrace) {

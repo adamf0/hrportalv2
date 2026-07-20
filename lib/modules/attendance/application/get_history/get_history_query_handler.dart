@@ -4,13 +4,13 @@ import '../../domain/i_attendance_repository.dart';
 import 'get_history_query.dart';
 
 class GetAttendanceHistoryQueryHandler
-    extends IQueryHandler<GetAttendanceHistoryQuery, List<ActivityLogItem>> {
+    extends IQueryHandler<GetAttendanceHistoryQuery, AttendanceHistoryResult> {
   final IAttendanceRepository repository;
 
   GetAttendanceHistoryQueryHandler(this.repository);
 
   @override
-  Future<List<ActivityLogItem>> handle(GetAttendanceHistoryQuery query) async {
+  Future<AttendanceHistoryResult> handle(GetAttendanceHistoryQuery query) async {
     return await repository.fetchHistory();
   }
 }

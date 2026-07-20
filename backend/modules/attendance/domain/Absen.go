@@ -16,6 +16,7 @@ type Absen struct {
 	AbsenKeluar    *time.Time `gorm:"column:absen_keluar" json:"absen_keluar"`
 	CatatanTelat   *string    `gorm:"column:catatan_telat" json:"catatan_telat"`
 	CatatanPulang  *string    `gorm:"column:catatan_pulang" json:"catatan_pulang"`
+	Note           string     `gorm:"column:note;type:varchar(10)" json:"note"`
 	OtomatisKeluar bool       `gorm:"column:otomatis_keluar" json:"otomatis_keluar"`
 	CreatedAt      *time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt      *time.Time `gorm:"column:updated_at" json:"updated_at"`

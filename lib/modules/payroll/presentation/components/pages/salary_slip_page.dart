@@ -5,6 +5,8 @@ import 'package:hrportalv2/modules/payroll/presentation/payroll_bloc.dart';
 import 'package:hrportalv2/modules/auth/presentation/auth_bloc.dart';
 
 import 'package:hrportalv2/modules/payroll/presentation/components/organisms/printable_salary_slip.dart';
+import 'package:hrportalv2/modules/payroll/presentation/components/helpers/pdf_generator_helper.dart';
+import 'package:open_filex/open_filex.dart';
 
 // Modular Molecule Components
 import 'package:hrportalv2/modules/payroll/presentation/components/molecules/year_selector.dart';
@@ -111,13 +113,41 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
                             const SizedBox(height: 24),
 
                             ElevatedButton.icon(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Unduh PDF slip gaji ${slip.bulan} ${slip.tahun} berhasil!'),
-                                    backgroundColor: primaryColor,
-                                  ),
-                                );
+                              onPressed: () async {
+                                try {
+                                  final file = await PdfGeneratorHelper.generateSalarySlipPdf(slip);
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Unduh PDF slip gaji ${slip.bulan} ${slip.tahun} berhasil!'),
+                                      backgroundColor: primaryColor,
+                                      action: SnackBarAction(
+                                        label: 'BUKA',
+                                        textColor: Colors.white,
+                                        onPressed: () async {
+                                          final result = await OpenFilex.open(file.path);
+                                          if (result.type != ResultType.done) {
+                                            if (!mounted) return;
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Gagal membuka file: ${result.message}'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Gagal mengunduh/membuat file PDF slip gaji.'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,

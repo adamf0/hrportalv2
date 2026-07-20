@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hrportalv2/core/responsive_helper.dart';
+import 'package:hrportalv2/core/presentation/components/atoms/pulsing_skeleton.dart';
 
 class AttendanceTimeCards extends StatelessWidget {
   final bool isCheckedIn;
@@ -8,6 +9,7 @@ class AttendanceTimeCards extends StatelessWidget {
   final String checkOutTime;
   final VoidCallback onJamMasukTap;
   final VoidCallback onJamPulangTap;
+  final bool isLoading;
 
   const AttendanceTimeCards({
     super.key,
@@ -16,6 +18,7 @@ class AttendanceTimeCards extends StatelessWidget {
     required this.checkOutTime,
     required this.onJamMasukTap,
     required this.onJamPulangTap,
+    this.isLoading = false,
   });
 
   @override
@@ -23,6 +26,27 @@ class AttendanceTimeCards extends StatelessWidget {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final onSurfaceVariant = Theme.of(context).colorScheme.secondary;
+
+    if (isLoading) {
+      const shimmerCard = PulsingSkeleton(
+        width: double.infinity,
+        height: 90,
+        borderRadius: 12,
+      );
+
+      return Flex(
+        direction: context.isWatch ? Axis.vertical : Axis.horizontal,
+        crossAxisAlignment: context.isWatch ? CrossAxisAlignment.stretch : CrossAxisAlignment.start,
+        children: [
+          context.isWatch ? shimmerCard : Expanded(child: shimmerCard),
+          SizedBox(
+            width: context.isWatch ? 0 : 16,
+            height: context.isWatch ? 12 : 0,
+          ),
+          context.isWatch ? shimmerCard : Expanded(child: shimmerCard),
+        ],
+      );
+    }
 
     final jamMasukCard = GestureDetector(
       onTap: onJamMasukTap,

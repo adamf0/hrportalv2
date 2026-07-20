@@ -11,6 +11,7 @@ import '../../../leave/presentation/components/pages/leave_form_page.dart';
 
 // Atomic Design Components
 import 'package:hrportalv2/core/presentation/components/molecules/quick_menu_button.dart';
+import 'package:hrportalv2/core/presentation/components/atoms/pulsing_skeleton.dart';
 // Dashboard Specific Components
 import 'package:hrportalv2/modules/dashboard/presentation/components/molecules/dashboard_header.dart';
 import 'package:hrportalv2/modules/dashboard/presentation/components/molecules/greeting_banner.dart';
@@ -63,6 +64,21 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _selectedCalendarDay = DateTime.now();
   final Map<String, List<CalendarItem>> _calendarEvents = {};
 
+  bool _calendarLoading = false;
+  bool _calendarError = false;
+
+  int _totalAbsen1To31 = 0;
+  int _totalIzin1To31 = 0;
+  int _totalSppd1To31 = 0;
+  int _tidakMasuk1To31 = 0;
+  int _totalUpacara1To31 = 0;
+
+  int _totalAbsen15To15 = 0;
+  int _totalIzin15To15 = 0;
+  int _totalSppd15To15 = 0;
+  int _tidakMasuk15To15 = 0;
+  int _totalUpacara15To15 = 0;
+
   CalendarItem? _getPriorityEvent(String key) {
     final list = _calendarEvents[key];
     if (list == null || list.isEmpty) return null;
@@ -105,6 +121,11 @@ class _DashboardPageState extends State<DashboardPage> {
     final nip = authBloc.session?.nip ?? '';
     if (nip.isEmpty) return;
 
+    setState(() {
+      _calendarLoading = true;
+      _calendarError = false;
+    });
+
     try {
       final firstDay =
           DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 1);
@@ -117,13 +138,25 @@ class _DashboardPageState extends State<DashboardPage> {
       final endStr =
           "${gridEnd.year}-${_twoDigits(gridEnd.month)}-${_twoDigits(gridEnd.day)}";
 
-      final responseData = await ApiClient.get(
-        Uri.parse(
-            "${ApiClient.baseUrl}/api/calendar?start_date=$startStr&end_date=$endStr"),
-      );
+      final yearMonthStr = "${_selectedCalendarDay.year}-${_twoDigits(_selectedCalendarDay.month)}";
 
+      // Execute all 4 requests in parallel!
+      final results = await Future.wait([
+        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/calendar?start_date=$startStr&end_date=$endStr")),
+        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/holiday?year=${_selectedCalendarDay.year}")),
+        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/laporan/summary?nip=$nip&periode_type=CALENDAR&periode_key=$yearMonthStr")),
+        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/laporan/summary?nip=$nip&periode_type=CALENDAR-CUTOFF&periode_key=$yearMonthStr")),
+      ]);
+
+      final responseData = results[0];
+      final holidayData = results[1];
+      final summaryCalendar = results[2];
+      final summaryCutoff = results[3];
+
+      _calendarEvents.clear();
+
+      // Parse calendar events
       if (responseData is List) {
-        _calendarEvents.clear();
         for (var item in responseData) {
           if (item is Map<String, dynamic>) {
             final tanggal = item['tanggal'] as String? ?? '';
@@ -134,126 +167,87 @@ class _DashboardPageState extends State<DashboardPage> {
           }
         }
       }
-    } catch (e) {
-      debugPrint("Error fetching calendar events: $e");
-    }
-  }
 
-  Map<String, DateTime> _getPeriod1To31() {
-    final ref = _selectedCalendarDay;
-    final start = DateTime(ref.year, ref.month, 1);
-    final end = DateTime(ref.year, ref.month + 1, 0);
-    return {'start': start, 'end': end};
-  }
+      // Parse holidays
+      if (holidayData is List) {
+        for (var item in holidayData) {
+          if (item is Map<String, dynamic>) {
+            final tanggal = item['tanggal'] as String? ?? '';
+            final nama = item['nama'] as String? ?? '';
+            final isLibur = item['libur'] == 1;
 
-  Map<String, DateTime> _getPeriod15To15() {
-    final ref = _selectedCalendarDay;
-    final start = DateTime(ref.year, ref.month - 1, 15);
-    final end = DateTime(ref.year, ref.month, 14);
-    return {'start': start, 'end': end};
-  }
-
-  int _calculateAbsenForPeriod(
-      DateTime start, DateTime end, AttendanceBloc attendanceBloc) {
-    int count = 0;
-    for (var act in attendanceBloc.activities) {
-      if (act.title.contains("Absen Masuk") && act.isSuccess) {
-        final parts = act.time.split(' • ');
-        if (parts.isNotEmpty) {
-          final dateStr = parts[0];
-          DateTime? actDate;
-          if (dateStr == "Hari ini" || dateStr.startsWith("Hari")) {
-            actDate = DateTime.now();
-          } else {
-            actDate = DateTime.tryParse(dateStr);
-          }
-          if (actDate != null) {
-            final normalizedAct =
-                DateTime(actDate.year, actDate.month, actDate.day);
-            final normalizedStart =
-                DateTime(start.year, start.month, start.day);
-            final normalizedEnd = DateTime(end.year, end.month, end.day);
-            if ((normalizedAct.isAfter(normalizedStart) ||
-                    normalizedAct.isAtSameMomentAs(normalizedStart)) &&
-                (normalizedAct.isBefore(normalizedEnd) ||
-                    normalizedAct.isAtSameMomentAs(normalizedEnd))) {
-              count++;
+            if (tanggal.isNotEmpty && isLibur) {
+              final cleanKey = tanggal.split('T')[0];
+              final calItem = CalendarItem(
+                nidn: '',
+                nip: '',
+                tanggal: tanggal,
+                type: 'holiday',
+                catatan: nama,
+                status: 'Libur',
+              );
+              _calendarEvents.putIfAbsent(cleanKey, () => []).add(calItem);
             }
           }
         }
       }
-    }
-    return count;
-  }
 
-  int _calculateIzinForPeriod(
-      DateTime start, DateTime end, LeaveBloc leaveBloc) {
-    int count = 0;
-    for (var req in leaveBloc.leaves) {
-      final statusLower = req.status.toLowerCase();
-      if (statusLower == "acc" ||
-          statusLower == "disetujui" ||
-          statusLower.contains("acc")) {
-        final isCuti = req.type.toLowerCase().contains("cuti");
-        if (!isCuti) {
-          final reqStart = req.startDate;
-          final reqEnd = req.endDate;
-          final intersectStart = reqStart.isAfter(start) ? reqStart : start;
-          final intersectEnd = reqEnd.isBefore(end) ? reqEnd : end;
-          if (intersectStart.isBefore(intersectEnd) ||
-              DateUtils.isSameDay(intersectStart, intersectEnd)) {
-            final days = intersectEnd.difference(intersectStart).inDays + 1;
-            count += days;
-          }
-        }
+      // Parse CALENDAR summary (1-31)
+      if (summaryCalendar is Map<String, dynamic>) {
+        _totalAbsen1To31 = summaryCalendar['total_masuk'] ?? 0;
+        _totalIzin1To31 = (summaryCalendar['total_izin'] ?? 0) + (summaryCalendar['total_cuti'] ?? 0);
+        _totalSppd1To31 = summaryCalendar['total_sppd'] ?? 0;
+        _totalUpacara1To31 = summaryCalendar['total_upacara'] ?? 0;
+        
+        final start = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 1);
+        final end = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month + 1, 0);
+        final totalLibur = summaryCalendar['total_libur'] ?? 0;
+        _tidakMasuk1To31 = _calculateTidakMasukFromDB(_totalAbsen1To31, _totalIzin1To31, _totalSppd1To31, totalLibur, start, end);
       }
+
+      // Parse CALENDAR-CUTOFF summary (15-15)
+      if (summaryCutoff is Map<String, dynamic>) {
+        _totalAbsen15To15 = summaryCutoff['total_masuk'] ?? 0;
+        _totalIzin15To15 = (summaryCutoff['total_izin'] ?? 0) + (summaryCutoff['total_cuti'] ?? 0);
+        _totalSppd15To15 = summaryCutoff['total_sppd'] ?? 0;
+        _totalUpacara15To15 = summaryCutoff['total_upacara'] ?? 0;
+        
+        final start = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month - 1, 16);
+        final end = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 15);
+        final totalLibur = summaryCutoff['total_libur'] ?? 0;
+        _tidakMasuk15To15 = _calculateTidakMasukFromDB(_totalAbsen15To15, _totalIzin15To15, _totalSppd15To15, totalLibur, start, end);
+      }
+
+      setState(() {
+        _calendarLoading = false;
+      });
+    } catch (e) {
+      debugPrint("Error fetching calendar events: $e");
+      setState(() {
+        _calendarLoading = false;
+        _calendarError = true;
+      });
     }
-    return count;
   }
 
-  int _calculateTidakMasukForPeriod(
-      DateTime start, DateTime end, int totalAbsen, int totalIzin) {
-    int workdays = 0;
+  int _calculateTidakMasukFromDB(int totalAbsen, int totalIzin, int totalSppd, int totalLibur, DateTime start, DateTime end) {
+    int totalDays = 0;
+    int sundays = 0;
     DateTime cur = start;
     final today = DateTime.now();
     final limit = end.isAfter(today) ? today : end;
     while (cur.isBefore(limit) || DateUtils.isSameDay(cur, limit)) {
-      if (cur.weekday != DateTime.sunday) {
-        workdays++;
+      totalDays++;
+      if (cur.weekday == DateTime.sunday) {
+        sundays++;
       }
       cur = cur.add(const Duration(days: 1));
     }
-    final missing = workdays - totalAbsen - totalIzin;
+    final missing = totalDays - totalAbsen - totalIzin - totalSppd - sundays - totalLibur;
     return missing > 0 ? missing : 0;
   }
 
-  int _calculateUpacaraForPeriod(
-      DateTime start, DateTime end, AttendanceBloc attendanceBloc) {
-    int count = 0;
-    for (var upacara in attendanceBloc.ceremonyAttendances) {
-      final dateStr = upacara.tanggal.contains('T') ? upacara.tanggal.split('T')[0] : upacara.tanggal;
-      final date = DateTime.tryParse(dateStr);
-      if (date != null) {
-        final normalizedDate = DateTime(date.year, date.month, date.day);
-        final normalizedStart = DateTime(start.year, start.month, start.day);
-        
-        // Upacaras are held on the 17th of each month. 
-        // If it's the 15-15 cutoff, extend the end limit to the 17th to count the current month's upacara.
-        final adjustedEnd = (end.day == 14 || end.day == 15)
-            ? DateTime(end.year, end.month, 17)
-            : end;
-        final normalizedEnd = DateTime(adjustedEnd.year, adjustedEnd.month, adjustedEnd.day);
-        
-        if ((normalizedDate.isAfter(normalizedStart) ||
-                normalizedDate.isAtSameMomentAs(normalizedStart)) &&
-            (normalizedDate.isBefore(normalizedEnd) ||
-                normalizedDate.isAtSameMomentAs(normalizedEnd))) {
-          count++;
-        }
-      }
-    }
-    return count;
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -292,6 +286,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
                 const SizedBox(height: 20),
                 AttendanceTimeCards(
+                  isLoading: _calendarLoading,
                   isCheckedIn: attendanceBloc.isCheckedIn,
                   checkInTime: attendanceBloc.checkInTime,
                   checkOutTime: attendanceBloc.checkOutTime,
@@ -336,83 +331,63 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 24),
                 const QuestionnaireSection(),
                 const SizedBox(height: 24),
-                DashboardCalendarCard(
-                  selectedCalendarDay: _selectedCalendarDay,
-                  onDaySelected: (day) {
-                    final oldMonth = _selectedCalendarDay.month;
-                    final oldYear = _selectedCalendarDay.year;
-                    setState(() {
-                      _selectedCalendarDay = day;
-                    });
-                    if (day.month != oldMonth || day.year != oldYear) {
-                      _fetchCalendarEvents();
-                    }
-                  },
-                  getDayStatusColor: (day) =>
-                      _getCalendarDayStatusColor(day, attendanceBloc),
-                  getDayTextColor: (day, isFaded, isRed, isSelected) {
-                    Color textColor = Colors.black;
-                    if (isFaded) {
-                      textColor = Colors.grey[300]!;
-                    } else if (isRed) {
-                      textColor = Colors.red[600]!;
-                    }
-                    if (isSelected) {
-                      textColor = Theme.of(context).colorScheme.primary;
-                    }
-                    return textColor;
-                  },
-                  buildDayIndicatorDot: (day, isFaded) =>
-                      _buildDayIndicatorDot(day, isFaded),
-                  dayStatus: _getCalendarDayStatus(
-                      _selectedCalendarDay, attendanceBloc),
-                  dayTimes: _getCalendarDayTimes(
-                      _selectedCalendarDay, attendanceBloc),
-                  statusColor: _getCalendarDayStatusColor(
-                      _selectedCalendarDay, attendanceBloc),
-                ),
+                if (_calendarLoading)
+                  _buildCalendarShimmer(context)
+                else if (_calendarError)
+                  _buildCalendarError(context)
+                else
+                  DashboardCalendarCard(
+                    selectedCalendarDay: _selectedCalendarDay,
+                    onDaySelected: (day) {
+                      final oldMonth = _selectedCalendarDay.month;
+                      final oldYear = _selectedCalendarDay.year;
+                      setState(() {
+                        _selectedCalendarDay = day;
+                      });
+                      if (day.month != oldMonth || day.year != oldYear) {
+                        _fetchCalendarEvents();
+                      }
+                    },
+                    getDayStatusColor: (day) =>
+                        _getCalendarDayStatusColor(day, attendanceBloc),
+                    getDayTextColor: (day, isFaded, isRed, isSelected) {
+                      final key = "${day.year}-${_twoDigits(day.month)}-${_twoDigits(day.day)}";
+                      final event = _getPriorityEvent(key);
+                      final isHoliday = event != null && event.type.toLowerCase() == "holiday";
+
+                      Color textColor = Colors.black;
+                      if (isFaded) {
+                        textColor = Colors.grey[300]!;
+                      } else if (isRed || isHoliday) {
+                        textColor = Colors.red[600]!;
+                      }
+                      if (isSelected) {
+                        textColor = Theme.of(context).colorScheme.primary;
+                      }
+                      return textColor;
+                    },
+                    buildDayIndicatorDot: (day, isFaded) =>
+                        _buildDayIndicatorDot(day, isFaded),
+                    dayStatus: _getCalendarDayStatus(
+                        _selectedCalendarDay, attendanceBloc),
+                    dayTimes: _getCalendarDayTimes(
+                        _selectedCalendarDay, attendanceBloc),
+                    statusColor: _getCalendarDayStatusColor(
+                        _selectedCalendarDay, attendanceBloc),
+                  ),
                 const SizedBox(height: 24),
                 AttendanceStatsSection(
-                  totalAbsen1To31: _calculateAbsenForPeriod(
-                      _getPeriod1To31()['start']!,
-                      _getPeriod1To31()['end']!,
-                      attendanceBloc),
-                  totalIzin1To31: _calculateIzinForPeriod(
-                      _getPeriod1To31()['start']!,
-                      _getPeriod1To31()['end']!,
-                      leaveBloc),
-                  tidakMasuk1To31: _calculateTidakMasukForPeriod(
-                    _getPeriod1To31()['start']!,
-                    _getPeriod1To31()['end']!,
-                    _calculateAbsenForPeriod(_getPeriod1To31()['start']!,
-                        _getPeriod1To31()['end']!, attendanceBloc),
-                    _calculateIzinForPeriod(_getPeriod1To31()['start']!,
-                        _getPeriod1To31()['end']!, leaveBloc),
-                  ),
-                  totalUpacara1To31: _calculateUpacaraForPeriod(
-                      _getPeriod1To31()['start']!,
-                      _getPeriod1To31()['end']!,
-                      attendanceBloc),
-                  totalAbsen15To15: _calculateAbsenForPeriod(
-                      _getPeriod15To15()['start']!,
-                      _getPeriod15To15()['end']!,
-                      attendanceBloc),
-                  totalIzin15To15: _calculateIzinForPeriod(
-                      _getPeriod15To15()['start']!,
-                      _getPeriod15To15()['end']!,
-                      leaveBloc),
-                  tidakMasuk15To15: _calculateTidakMasukForPeriod(
-                    _getPeriod15To15()['start']!,
-                    _getPeriod15To15()['end']!,
-                    _calculateAbsenForPeriod(_getPeriod15To15()['start']!,
-                        _getPeriod15To15()['end']!, attendanceBloc),
-                    _calculateIzinForPeriod(_getPeriod15To15()['start']!,
-                        _getPeriod15To15()['end']!, leaveBloc),
-                  ),
-                  totalUpacara15To15: _calculateUpacaraForPeriod(
-                      _getPeriod15To15()['start']!,
-                      _getPeriod15To15()['end']!,
-                      attendanceBloc),
+                  isLoading: _calendarLoading,
+                  totalAbsen1To31: _totalAbsen1To31,
+                  totalIzin1To31: _totalIzin1To31,
+                  totalSppd1To31: _totalSppd1To31,
+                  tidakMasuk1To31: _tidakMasuk1To31,
+                  totalUpacara1To31: _totalUpacara1To31,
+                  totalAbsen15To15: _totalAbsen15To15,
+                  totalIzin15To15: _totalIzin15To15,
+                  totalSppd15To15: _totalSppd15To15,
+                  tidakMasuk15To15: _tidakMasuk15To15,
+                  totalUpacara15To15: _totalUpacara15To15,
                 ),
                 const SizedBox(height: 24),
                 LeaveSummarySection(
@@ -496,6 +471,8 @@ class _DashboardPageState extends State<DashboardPage> {
         dotColor = AppTheme.info;
       } else if (type == "sppd") {
         dotColor = AppTheme.secondary;
+      } else if (type == "holiday") {
+        dotColor = Colors.red[600]!;
       }
     } else if (DateUtils.isSameDay(DateTime.now(), day) &&
         context.read<AttendanceBloc>().isCheckedIn) {
@@ -528,6 +505,8 @@ class _DashboardPageState extends State<DashboardPage> {
         return AppTheme.info;
       } else if (type == "sppd") {
         return AppTheme.secondary;
+      } else if (type == "holiday") {
+        return Colors.red[600]!;
       }
     }
 
@@ -556,6 +535,8 @@ class _DashboardPageState extends State<DashboardPage> {
         return 'Cuti Tahunan (${event.status})';
       } else if (type == "sppd") {
         return 'Dinas Luar SPPD (${event.status})';
+      } else if (type == "holiday") {
+        return '${event.catatan} (Hari Libur)';
       }
     }
 
@@ -654,6 +635,110 @@ class _DashboardPageState extends State<DashboardPage> {
                     color: Colors.red, fontWeight: FontWeight.bold)),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarShimmer(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.surfaceContainer),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              PulsingSkeleton(width: 120, height: 18),
+              Row(
+                children: [
+                  PulsingSkeleton(width: 24, height: 24, borderRadius: 12),
+                  SizedBox(width: 16),
+                  PulsingSkeleton(width: 24, height: 24, borderRadius: 12),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Days skeleton grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 35,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+            ),
+            itemBuilder: (context, index) => const Center(
+              child: PulsingSkeleton(width: 24, height: 24, borderRadius: 6),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const PulsingSkeleton(width: double.infinity, height: 1),
+          const SizedBox(height: 16),
+          const PulsingSkeleton(width: 80, height: 12),
+          const SizedBox(height: 8),
+          const PulsingSkeleton(width: double.infinity, height: 52, borderRadius: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendarError(BuildContext context) {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    return Container(
+      height: 350,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.surfaceContainer),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'Gagal memuat data kalender',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Periksa koneksi internet Anda dan coba lagi.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: Colors.grey[600],
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _fetchCalendarEvents,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text(
+                'Coba Lagi',
+                style: GoogleFonts.inter(fontWeight: FontWeight.bold),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

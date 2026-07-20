@@ -10,7 +10,7 @@ type PeriodeType string
 
 const (
 	PeriodeCalendar PeriodeType = "CALENDAR"
-	PeriodeCutoff   PeriodeType = "CUTOFF"
+	PeriodeCutoff   PeriodeType = "CALENDAR-CUTOFF"
 )
 
 type RekapLaporanBulanan struct {
@@ -27,6 +27,7 @@ type RekapLaporanBulanan struct {
 	TotalCuti    int         `gorm:"column:total_cuti;not null;default:0" json:"total_cuti"`
 	TotalSppd    int         `gorm:"column:total_sppd;not null;default:0" json:"total_sppd"`
 	TotalUpacara int         `gorm:"column:total_upacara;not null;default:0" json:"total_upacara"`
+	TotalLibur   int         `gorm:"column:total_libur;not null;default:0" json:"total_libur"`
 	UpdatedAt    *time.Time  `gorm:"column:updated_at" json:"updated_at"`
 }
 

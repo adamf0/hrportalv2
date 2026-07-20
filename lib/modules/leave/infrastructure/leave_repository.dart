@@ -8,6 +8,7 @@ import '../domain/i_leave_repository.dart';
 
 class LeaveRepository implements ILeaveRepository {
   final List<Supervisor> _supervisors = [
+    //[pr]
     Supervisor(
         id: '1110221914',
         name: 'Sobar Sukmana, MH.',
@@ -90,8 +91,10 @@ class LeaveRepository implements ILeaveRepository {
           for (var json in cutiData) {
             final startStr = json['tanggal_mulai'] as String? ?? '';
             final endStr = json['tanggal_selesai'] as String? ?? '';
-            final startDate = DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
-            final endDate = DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
+            final startDate =
+                DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
+            final endDate =
+                DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
             final jenisCutiId = json['jenis_cuti_id'] as int? ?? 1;
             String type = "Cuti Tahunan";
             if (jenisCutiId == 2) type = "Cuti Sakit";
@@ -123,7 +126,8 @@ class LeaveRepository implements ILeaveRepository {
         if (izinData is List) {
           for (var json in izinData) {
             final dateStr = json['tanggal_pengajuan'] as String? ?? '';
-            final date = DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
+            final date =
+                DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
             final jenisIzinId = json['jenis_izin_id'] as int? ?? 1;
             String type = "Izin Sakit";
             if (jenisIzinId == 2) type = "Izin Sakit Tanpa Dokter";
@@ -157,8 +161,10 @@ class LeaveRepository implements ILeaveRepository {
           for (var json in items) {
             final startStr = json['tanggal_berangkat'] as String? ?? '';
             final endStr = json['tanggal_kembali'] as String? ?? '';
-            final startDate = DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
-            final endDate = DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
+            final startDate =
+                DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
+            final endDate =
+                DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
             final jenisSppdId = json['jenis_sppd_id'] as int? ?? 1;
             String type = "SPPD - Dinas Luar";
             if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";

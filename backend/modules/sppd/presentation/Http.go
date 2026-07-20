@@ -117,7 +117,10 @@ func ModuleSppd(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		return c.JSON(fiber.Map{"data": res.Value})
+		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		sseAdapter := &commonpresentation.SSEAdapter[domain.Sppd]{}
+
+		return sseAdapter.Send(c, pagedData)
 	})
 
 	group.Get("/:id", func(c *fiber.Ctx) error {

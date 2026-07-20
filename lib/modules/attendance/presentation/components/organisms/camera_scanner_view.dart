@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
+import 'package:provider/provider.dart';
 import 'package:hrportalv2/core/responsive_helper.dart';
+import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
 
 class CameraScannerView extends StatelessWidget {
   final bool isCameraInitialized;
@@ -29,6 +31,25 @@ class CameraScannerView extends StatelessWidget {
     final background = Theme.of(context).colorScheme.surface;
     final onSurface = Theme.of(context).colorScheme.onSurface;
     final onSurfaceVariant = Theme.of(context).colorScheme.onSurfaceVariant;
+
+    final attendanceBloc = Provider.of<AttendanceBloc>(context);
+    final ip = attendanceBloc.useRealNetworkAndGps
+        ? attendanceBloc.realIp
+        : attendanceBloc.simulatedIp;
+    final lat = attendanceBloc.useRealNetworkAndGps
+        ? attendanceBloc.realLatitude
+        : attendanceBloc.simulatedLatitude;
+    final lon = attendanceBloc.useRealNetworkAndGps
+        ? attendanceBloc.realLongitude
+        : attendanceBloc.simulatedLongitude;
+
+    final isG = attendanceBloc.isFakeGps;
+    final isV = attendanceBloc.isVpn;
+    final noteList = <String>[];
+    if (isG) noteList.add('G');
+    if (isV) noteList.add('V');
+    final noteStr =
+        noteList.isEmpty ? '-' : noteList.map((e) => '[$e]').join(', ');
 
     return Scaffold(
       backgroundColor: background,
@@ -81,17 +102,23 @@ class CameraScannerView extends StatelessWidget {
                           FittedBox(
                             fit: BoxFit.cover,
                             child: SizedBox(
-                              width: cameraController!.value.previewSize!.height,
-                              height: cameraController!.value.previewSize!.width,
+                              width:
+                                  cameraController?.value.previewSize?.height ??
+                                      1280.0,
+                              height:
+                                  cameraController?.value.previewSize?.width ??
+                                      720.0,
                               child: CameraPreview(cameraController!),
                             ),
                           )
                         else
                           Container(
-                            color: Theme.of(context).colorScheme.surfaceContainer,
+                            color:
+                                Theme.of(context).colorScheme.surfaceContainer,
                             child: GridView.builder(
                               physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 10,
                               ),
                               itemBuilder: (context, index) => Container(
@@ -122,7 +149,8 @@ class CameraScannerView extends StatelessWidget {
                           animation: pulseController,
                           builder: (context, child) {
                             return Positioned(
-                              top: (context.isWatch ? 140 : 260) * pulseController.value,
+                              top: (context.isWatch ? 140 : 260) *
+                                  pulseController.value,
                               left: 0,
                               right: 0,
                               child: Container(
@@ -134,12 +162,12 @@ class CameraScannerView extends StatelessWidget {
                         ),
                         SizedBox(
                           width: context.isWatch ? 120 : 230,
-                          height: context.isWatch ? 120 : 230,
                           child: CircularProgressIndicator(
                             value: progress,
                             strokeWidth: 4,
                             backgroundColor: Colors.grey[300],
-                            valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(primaryColor),
                           ),
                         ),
                       ],
@@ -192,7 +220,8 @@ class CameraScannerView extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.psychology, size: context.w(16), color: primaryColor),
+                        Icon(Icons.psychology,
+                            size: context.w(16), color: primaryColor),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -209,13 +238,104 @@ class CameraScannerView extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(height: context.h(24)),
+              const SizedBox(height: 16),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.network_ping, size: 16, color: primaryColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          'ip: ',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            fontWeight: FontWeight.bold,
+                            color: onSurfaceVariant,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            ip,
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(12),
+                              color: onSurface,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_outlined,
+                            size: 16, color: primaryColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          'gps: ',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            fontWeight: FontWeight.bold,
+                            color: onSurfaceVariant,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '${lat.toStringAsFixed(6)}, ${lon.toStringAsFixed(6)}',
+                            style: GoogleFonts.inter(
+                              fontSize: context.sp(12),
+                              color: onSurface,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.security_outlined,
+                            size: 16, color: primaryColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          'note: ',
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            fontWeight: FontWeight.bold,
+                            color: onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          noteStr,
+                          style: GoogleFonts.inter(
+                            fontSize: context.sp(12),
+                            color: (isG || isV) ? Colors.red : onSurface,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: onRefreshTap,
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: Colors.grey[350]!),
-                  padding: EdgeInsets.symmetric(vertical: context.isWatch ? 8.0 : 14.0),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: EdgeInsets.symmetric(
+                      vertical: context.isWatch ? 8.0 : 14.0),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 icon: Icon(Icons.refresh, color: onSurfaceVariant, size: 18),
                 label: Text(
@@ -233,9 +353,11 @@ class CameraScannerView extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: Colors.grey[350]!),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: Icon(Icons.help_outline, color: onSurfaceVariant, size: 18),
+                icon:
+                    Icon(Icons.help_outline, color: onSurfaceVariant, size: 18),
                 label: Text(
                   'Butuh Bantuan?',
                   style: GoogleFonts.inter(

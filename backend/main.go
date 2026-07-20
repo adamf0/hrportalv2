@@ -46,6 +46,9 @@ import (
 
 	calendarInfrastructure "hrportal_backend/modules/calendar/infrastructure"
 	calendarPresentation "hrportal_backend/modules/calendar/presentation"
+
+	holidayInfrastructure "hrportal_backend/modules/holiday/infrastructure"
+	holidayPresentation "hrportal_backend/modules/holiday/presentation"
 )
 
 var startupErrors []fiber.Map
@@ -247,6 +250,13 @@ func main() {
 		return calendarInfrastructure.RegisterModuleCalendar(db)
 	})
 
+	mustStart("Holiday Module", func() error {
+		if db == nil {
+			return errors.New("db nil")
+		}
+		return holidayInfrastructure.RegisterModuleHoliday(db)
+	})
+
 	if len(startupErrors) > 0 {
 		log.Printf("Startup warnings/errors encountered: %v", startupErrors)
 	}
@@ -260,6 +270,7 @@ func main() {
 	ceremonyAttendancePresentation.ModuleCeremonyAttendance(app)
 	calendarPresentation.ModuleCalendar(app)
 	reportPresentation.ModuleReport(app)
+	holidayPresentation.ModuleHoliday(app, db)
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "service": "Unpak HRPortal Backend API"})

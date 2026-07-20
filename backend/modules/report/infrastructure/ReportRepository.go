@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	commoninfra "hrportal_backend/common/infrastructure"
 	accountDomain "hrportal_backend/modules/account/domain"
 	attendanceDomain "hrportal_backend/modules/attendance/domain"
 	permissionDomain "hrportal_backend/modules/izin/domain"
@@ -26,6 +27,10 @@ func NewReportRepository(db *gorm.DB) domain.IReportRepository {
 	return &ReportRepository{db: db}
 }
 
+func (r *ReportRepository) GetDB() *gorm.DB {
+	return r.db
+}
+
 func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nidn string, date time.Time, counterType string) error {
 	nipClean := strings.TrimSpace(nip)
 	nidnClean := strings.TrimSpace(nidn)
@@ -43,13 +48,13 @@ func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nid
 	var cutKey string
 
 	if date.Day() < 16 {
-		cutStart = time.Date(date.Year(), date.Month()-1, 15, 0, 0, 0, 0, date.Location())
+		cutStart = time.Date(date.Year(), date.Month()-1, 16, 0, 0, 0, 0, date.Location())
 		cutEnd = time.Date(date.Year(), date.Month(), 15, 0, 0, 0, 0, date.Location())
-		cutKey = date.Format("2006-01") + "-CUTOFF"
+		cutKey = date.Format("2006-01")
 	} else {
 		cutStart = time.Date(date.Year(), date.Month(), 16, 0, 0, 0, 0, date.Location())
 		cutEnd = time.Date(date.Year(), date.Month()+1, 15, 0, 0, 0, 0, date.Location())
-		cutKey = date.AddDate(0, 1, 0).Format("2006-01") + "-CUTOFF"
+		cutKey = date.AddDate(0, 1, 0).Format("2006-01")
 	}
 
 	periods := []struct {
@@ -91,7 +96,7 @@ func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nid
 
 		conflictCols := []clause.Column{{Name: "nip"}, {Name: "nidn"}, {Name: "periode_type"}, {Name: "periode_key"}}
 
-		err := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		err := commoninfra.GetTx(ctx, r.db).Clauses(clause.OnConflict{
 			Columns: conflictCols,
 			DoUpdates: clause.Assignments(map[string]interface{}{
 				columnToInc:  gorm.Expr("rekap_laporan_bulanan."+columnToInc+" + ?", 1),
@@ -140,7 +145,7 @@ func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai 
 	// 2. Versi 2 (Cutoff Period)
 	v2Start := time.Date(now.Year(), now.Month()-1, 16, 0, 0, 0, 0, now.Location())
 	v2End := time.Date(now.Year(), now.Month(), 15, 0, 0, 0, 0, now.Location())
-	v2Key := now.Format("2006-01") + "-CUTOFF"
+	v2Key := now.Format("2006-01")
 
 	var rekapsV2 []domain.RekapLaporanBulanan
 	q2 := r.db.WithContext(ctx).Model(&domain.RekapLaporanBulanan{}).
@@ -550,10 +555,19 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 		v1End := v1Start.AddDate(0, 1, -1)
 		v1Key := v1Start.Format("2006-01")
 
-		// 2. Versi 2 (Cutoff Period: 16th of prev month to 15th of curr month)
+		// 2. Versi 2 (Cutoff Period: 15th of prev month to 14th of curr month)
 		v2Start := time.Date(refDate.Year(), refDate.Month()-1, 16, 0, 0, 0, 0, refDate.Location())
 		v2End := time.Date(refDate.Year(), refDate.Month(), 15, 0, 0, 0, 0, refDate.Location())
-		v2Key := refDate.Format("2006-01") + "-CUTOFF"
+		v2Key := refDate.Format("2006-01")
+
+		var cLiburV1, cLiburV2 int64
+		r.db.WithContext(ctx).Table("master_libur").
+			Where("tanggal >= ? AND tanggal <= ? AND (is_national_holiday = 1 OR type LIKE '%Holiday%')", v1Start.Format("2006-01-02"), v1End.Format("2006-01-02")).
+			Count(&cLiburV1)
+
+		r.db.WithContext(ctx).Table("master_libur").
+			Where("tanggal >= ? AND tanggal <= ? AND (is_national_holiday = 1 OR type LIKE '%Holiday%')", v2Start.Format("2006-01-02"), v2End.Format("2006-01-02")).
+			Count(&cLiburV2)
 
 		type job struct {
 			p accountDomain.Pegawai
@@ -662,6 +676,7 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 						TotalCuti:    int(cCutiV1),
 						TotalSppd:    int(cSppdV1),
 						TotalUpacara: int(cUpacaraV1),
+						TotalLibur:   int(cLiburV1),
 						UpdatedAt:    &now,
 					}
 					conflictCols := []clause.Column{{Name: "nip"}, {Name: "nidn"}, {Name: "periode_type"}, {Name: "periode_key"}}
@@ -684,6 +699,7 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 						TotalCuti:    int(cCutiV2),
 						TotalSppd:    int(cSppdV2),
 						TotalUpacara: int(cUpacaraV2),
+						TotalLibur:   int(cLiburV2),
 						UpdatedAt:    &now,
 					}
 					r.db.WithContext(ctx).Clauses(clause.OnConflict{

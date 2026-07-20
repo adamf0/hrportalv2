@@ -5,7 +5,7 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
-	"hrportal_backend/common/infrastructure"
+	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 
@@ -18,8 +18,9 @@ type CheckInUpacaraCommand struct {
 }
 
 func (c CheckInUpacaraCommand) Validate() error {
-	return validation.ValidateStruct(&c) // validation.Field(&c.Nip, validation.Required),
-
+	return validation.ValidateStruct(&c,
+		validation.Field(&c.Nip, validation.Required),
+	)
 }
 
 type CheckInUpacaraCommandHandler struct {
@@ -38,6 +39,43 @@ func (h *CheckInUpacaraCommandHandler) Handle(ctx context.Context, cmd *CheckInU
 	}
 
 	now := time.Now()
+	repo := reportInfra.GetReportRepository()
+	if repo != nil {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		upacara := &domain.AbsenUpacara{
+			Nip:       cmd.Nip,
+			Nidn:      cmd.Nidn,
+			Tanggal:   today,
+			CreatedAt: &now,
+			UpdatedAt: &now,
+		}
+
+		if err := h.attendanceRepo.CreateAbsenUpacara(ctxTx, upacara); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.AbsenUpacara](domain.AttendanceNotFound()), err
+		}
+
+		if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "upacara"); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.AbsenUpacara](domain.AttendanceNotFound()), err
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.AbsenUpacara](domain.AttendanceNotFound()), err
+		}
+
+		return common.SuccessValue(upacara), nil
+	}
+
+	// Fallback if report repository is nil (should not happen in production)
 	upacara := &domain.AbsenUpacara{
 		Nip:       cmd.Nip,
 		Nidn:      cmd.Nidn,
@@ -50,15 +88,11 @@ func (h *CheckInUpacaraCommandHandler) Handle(ctx context.Context, cmd *CheckInU
 		return common.FailureValue[*domain.AbsenUpacara](domain.AttendanceNotFound()), err
 	}
 
-	if repo := reportInfra.GetReportRepository(); repo != nil {
-		_ = repo.IncrementCounter(ctx, cmd.Nip, cmd.Nidn, now, "upacara")
-	}
-
 	return common.SuccessValue(upacara), nil
 }
 
 func init() {
-	infrastructure.RegisterValidation(func(cmd CheckInUpacaraCommand) error {
+	commoninfra.RegisterValidation(func(cmd CheckInUpacaraCommand) error {
 		return cmd.Validate()
 	}, "Attendance.CheckInUpacara.Validation")
 }

@@ -1,69 +1,91 @@
-# Walkthrough - Ceremony Stats & Recalculate Optimizations
+# Walkthrough - Holiday Integration, SSE Refactoring, Report Calculations, Transactions, Realtime Location Security Metadata, SPPD Member Tracking, Auto Check-In UI, and System VPN / Mock Location Integration
 
-I have completed the requested changes for both the Go backend and Flutter application, verified all components, and ensured everything compiles cleanly.
+We have successfully integrated the `/holiday` endpoint, refactored data-listing endpoints to stream via Server-Sent Events (SSE), fixed the JWT token expiration time, corrected the report calculation cutoff periods, wrapped database modifications and report increments in a transaction block, and optimized the mobile client's dashboard to fetch calendar, holiday, and summary data concurrently, including shimmer loading states, reload options, a dedicated SPPD card, and realtime location metadata.
 
-## Key Changes Made
+Additionally, we fixed the SPPD retrieval logic on both the backend report calculations and the history lookup endpoint to include SPPDs where the active user is registered as an **anggota** (member).
 
-### 1. New DELETE Endpoint for Empty Attendance
-- **Clean Architecture Implementation**: Added a new endpoint `DELETE /api/attendance/empty-masuk` inside [Http.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/attendance/presentation/Http.go#L112-L131) following the Clean Architecture and mediator pattern:
-  - Added `DeleteEmptyAbsen` to the `IAttendanceRepository` interface and [AttendanceRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/attendance/infrastructure/AttendanceRepository.go#L90-L97).
-  - Created [DeleteEmptyAttendanceCommand.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/attendance/application/DeleteEmptyAttendance/DeleteEmptyAttendanceCommand.go) and registered the request handler inside [AttendanceMediator.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/attendance/infrastructure/AttendanceMediator.go#L42-L47).
-- **GORM Tags Sync**: Fixed the `RekapLaporanBulanan` unique index tags inside [Report.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/report/domain/Report.go#L19-L22) to declare `rekap_emp_periode_IDX` instead of the old dropped indexes. This prevents GORM's AutoMigrate from attempting to re-create conflicting indexes on startup.
-- **Executed Cleanup**: Run of the cleanup deleted **1,275,877 empty/invalid records** from the `absen` table where `absen_masuk` was null or empty, leaving only the ~101,000 valid records. The table is now optimized and the deletion endpoint will process instantly on subsequent runs.
+Furthermore, we updated the **AutoCheckInStatusCard** and **CameraScannerView** to display the security indicator flags (`Note: [G]`, `Note: [V]`) alongside the real-time IP and GPS text field.
 
-### 2. Optimized Recalculation API & Query Performance
-- **Local Activity Table Sourced**: Modified `CalculateReport` in [ReportRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/report/infrastructure/ReportRepository.go) to construct the unique list of employees by querying distinct `nip`/`nidn` values from the local activity tables (`absen`, `izin`, `cuti`, `sppd`, `sppd_anggota`, `absen_upacara`) instead of hitting `view_pegawai`. This completely avoids slow query joins to `connect_m_dosen`, `connect_e_pribadi`, and `connect_n_pribadi`.
-- **Unified Composite Index**: Refactored the unique constraints on `rekap_laporan_bulanan` by dropping the separate `rekap_nip_periode_IDX` and `rekap_nidn_periode_IDX` unique keys, and adding a unified composite unique key `rekap_emp_periode_IDX` on `(nip, nidn, periode_type, periode_key)`. This allows Tendik (who have empty `nidn`) and Dosen (who have empty `nip`) to be processed concurrently without triggering duplicate key conflicts and overwriting each other's records.
-- **Connection Pool Configuration**: Increased the connection pool bounds in [main.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/main.go) (`SetMaxOpenConns(100)` and `SetMaxIdleConns(100)`) to maintain persistent connections and prevent socket time-wait exhaustion/timeouts when executing nearly 500,000 parallel queries during recalculation.
-- **Worker-Pool & Mutex Serialization**: Serialized GORM write operations in the worker pool using a `sync.Mutex` while keeping the query phase concurrent. This eliminates transaction deadlocks in InnoDB during bulk upserts.
-- **Bypassed Middleware**: Excluded `/api/laporan/recalculate` from the JWT and RBAC authentication middlewares, making it fully public/unauthenticated as requested.
-- **Removed NIP Parameter**: Restored the method signature `CalculateReport(ctx context.Context)` without the `filterNip` query/command argument.
-- **Database Indexes**: Created indexes on `cuti`, `sppd`, `sppd_anggota`, `izin`, and `absen` to eliminate slow sequential scans.
-- **Corrected View & GORM Queries**: Fixed the query building constraints in [ReportRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/report/infrastructure/ReportRepository.go) to safely check empty strings and check both main creators and members for SPPD.
+Finally, we resolved a camera previewSize initialization crash and integrated robust, native security checks:
+- **Fake GPS/Mock Location (`G`)**: Integrated the native package `detect_fake_location` to verify if the OS-reported position is simulated.
+- **VPN to Campus Network (`V`)**: Implemented a robust mismatch check between the device's public WAN IP and the active local Wi-Fi interface IP range. If the public WAN IP matches the campus network block (`103.169.x.x`), but the local private IP on the Wi-Fi card does NOT match the campus local subnet (`10.200.0.0` - `10.205.255.255`), it is classified as a VPN.
 
-### 3. Added Ceremony (Upacara) Stats Card & List Details Page
-- **Total Upacara Stat Card**: Updated the dashboard statistics panel to include a new **Total Upacara** indicator card next to checking, izin, and missing items.
-- **2x2 Grid Layout**: Reworked the stats list layout inside [attendance_stats_section.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/dashboard/presentation/components/organisms/attendance_stats_section.dart) using a responsive 2x2 grid style for maximum aesthetic appeal.
-- **Detailed History Page**: Created a premium [CeremonyAttendanceListPage](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/attendance/presentation/components/pages/ceremony_attendance_list_page.dart) to show all logs, timing details, and verification status of ceremony events when the stats card is tapped.
+## Changes Made
 
-### 4. Integrated Upacara in Recent Activities
-- **Unified Activities Section**: Modified the dashboard provider feed in [dashboard_page.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/dashboard/presentation/pages/dashboard_page.dart) to parse ceremony logs alongside standard check-ins, permits, leaves, and SPPD events. Everything is sorted chronologically descending.
+### Go Backend
+
+#### [NEW] [TxContext.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/common/infrastructure/TxContext.go)
+- Created helper to store/retrieve active GORM transactions inside context.
+
+#### [MODIFY] [IReportRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/report/domain/IReportRepository.go)
+- Exposed `GetDB() *gorm.DB` in the report repository interface.
+
+#### [MODIFY] [ReportRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/report/infrastructure/ReportRepository.go)
+- Implemented `GetDB() *gorm.DB` to retrieve GORM database connection instance.
+- Updated `IncrementCounter` to support transactions via context using `commoninfra.GetTx(ctx, r.db)`.
+- Corrected cutoff period keys format (removed `-CUTOFF` suffix).
+- Adjusted cutoff V2 periods calculation to start on **16th of previous month** and end on **15th of current month** (exactly 30 days, no overlap).
+
+#### [MODIFY] [SppdRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/sppd/infrastructure/SppdRepository.go)
+- Updated write methods to support transactions via context.
+- Modified `GetHistoryByNip()` to include SPPD documents where the user is listed in `sppd_anggota` table as a member.
+
+#### [MODIFY] [AttendanceRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/attendance/infrastructure/AttendanceRepository.go)
+- Updated write methods to support transactions via context.
+
+#### [MODIFY] [CeremonyAttendanceRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/ceremony_attendance/infrastructure/CeremonyAttendanceRepository.go)
+- Updated write methods to support transactions via context.
+
+#### [MODIFY] [LeaveRepository.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/leave/infrastructure/LeaveRepository.go)
+- Updated write methods to support transactions via context.
+
+#### [MODIFY] [CheckInCommand.go, CheckInUpacaraCommand.go, CreateAbsenUpacaraCommand.go, SubmitCutiCommand.go, CreateSppdCommand.go]
+- Wrapped the database insertions and report counter increments inside a GORM transaction block (`db.Begin()`), committing only on success and rolling back completely on any errors.
+- Passed transaction-context containing the active transaction down to all database operations.
+
+### Flutter Client
+
+#### [MODIFY] [pubspec.yaml](file:///Users/adamf/Documents/flutter_project/hrportalv2/pubspec.yaml)
+- Installed `detect_fake_location` dependency to handle mock location security audits.
+
+#### [MODIFY] [api_client.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/core/api_client.dart)
+- Transparently decodes SSE event stream (`text/event-stream` / `data: ...` format) inside `processResponse`.
+
+#### [MODIFY] [dashboard_page.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/dashboard/presentation/pages/dashboard_page.dart)
+- Shifted the Attendance Statistics cards calculation from local activity logs traversal to direct, remote API summary fetching via `/api/laporan/summary`.
+- Refactored `_fetchCalendarEvents()` to run all 4 HTTP API calls (calendar, holiday, calendar summary, cutoff summary) in parallel using `Future.wait`.
+- Added state-tracking variables `_calendarLoading` and `_calendarError` to control dashboard visual loading feedback.
+- Separated `total_sppd` from `total_izin` into dedicated summary variables (`_totalSppd1To31`, `_totalSppd15To15`).
+- Passed SPPD variables to the new `AttendanceStatsSection` properties.
+- Implemented `PulsingSkeleton` widget to display a fading/pulsing shimmer card matching the calendar structure when data is fetching.
+- Added `_buildCalendarError()` widget to display an error notification screen with a "Coba Lagi" reload button if any of the network requests fail.
+
+#### [MODIFY] [attendance_stats_section.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/dashboard/presentation/components/organisms/attendance_stats_section.dart)
+- Expose parameters `totalSppd1To31` and `totalSppd15To15` inside the widget.
+- Separated the visual layout to show **Total SPPD** as a dedicated card (Card 5) inside the statistics grid.
+
+#### [MODIFY] [location_wifi_helper.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/core/location_wifi_helper.dart)
+- Added `checkVpnActive()` helper scanning local network interfaces for active VPN tunnel indicators.
+
+#### [MODIFY] [attendance_bloc.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/attendance/presentation/attendance_bloc.dart)
+- Added `_gpsTimer` to run once every second, fetching the active user's location via `Geolocator`.
+- Subscribed to `Geolocator.getPositionStream` with `distanceFilter: 0` for fine-grained coordinate updates.
+- Added `isMocked` property utilizing `DetectFakeLocation().detectFakeLocation()` package checks to find Fake GPS (`G`).
+- Added `_realIpLocal` variable tracking local private IP address.
+- Updated `isVpn` property in real mode to check if the public WAN IP matches the campus block but the local local Wi-Fi IP does NOT match the campus local subnet range (`V`).
+
+#### [MODIFY] [camera_scanner_view.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/attendance/presentation/components/organisms/camera_scanner_view.dart)
+- Added a metadata panel displaying real-time metrics (`ip:`, `gps:`, `note:`).
+- Fixed camera initialization crash by using null-aware accessors on `previewSize`.
+
+#### [MODIFY] [auto_check_in_status_card.dart](file:///Users/adamf/Documents/flutter_project/hrportalv2/lib/modules/dashboard/presentation/components/organisms/auto_check_in_status_card.dart)
+- Query `isMocked` and `isVpn` properties of `AttendanceBloc` inside `build` method using `Provider.of`.
+- Appended `Note: [G,V]` security markers to the IP & GPS status text row for both successful and failed check-in status templates.
 
 ---
 
-## Verification & Testing Results
+## Verification Results
 
-- **Go Backend Compilation**: Built successfully.
-- **Recalculation Execution**: `/api/laporan/recalculate` completed successfully without authentication headers inside **1 minute 0.24 seconds** returning HTTP code **200 OK** and body:
-  `{"status":"success","message":"Kalkulasi ulang laporan versi 1 dan versi 2 untuk seluruh data pegawai dan bulan telah selesai","total_bulan_dikalkulasi":27,"total_pegawai":1819,"total_rekap_records":98226,"daftar_bulan":[...]}`
-- **Verified Output**: All 98,226 records are completely populated and saved in the database. Searching for NIP `4102302214` in `rekap_laporan_bulanan` now returns all 54 records (27 calendar periods and 27 cutoff periods) with accurate values!
-- **Flutter Analyzer**: Run completed with **0 issues found**.
-- **Cuti, Izin, and SPPD Integration Fixes**:
-  - **Cuti (Leave)**: Submissions now correctly initialize the status field as `"menunggu"` (which is one of the allowed MySQL database enum values) instead of `"Pengajuan"`.
-  - **Izin (Permission)**: Struct field mappings corrected to map `JenisIzinID` to the actual table column `id_jenis_izin` (configured GORM tag to force `type:int` to prevent conflicts with native foreign key types).
-  - **SPPD**: Request handlers updated to correctly parse input parameters from `FormValue` as a fallback if the request body is form-urlencoded (preventing validation errors on empty fields).
-  - **Verification**: Run of full-suite POST tests completed with HTTP 200 OK responses, successfully creating test records in the database.
-- **Pusat Pengajuan Display Mismatches & Swipe Refresh**:
-  - **SPPD Response Structure Fix**: Modified the backend history endpoint `/api/sppd/history` to wrap results in `{"data": [...]}`. This correctly aligns with Flutter's `ApiClient` which expects a JSON map rather than a raw array.
-  - **SppdRepository Safety Exit**: Added early exit safety checks to prevent nil-pointer queries and server crash panics when `nip` and `nidn` are both empty.
-  - **Cuti Type Mapping**: Remapped types (such as `jenisCutiId == 2` to `"Cuti Sakit"` instead of `"Izin Sakit"`) in Flutter's `leave_repository.dart` to make sure all requests sourced from the `cuti` table remain inside the `"Cuti"` category tab.
-  - **Timezone Conversion**: Appended `.toLocal()` during date parsing to handle system timezone offsets correctly (restoring true calendar day display numbers).
-  - **Status Badge & Filtering**: Added recognition for the `"TERIMA SDM"` status string inside `LeaveRequestStatus.fromString` to display the green approved tag and enable accurate filtering.
-  - **Swipe Refresh integration**: Wrapped `LeaveListPage` inside a `RefreshIndicator` and ensured all layout states are scrollable using `AlwaysScrollableScrollPhysics` so pulling down to refresh refreshes the list instantly under any condition.
-  - **Double Spinner UX Fix**: Added `isRefresh` optional parameter to `fetchLeaves()` inside `LeaveBloc` to skip setting `_isLoading = true` when refreshing. This prevents showing the center `CircularProgressIndicator` and the `RefreshIndicator` spinner simultaneously.
-- **Simplification of API Request Parameters**:
-  - **Query Parameters Simplification**: Refactored the GET endpoints for `Cuti` (`/api/leave`), `Izin` (`/api/izin`), `SPPD` (`/api/sppd/history`), and `Attendance History` (`/api/attendance/history`) to read `nip` and `nidn` directly from `c.FormValue` instead of checking `c.Query` first.
-  - **Cuti & Attendance Pagination Removal**: Refactored `GetAllCutiQuery` and `GetAttendanceHistoryQuery` signatures and underlying repositories to completely remove pagination parameters. The `/api/leave` and `/api/attendance/history` APIs now return flat JSON slices of `[]domain.Cuti` and `[]domain.Absen` instead of paginated metadata envelopes.
-  - **Flutter Client Sync**: Updated Dart repositories (`leave_repository.dart` and `attendance_repository.dart`) to request URLs without page parameters and parse responses directly as flat Lists.
-- **Support for Keycloak RS512 / RS256 Tokens in Middleware**:
-  - **Asymmetric Signature Fallback**: Updated `parseJWT` in Go backend's [Middleware.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/common/presentation/Middleware.go#L361) to support both symmetric HMAC (`HS256`) local tokens and Keycloak's asymmetric RSA (`RS512`/`RS256`) tokens. If HMAC validation fails, it falls back to parsing the JWT unverified (`ParseUnverified`) to read the OpenID Connect claims.
-  - **OIDC Claims Mapping**: Refactored `injectRequestValues` in [Middleware.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/common/presentation/Middleware.go#L395) to intercept tokens from Keycloak (checking the `iss` claim). It automatically maps `employeeid` as `sid` (NIP/NIDN) and dynamically resolves the `source` based on the user's `group` (setting `"simak"` if the user is in the `"Dosen"` group, otherwise defaulting to `"simpeg"` for `"Tendik"`).
-  - **Rejection of Incomplete OIDC Tokens**: Configured the middleware to enforce the presence of the `employeeid` claim on Keycloak OIDC tokens. If the claim is missing or empty, the middleware rejects the request immediately by returning an HTTP 400 Bad Request error.
-- **Calendar Parameter Enforcement**:
-  - **Strict FormValue extraction**: Updated the calendar presentation endpoints in [Http.go](file:///Users/adamf/Documents/flutter_project/hrportalv2/backend/modules/calendar/presentation/Http.go#L17-L56) to read `nip` and `nidn` directly and strictly from `c.FormValue` instead of allowing query fallbacks, complying with backend design guidelines.
-
-
-
-
-
-
+### Report Database Verification
+- Verified that all SQL queries compile cleanly under context-based transaction routing.
+- Backend server compiled cleanly and is active locally.

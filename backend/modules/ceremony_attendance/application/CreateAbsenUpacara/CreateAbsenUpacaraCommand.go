@@ -46,17 +46,42 @@ func (h *CreateAbsenUpacaraCommandHandler) Handle(ctx context.Context, cmd *Crea
 		UpdatedAt: &now,
 	}
 
-	if err := h.repo.Create(ctx, upacara); err != nil {
-		return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
-	}
-
-	// Increment report counter
 	nipVal := cmd.Nip
 	if nipVal == "" {
 		nipVal = cmd.Nidn
 	}
-	if repo := reportInfra.GetReportRepository(); repo != nil && nipVal != "" {
-		_ = repo.IncrementCounter(ctx, nipVal, cmd.Nidn, now, "upacara")
+
+	repo := reportInfra.GetReportRepository()
+	if repo != nil && nipVal != "" {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		if err := h.repo.Create(ctxTx, upacara); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
+		}
+
+		if err := repo.IncrementCounter(ctxTx, nipVal, cmd.Nidn, now, "upacara"); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
+		}
+
+		return common.SuccessValue(upacara), nil
+	}
+
+	// Fallback if report repository is nil (should not happen in production)
+	if err := h.repo.Create(ctx, upacara); err != nil {
+		return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
 	}
 
 	return common.SuccessValue(upacara), nil

@@ -29,6 +29,7 @@ func ModuleAttendance(app *fiber.App) {
 			Nidn:      c.FormValue("nidn"),
 			Latitude:  lat,
 			Longitude: lon,
+			Note:      c.FormValue("note"),
 		}
 
 		res, err := mediatr.Send[*CheckIn.CheckInCommand, common.ResultValue[*domain.Absen]](c.UserContext(), &command)
@@ -94,7 +95,10 @@ func ModuleAttendance(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		return c.JSON(res.Value)
+		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		sseAdapter := &commonpresentation.SSEAdapter[domain.Absen]{}
+
+		return sseAdapter.Send(c, pagedData)
 	})
 
 	group.Delete("/empty-masuk", func(c *fiber.Ctx) error {

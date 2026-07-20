@@ -14,6 +14,7 @@ class CheckInCommandHandler extends ICommandHandler<CheckInCommand, bool> {
       command.longitude,
       command.ipAddress,
       command.isUpacara,
+      command.note,
     );
   }
 }
