@@ -15,7 +15,6 @@ class DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
     final onSurfaceVariant = Theme.of(context).colorScheme.secondary;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -28,13 +27,15 @@ class DashboardHeader extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
+                color: Colors.white,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.grey[200]!, width: 1.5),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150',
-                  ),
-                  fit: BoxFit.cover,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(6.0),
+                child: Image.asset(
+                  'asset_app/logo-transparent.png',
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
@@ -42,15 +43,6 @@ class DashboardHeader extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'HR Connect',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: onSurface,
-                  ),
-                ),
-                const SizedBox(height: 2),
                 Text(
                   'Halo, $userName',
                   style: GoogleFonts.inter(

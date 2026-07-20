@@ -13,7 +13,8 @@ class SplashPage extends StatefulWidget {
   State<SplashPage> createState() => _SplashPageState();
 }
 
-class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateMixin {
+class _SplashPageState extends State<SplashPage>
+    with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -80,30 +81,22 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                     color: primaryColor.withOpacity(0.05),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
-                    Icons.bubble_chart,
-                    size: 80,
-                    color: primaryColor,
+                  child: Image.asset(
+                    'asset_app/logo-transparent.png',
+                    width: 160,
+                    height: 160,
+                    fit: BoxFit.contain,
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'HR CONNECT',
-                  style: GoogleFonts.outfit(
-                    fontSize: context.sp(28),
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
-                    letterSpacing: 2.0,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Universitas Pakuan Smart Portal',
+                  'Satu Portal Pintar untuk Semua Kebutuhan Kepegawaian',
                   style: GoogleFonts.inter(
                     fontSize: context.sp(14),
                     fontWeight: FontWeight.w500,
                     color: Theme.of(context).colorScheme.secondary,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 48),
                 SizedBox(
@@ -112,7 +105,8 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
                     borderRadius: const BorderRadius.all(Radius.circular(4)),
                     child: LinearProgressIndicator(
                       color: primaryColor,
-                      backgroundColor: Theme.of(context).colorScheme.surfaceContainer,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.surfaceContainer,
                       minHeight: 4,
                     ),
                   ),

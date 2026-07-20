@@ -29,23 +29,28 @@ class FloatingLogo extends StatelessWidget {
               );
             },
             child: Container(
-              width: context.w(64),
-              height: context.w(64),
+              width: context.w(80),
+              height: context.w(80),
               decoration: BoxDecoration(
-                color: primaryColor,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: primaryColor.withOpacity(0.3),
+                    color: Colors.black.withOpacity(0.05),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.corporate_fare,
-                color: Colors.white,
-                size: context.w(36),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Image.asset(
+                    'asset_app/logo-transparent.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
             ),
           ),
