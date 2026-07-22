@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kebijakan Privasi - HR Portal (hrportal.unpak.ac.id)</title>
+    <meta name="description" content="Kebijakan Privasi untuk HR Portal Universitas Pakuan. Informasi mengenai pengumpulan, penggunaan, dan perlindungan data pribadi Anda.">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --primary-bg: #eef2ff;
+            --dark: #0f172a;
+            --text-main: #334155;
+            --text-muted: #64748b;
+            --bg-body: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --radius-lg: 16px;
+            --radius-md: 10px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 10px 25px -5px rgba(79, 70, 229, 0.08), 0 8px 10px -6px rgba(0,0,0,0.02);
+            --shadow-sticky: 0 4px 20px rgba(0,0,0,0.06);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.7;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Background Pattern */
+        .bg-glow {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100vw;
+            height: 450px;
+            background: radial-gradient(circle at 50% -20%, #c7d2fe 0%, #e0e7ff 35%, rgba(248,250,252,0) 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Navbar */
+        .navbar {
+            position: sticky;
+            top: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+            padding: 1rem 0;
+        }
+
+        .navbar .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 800;
+            font-size: 1.25rem;
+        }
+
+        .brand-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            border-radius: var(--radius-md);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+        }
+
+        .badge-updated {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--primary-bg);
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(79, 70, 229, 0.15);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* Hero Header */
+        .hero {
+            padding: 3.5rem 0 2.5rem;
+            text-align: center;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 2.75rem;
+            font-weight: 800;
+            color: var(--dark);
+            letter-spacing: -0.025em;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 1.125rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Search Input */
+        .search-box {
+            position: relative;
+            max-width: 500px;
+            margin: 0 auto 1.5rem;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 12px 18px 12px 46px;
+            font-size: 0.95rem;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+            background: var(--card-bg);
+            box-shadow: var(--shadow-sm);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .search-box input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.12);
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Main Content Layout */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 2.5rem;
+            margin-bottom: 5rem;
+            align-items: start;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: sticky;
+            top: 90px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .sidebar-title {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-bottom: 0.75rem;
+            padding-left: 0.75rem;
+        }
+
+        .toc-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .toc-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            border-radius: var(--radius-md);
+            transition: all 0.2s ease;
+        }
+
+        .toc-link:hover, .toc-link.active {
+            background: var(--primary-bg);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .toc-link i {
+            width: 18px;
+            height: 18px;
+            color: var(--text-muted);
+        }
+
+        .toc-link:hover i, .toc-link.active i {
+            color: var(--primary);
+        }
+
+        /* Content Body */
+        .content-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 3rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .policy-section {
+            margin-bottom: 3rem;
+            scroll-margin-top: 100px;
+        }
+
+        .policy-section:last-child {
+            margin-bottom: 0;
+        }
+
+        h2 {
+            font-size: 1.65rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid var(--bg-body);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h2 i {
+            color: var(--primary);
+        }
+
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--dark);
+            margin: 1.75rem 0 0.85rem;
+        }
+
+        h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin: 1.25rem 0 0.5rem;
+        }
+
+        p {
+            margin-bottom: 1rem;
+            color: var(--text-main);
+        }
+
+        ul, ol {
+            margin-bottom: 1.25rem;
+            padding-left: 1.5rem;
+        }
+
+        li {
+            margin-bottom: 0.5rem;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        /* Definition Boxes & Callouts */
+        .info-card {
+            background: var(--primary-bg);
+            border-left: 4px solid var(--primary);
+            padding: 1.25rem 1.5rem;
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+            margin: 1.5rem 0;
+        }
+
+        .info-card p {
+            margin-bottom: 0;
+            color: #312e81;
+            font-size: 0.95rem;
+        }
+
+        .def-list {
+            list-style: none;
+            padding-left: 0;
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .def-item {
+            background: var(--bg-body);
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            border-radius: var(--radius-md);
+        }
+
+        .def-item strong {
+            color: var(--dark);
+            font-size: 1rem;
+        }
+
+        /* Contact Section Box */
+        .contact-box {
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+            color: white;
+            padding: 2.5rem;
+            border-radius: var(--radius-lg);
+            text-align: center;
+            margin-top: 2rem;
+            box-shadow: 0 10px 30px rgba(79, 70, 229, 0.25);
+        }
+
+        .contact-box h3 {
+            color: white;
+            margin-top: 0;
+            font-size: 1.5rem;
+        }
+
+        .contact-box p {
+            color: #e0e7ff;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn-contact {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: white;
+            color: var(--primary);
+            font-weight: 700;
+            padding: 12px 24px;
+            border-radius: 30px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-contact:hover {
+            text-decoration: none;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border);
+            background: var(--card-bg);
+            padding: 2.5rem 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 992px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                position: relative;
+                top: 0;
+            }
+
+            .hero h1 {
+                font-size: 2.15rem;
+            }
+
+            .content-card {
+                padding: 1.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-glow"></div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="https://hrportal.unpak.ac.id" class="brand">
+                <div class="brand-icon">
+                    <i data-lucide="shield-check"></i>
+                </div>
+                <span>HR Portal</span>
+            </a>
+            <div class="badge-updated">
+                <i data-lucide="calendar" style="width: 14px; height: 14px;"></i>
+                Terakhir Diperbarui: 21 Juli 2026
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Header -->
+    <header class="hero">
+        <div class="container">
+            <h1>Kebijakan Privasi</h1>
+            <p>Privasi Anda adalah prioritas kami. Halaman ini menjelaskan bagaimana HR Portal mengumpulkan, menggunakan, dan melindungi data pribadi Anda.</p>
+            
+            <div class="search-box">
+                <i data-lucide="search"></i>
+                <input type="text" id="searchPolicy" placeholder="Cari topik privasi (misal: Cookies, Data, Hak Anda)..." onkeyup="filterContent()">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <div class="container main-layout">
+        
+        <!-- Sidebar Navigation (Table of Contents) -->
+        <aside class="sidebar">
+            <div class="sidebar-title">Daftar Isi</div>
+            <ul class="toc-list">
+                <li><a href="#overview" class="toc-link active"><i data-lucide="info"></i> Pengantar</a></li>
+                <li><a href="#definitions" class="toc-link"><i data-lucide="book-open"></i> Definisi & Istilah</a></li>
+                <li><a href="#data-collection" class="toc-link"><i data-lucide="database"></i> Pengumpulan Data</a></li>
+                <li><a href="#data-use" class="toc-link"><i data-lucide="cpu"></i> Penggunaan Data</a></li>
+                <li><a href="#retention" class="toc-link"><i data-lucide="clock"></i> Penyimpanan Data</a></li>
+                <li><a href="#rights" class="toc-link"><i data-lucide="user-x"></i> Hak Hapus Data</a></li>
+                <li><a href="#security" class="toc-link"><i data-lucide="lock"></i> Keamanan Data</a></li>
+                <li><a href="#contact" class="toc-link"><i data-lucide="mail"></i> Hubungi Kami</a></li>
+            </ul>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content-card">
+
+            <!-- Section: Overview -->
+            <section id="overview" class="policy-section">
+                <h2><i data-lucide="info"></i> Pengantar</h2>
+                <p>Kebijakan Privasi ini menjelaskan kebijakan dan prosedur Kami dalam mengumpulkan, menggunakan, dan mengungkapkan informasi Anda saat Anda menggunakan Layanan, serta memberi tahu Anda tentang hak privasi Anda dan bagaimana hukum melindungi Anda.</p>
+                <div class="info-card">
+                    <p><strong>Ringkasan Ringkas:</strong> Kami menggunakan Data Pribadi Anda hanya untuk menyediakan, mengelola, dan meningkatkan Layanan HR Portal Universitas Pakuan. Dengan menggunakan Layanan, Anda menyetujui pengumpulan dan penggunaan informasi sesuai dengan Kebijakan Privasi ini.</p>
+                </div>
+            </section>
+
+            <!-- Section: Definitions -->
+            <section id="definitions" class="policy-section">
+                <h2><i data-lucide="book-open"></i> Penafsiran dan Definisi</h2>
+                <p>Kata-kata yang huruf pertamanya dikapitalisasi memiliki arti yang ditentukan berdasarkan kondisi berikut. Definisi berikut memiliki arti yang sama terlepas dari apakah bentuknya tunggal atau jamak.</p>
+                
+                <h3>Definisi Utama:</h3>
+                <div class="def-list">
+                    <div class="def-item">
+                        <strong>Akun (Account)</strong>
+                        <p>Akun unik yang dibuat untuk Anda agar dapat mengakses Layanan kami atau bagian dari Layanan kami.</p>
+                    </div>
+                    <div class="def-item">
+                        <strong>Perusahaan / Universitas (Company)</strong>
+                        <p>Merujuk pada <strong>hrportal</strong> (Universitas Pakuan, Indonesia).</p>
+                    </div>
+                    <div class="def-item">
+                        <strong>Data Pribadi (Personal Data)</strong>
+                        <p>Setiap informasi yang berkaitan dengan individu yang teridentifikasi atau dapat diidentifikasi (misalnya nama, NIP/NPM, email, data kehadiran).</p>
+                    </div>
+                    <div class="def-item">
+                        <strong>Situs Web (Website)</strong>
+                        <p>Merujuk pada HR Portal yang dapat diakses melalui <a href="https://hrportal.unpak.ac.id" target="_blank" rel="noopener">hrportal.unpak.ac.id</a>.</p>
+                    </div>
+                    <div class="def-item">
+                        <strong>Perangkat (Device)</strong>
+                        <p>Setiap perangkat yang dapat mengakses Layanan seperti komputer, ponsel cerdas (smartphone), atau tablet.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: Data Collection -->
+            <section id="data-collection" class="policy-section">
+                <h2><i data-lucide="database"></i> Pengumpulan dan Penggunaan Data Pribadi</h2>
+                
+                <h3>Jenis Data yang Dikumpulkan</h3>
+                <h4>Data Pribadi</h4>
+                <p>Saat menggunakan Layanan Kami, Kami dapat meminta Anda memberikan informasi identifikasi pribadi tertentu yang dapat digunakan untuk menghubungi atau mengidentifikasi Anda, termasuk namun tidak terbatas pada:</p>
+                <ul>
+                    <li>Alamat Email Resmi / Institusi</li>
+                    <li>Nama Lengkap dan Nomor Identitas Pegawai/Dosen</li>
+                    <li>Nomor Telepon & Data Kontak</li>
+                    <li>Informasi Profil Pengguna & Jabatan</li>
+                </ul>
+
+                <h4>Data Penggunaan (Usage Data)</h4>
+                <p>Data Penggunaan dikumpulkan secara otomatis saat menggunakan Layanan.</p>
+                <p>Data Penggunaan ini mencakup informasi seperti alamat Protokol Internet perangkat Anda (misal alamat IP), jenis browser, versi browser, halaman Layanan kami yang Anda kunjungi, waktu dan tanggal kunjungan, durasi yang dihabiskan di halaman tersebut, pengenal unik perangkat, serta data diagnostik lainnya.</p>
+
+                <h4>Teknologi Pelacakan dan Cookies</h4>
+                <p>Kami menggunakan Cookies dan teknologi pelacakan serupa untuk melacak aktivitas di Layanan Kami dan menyimpan informasi tertentu. Cookies yang kami gunakan antara lain:</p>
+                <ul>
+                    <li><strong>Cookies Esensial / Wajib:</strong> Diperlukan untuk mengotentikasi pengguna dan mencegah penggunaan akun yang tidak sah.</li>
+                    <li><strong>Cookies Preferensi & Fungsionalitas:</strong> Mengingat pilihan yang Anda buat (seperti login dan preferensi bahasa).</li>
+                </ul>
+            </section>
+
+            <!-- Section: Data Use -->
+            <section id="data-use" class="policy-section">
+                <h2><i data-lucide="cpu"></i> Penggunaan Data Pribadi Anda</h2>
+                <p>Perusahaan dapat menggunakan Data Pribadi untuk tujuan berikut:</p>
+                <ul>
+                    <li><strong>Menyediakan dan memelihara Layanan kami:</strong> Termasuk memantau penggunaan Layanan HR Portal.</li>
+                    <li><strong>Mengelola Akun Anda:</strong> Mengelola pendaftaran Anda sebagai pengguna Layanan dan otorisasi hak akses kepegawaian.</li>
+                    <li><strong>Untuk pelaksanaan kontrak/layanan:</strong> Pengembangan, pemenuhan, dan pelaksanaan layanan kepegawaian institusi.</li>
+                    <li><strong>Menghubungi Anda:</strong> Menghubungi Anda melalui email, panggilan telepon, SMS, atau pemberitahuan push (*push notifications*) terkait pembaruan keamanan dan informasi penting kepegawaian.</li>
+                    <li><strong>Mengelola permintaan Anda:</strong> Menangani permintaan atau kendala teknis yang Anda ajukan kepada Kami.</li>
+                </ul>
+            </section>
+
+            <!-- Section: Retention -->
+            <section id="retention" class="policy-section">
+                <h2><i data-lucide="clock"></i> Penyimpanan dan Penghapusan Data</h2>
+                <p>Perusahaan hanya akan menyimpan Data Pribadi Anda selama diperlukan untuk tujuan yang tercantum dalam Kebijakan Privasi ini:</p>
+                <ul>
+                    <li><strong>Informasi Akun Pengguna:</strong> Disimpan selama akun aktif ditambah hingga 24 bulan setelah penutupan akun untuk keperluan penyelesaian administratif.</li>
+                    <li><strong>Log Server & Analitik:</strong> Disimpan hingga 24 bulan untuk pemantauan keamanan dan pemecahan masalah sistem.</li>
+                </ul>
+            </section>
+
+            <!-- Section: Delete Data -->
+            <section id="rights" class="policy-section">
+                <h2><i data-lucide="user-x"></i> Hak Anda untuk Menghapus Data</h2>
+                <p>Anda berhak untuk menghapus atau meminta Kami membantu menghapus Data Pribadi yang telah Kami kumpulkan tentang Anda.</p>
+                <p>Anda dapat memperbarui, mengubah, atau menghapus informasi Anda kapan saja dengan masuk ke Akun Anda dan mengunjungi bagian pengaturan akun. Anda juga dapat menghubungi kami secara langsung untuk meminta akses, koreksi, atau penghapusan data pribadi.</p>
+            </section>
+
+            <!-- Section: Security -->
+            <section id="security" class="policy-section">
+                <h2><i data-lucide="lock"></i> Keamanan Data Pribadi Anda</h2>
+                <p>Keamanan Data Pribadi Anda sangat penting bagi Kami. Kami menerapkan langkah-langkah enkripsi dan keamanan standar industri untuk melindungi data Anda. Namun, ingatlah bahwa tidak ada metode transmisi melalui Internet atau metode penyimpanan elektronik yang 100% aman.</p>
+            </section>
+
+            <!-- Section: Contact -->
+            <section id="contact" class="policy-section">
+                <h2><i data-lucide="mail"></i> Hubungi Kami</h2>
+                <p>Jika Anda memiliki pertanyaan tentang Kebijakan Privasi ini atau pengelolaan data pribadi di HR Portal, Anda dapat menghubungi tim kami:</p>
+                
+                <div class="contact-box">
+                    <h3>Punya Pertanyaan Mengenai Privasi?</h3>
+                    <p>Tim dukungan HR Portal siap membantu Anda.</p>
+                    <a href="mailto:adamilkom00@gmail.com" class="btn-contact">
+                        <i data-lucide="send"></i>
+                        Kirim Email Ke adamilkom00@gmail.com
+                    </a>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 HR Portal (hrportal.unpak.ac.id). Hak Cipta Dilindungi Undang-Undang.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Smooth Scroll & Active Link highlighting
+        const tocLinks = document.querySelectorAll('.toc-link');
+        tocLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                tocLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+            });
+        });
+
+        // Simple Search Filter
+        function filterContent() {
+            const input = document.getElementById('searchPolicy').value.toLowerCase();
+            const sections = document.querySelectorAll('.policy-section');
+
+            sections.forEach(section => {
+                const text = section.innerText.toLowerCase();
+                if (text.includes(input)) {
+                    section.style.display = 'block';
+                } else {
+                    section.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>

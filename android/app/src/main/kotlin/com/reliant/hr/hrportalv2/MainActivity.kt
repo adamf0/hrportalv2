@@ -1,4 +1,4 @@
-package com.reliant.hr.hrportalv2
+package com.unpak.hr
 
 import io.flutter.embedding.android.FlutterActivity
 

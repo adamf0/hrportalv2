@@ -40,20 +40,22 @@ func (r *SppdRepository) DeleteSppd(ctx context.Context, id uint) error {
 	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Sppd{}, id).Error
 }
 
-func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string) ([]domain.Sppd, error) {
-	if nip == "" && nidn == "" {
-		return []domain.Sppd{}, nil
-	}
+func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool) ([]domain.Sppd, error) {
 	var items []domain.Sppd
 	var total int64
 
-	var query *gorm.DB
-	if nip != "" && nidn != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Sppd{}).Where("(nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?))", nip, nidn, nip, nidn)
-	} else if nip != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Sppd{}).Where("(nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?))", nip, nip)
-	} else if nidn != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Sppd{}).Where("(nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?))", nidn, nidn)
+	query := r.db.WithContext(ctx).Model(&domain.Sppd{})
+
+	if isSdm {
+		// SDM user gets all records across all statuses (terima atasan, tolak atasan, terima sdm, tolak sdm, menunggu, etc)
+	} else if nip != "" || nidn != "" {
+		if nip != "" && nidn != "" {
+			query = query.Where("verifikasi = ? or (nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?))", nip, nip, nidn, nip, nidn)
+		} else if nip != "" {
+			query = query.Where("verifikasi = ? or (nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?))", nip, nip, nip)
+		} else {
+			query = query.Where("(nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?))", nidn, nidn)
+		}
 	}
 
 	query.Count(&total)

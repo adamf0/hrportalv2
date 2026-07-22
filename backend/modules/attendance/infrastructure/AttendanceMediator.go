@@ -14,9 +14,9 @@ import (
 )
 
 func RegisterModuleAttendance(db *gorm.DB) error {
-	if err := db.AutoMigrate(&domain.Absen{}); err != nil {
-		return err
-	}
+	// if err := db.AutoMigrate(&domain.Absen{}); err != nil {
+	// 	return err
+	// }
 	repo := NewAttendanceRepository(db)
 
 	checkInHandler := CheckIn.NewCheckInCommandHandler(repo)

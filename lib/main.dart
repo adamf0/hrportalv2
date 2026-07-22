@@ -46,6 +46,8 @@ import 'modules/leave/application/get_leaves/get_leaves_query.dart';
 import 'modules/leave/application/get_leaves/get_leaves_query_handler.dart';
 import 'modules/leave/application/get_supervisors/get_supervisors_query.dart';
 import 'modules/leave/application/get_supervisors/get_supervisors_query_handler.dart';
+import 'modules/leave/application/get_verification_leaves/get_verification_leaves_query.dart';
+import 'modules/leave/application/update_leave_status/update_leave_status_command.dart';
 import 'modules/leave/infrastructure/leave_repository.dart';
 import 'modules/leave/presentation/leave_bloc.dart';
 
@@ -56,6 +58,9 @@ import 'modules/payroll/application/get_salary_slip/get_salary_slip_query.dart';
 import 'modules/payroll/application/get_salary_slip/get_salary_slip_query_handler.dart';
 import 'modules/payroll/infrastructure/payroll_repository.dart';
 import 'modules/payroll/presentation/payroll_bloc.dart';
+
+// Report Module
+import 'modules/report/presentation/report_bloc.dart';
 
 // Navigation Shell
 import 'pages/main_shell.dart';
@@ -99,6 +104,10 @@ void main() {
       GetLeavesQueryHandler(leaveRepo));
   mediator.registerHandler<GetSupervisorsQuery, List<Supervisor>>(
       GetSupervisorsQueryHandler(leaveRepo));
+  mediator.registerHandler<GetVerificationLeavesQuery, List<LeaveRequest>>(
+      GetVerificationLeavesQueryHandler(leaveRepo));
+  mediator.registerHandler<UpdateLeaveStatusCommand, bool>(
+      UpdateLeaveStatusCommandHandler(leaveRepo));
 
   // 4. Payroll Registrations
   final IPayrollRepository payrollRepo = PayrollRepository();
@@ -112,6 +121,7 @@ void main() {
         ChangeNotifierProvider(create: (context) => AttendanceBloc()),
         ChangeNotifierProvider(create: (context) => LeaveBloc()),
         ChangeNotifierProvider(create: (context) => PayrollBloc()),
+        ChangeNotifierProvider(create: (context) => ReportBloc()),
       ],
       child: const HrPortalApp(),
     ),

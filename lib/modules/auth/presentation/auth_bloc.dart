@@ -20,6 +20,23 @@ class AuthBloc extends ChangeNotifier {
 
   bool get isLoggedIn => _session != null;
 
+  bool get isSdmUser {
+    if (_session == null) return false;
+    final roleLower = _session!.role.toLowerCase();
+
+    if (roleLower == 'sdm' || roleLower.contains('sdm')) {
+      return true;
+    }
+
+    for (var g in _session!.groups) {
+      final gLower = g.toLowerCase();
+      if (gLower.contains('sdm')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   bool _isPermissionsGranted = false;
   bool get isPermissionsGranted => _isPermissionsGranted;
 
@@ -96,7 +113,9 @@ class AuthBloc extends ChangeNotifier {
             email: sessionData['email'] ?? '',
             role: sessionData['role'] ?? '',
             groups: sessionData['groups'] != null
-                ? (sessionData['groups'] as List).map((e) => e.toString()).toList()
+                ? (sessionData['groups'] as List)
+                    .map((e) => e.toString())
+                    .toList()
                 : [],
             token: sessionData['token'] ?? '',
           );
@@ -157,7 +176,8 @@ class AuthBloc extends ChangeNotifier {
 
   void _startTokenRefreshTimer() {
     _tokenRefreshTimer?.cancel();
-    _tokenRefreshTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
+    _tokenRefreshTimer =
+        Timer.periodic(const Duration(minutes: 1), (timer) async {
       if (isLoggedIn) {
         try {
           final activeSession = await _mediator.send(CheckTokenQuery());

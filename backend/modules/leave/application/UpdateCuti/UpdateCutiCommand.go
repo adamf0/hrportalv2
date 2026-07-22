@@ -25,12 +25,6 @@ type UpdateCutiCommand struct {
 func (c UpdateCutiCommand) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.ID, validation.Required),
-		validation.Field(&c.JenisCutiID, validation.Required),
-		validation.Field(&c.TanggalMulai, validation.Required),
-		validation.Field(&c.TanggalSelesai, validation.Required),
-		validation.Field(&c.JumlahHari, validation.Required),
-		validation.Field(&c.Alasan, validation.Required),
-		validation.Field(&c.Status, validation.Required),
 	)
 }
 
@@ -53,15 +47,31 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 	}
 
 	now := time.Now()
-	cuti.JenisCutiID = cmd.JenisCutiID
-	cuti.TanggalMulai = cmd.TanggalMulai
-	cuti.TanggalSelesai = cmd.TanggalSelesai
-	cuti.JumlahHari = cmd.JumlahHari
-	cuti.Alasan = cmd.Alasan
+	if cmd.JenisCutiID > 0 {
+		cuti.JenisCutiID = cmd.JenisCutiID
+	}
+	if cmd.TanggalMulai != "" {
+		cuti.TanggalMulai = common.FormatDateOnly(cmd.TanggalMulai)
+	} else {
+		cuti.TanggalMulai = common.FormatDateOnly(cuti.TanggalMulai)
+	}
+	if cmd.TanggalSelesai != "" {
+		cuti.TanggalSelesai = common.FormatDateOnly(cmd.TanggalSelesai)
+	} else {
+		cuti.TanggalSelesai = common.FormatDateOnly(cuti.TanggalSelesai)
+	}
+	if cmd.JumlahHari > 0 {
+		cuti.JumlahHari = cmd.JumlahHari
+	}
+	if cmd.Alasan != "" {
+		cuti.Alasan = cmd.Alasan
+	}
 	if cmd.FileLampiran != nil {
 		cuti.FileLampiran = cmd.FileLampiran
 	}
-	cuti.Status = cmd.Status
+	if cmd.Status != "" {
+		cuti.Status = cmd.Status
+	}
 	if cmd.CatatanAtasan != nil {
 		cuti.CatatanAtasan = cmd.CatatanAtasan
 	}

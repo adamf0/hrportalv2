@@ -15,6 +15,7 @@ class CutiFormSection extends StatelessWidget {
   final TextEditingController cutiPurposeController;
   final Widget attachmentWidget;
   final Widget supervisorSelectorWidget;
+  final bool isLoading;
   final VoidCallback onSubmit;
 
   const CutiFormSection({
@@ -30,6 +31,7 @@ class CutiFormSection extends StatelessWidget {
     required this.cutiPurposeController,
     required this.attachmentWidget,
     required this.supervisorSelectorWidget,
+    this.isLoading = false,
     required this.onSubmit,
   });
 
@@ -203,30 +205,41 @@ class CutiFormSection extends StatelessWidget {
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: onSubmit,
+            onPressed: isLoading ? null : onSubmit,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
+              disabledBackgroundColor: primaryColor.withOpacity(0.6),
+              disabledForegroundColor: Colors.white70,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
               elevation: 0,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Kirim Pengajuan Cuti',
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
+            child: isLoading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Kirim Pengajuan Cuti',
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.send, size: 18),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.send, size: 18),
-              ],
-            ),
           ),
           const SizedBox(height: 20),
         ],

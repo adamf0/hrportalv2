@@ -8,8 +8,9 @@ import 'package:path_provider/path_provider.dart';
 
 class SsoHelper {
   static const String _clientId = "unpak_link_gate";
-  static const String _logoutUrl = "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout";
-  
+  static const String _logoutUrl =
+      "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout";
+
   static const _appAuth = FlutterAppAuth();
 
   static Future<String?> getLoggedInName() async {
@@ -57,7 +58,9 @@ class SsoHelper {
         final idToken = result.idToken;
 
         await LocalStorageMobile.write('token', accessToken);
-        if (refreshToken != null) await LocalStorageMobile.write('refresh', refreshToken);
+        if (refreshToken != null) {
+          await LocalStorageMobile.write('refresh', refreshToken);
+        }
         if (idToken != null) await LocalStorageMobile.write('idToken', idToken);
 
         final decoded = _decodeJwt(idToken ?? accessToken);
@@ -108,8 +111,10 @@ class SsoHelper {
       try {
         final client = HttpClient();
         final request = await client.postUrl(Uri.parse(_logoutUrl));
-        request.headers.set('content-type', 'application/x-www-form-urlencoded');
-        final body = "client_id=$_clientId&refresh_token=${Uri.encodeComponent(refreshToken)}";
+        request.headers
+            .set('content-type', 'application/x-www-form-urlencoded');
+        final body =
+            "client_id=$_clientId&refresh_token=${Uri.encodeComponent(refreshToken)}";
         request.write(body);
         await request.close();
       } catch (e) {
@@ -133,9 +138,9 @@ class SsoHelper {
   static Future<String?> getValidToken() async {
     final token = await LocalStorageMobile.read('token');
     final refresh = await LocalStorageMobile.read('refresh');
-    
+
     if (token == null) return null;
-    
+
     if (_isTokenExpired(token)) {
       if (refresh != null) {
         print("Token expired. Attempting to refresh token...");
@@ -210,7 +215,8 @@ class SsoHelper {
     List<String> groups = [];
     if (groupsRaw != null) {
       try {
-        groups = (jsonDecode(groupsRaw) as List).map((e) => e.toString()).toList();
+        groups =
+            (jsonDecode(groupsRaw) as List).map((e) => e.toString()).toList();
       } catch (_) {}
     }
     return {

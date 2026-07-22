@@ -21,7 +21,13 @@ func ModuleIzin(app *fiber.App) {
 	group := app.Group("/api/izin", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
 
 	group.Post("/", func(c *fiber.Ctx) error {
-		jenisIzinID, _ := strconv.Atoi(c.FormValue("jenis_izin_id"))
+		jenisIzinID, _ := strconv.Atoi(c.FormValue("id_jenis_izin"))
+
+		var verifikasi *string
+		vStr := c.FormValue("verifikasi")
+		if vStr != "" {
+			verifikasi = &vStr
+		}
 
 		cmd := create.CreateIzinCommand{
 			Nip:              c.FormValue("nip"),
@@ -29,6 +35,7 @@ func ModuleIzin(app *fiber.App) {
 			JenisIzinID:      uint(jenisIzinID),
 			TanggalPengajuan: c.FormValue("tanggal_pengajuan"),
 			Tujuan:           c.FormValue("tujuan"),
+			Verifikasi:       verifikasi,
 		}
 
 		res, err := mediatr.Send[*create.CreateIzinCommand, commondomain.ResultValue[*domain.Izin]](c.UserContext(), &cmd)
@@ -45,7 +52,13 @@ func ModuleIzin(app *fiber.App) {
 
 	group.Put("/:id", func(c *fiber.Ctx) error {
 		id, _ := strconv.Atoi(c.Params("id"))
-		jenisIzinID, _ := strconv.Atoi(c.FormValue("jenis_izin_id"))
+		jenisIzinID, _ := strconv.Atoi(c.FormValue("id_jenis_izin"))
+
+		var catatan *string
+		cStr := c.FormValue("catatan")
+		if cStr != "" {
+			catatan = &cStr
+		}
 
 		cmd := update.UpdateIzinCommand{
 			ID:               uint(id),
@@ -53,6 +66,7 @@ func ModuleIzin(app *fiber.App) {
 			TanggalPengajuan: c.FormValue("tanggal_pengajuan"),
 			Tujuan:           c.FormValue("tujuan"),
 			Status:           c.FormValue("status"),
+			Catatan:          catatan,
 		}
 
 		res, err := mediatr.Send[*update.UpdateIzinCommand, commondomain.ResultValue[*domain.Izin]](c.UserContext(), &cmd)
@@ -108,10 +122,12 @@ func ModuleIzin(app *fiber.App) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nidn := c.FormValue("nidn")
 		nip := c.FormValue("nip")
+		isSdm := c.FormValue("role") == "sdm" || c.Query("is_sdm") == "true" || c.Query("tanggal_mulai") != "" || (nip == "" && nidn == "")
 
 		query := getAll.GetAllIzinsQuery{
-			Nidn: nidn,
-			Nip:  nip,
+			Nidn:  nidn,
+			Nip:   nip,
+			IsSdm: isSdm,
 		}
 
 		res, err := mediatr.Send[*getAll.GetAllIzinsQuery, commondomain.ResultValue[[]domain.Izin]](c.UserContext(), &query)

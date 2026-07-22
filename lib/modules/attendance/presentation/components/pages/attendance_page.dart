@@ -6,7 +6,9 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
+import 'package:hrportalv2/modules/auth/presentation/auth_bloc.dart';
 import 'package:hrportalv2/core/app_theme.dart';
 
 // Modular Organisms
@@ -40,6 +42,12 @@ class _AttendancePageState extends State<AttendancePage>
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.isSdmUser) return;
+      ApiClient.setActivePageScope('attendance');
+    });
   }
 
   @override

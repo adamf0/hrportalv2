@@ -73,4 +73,34 @@ func ModuleMasterData(app *fiber.App) {
 		}
 		return c.JSON(res.Value)
 	})
+
+	group.Get("/verifikator", func(c *fiber.Ctx) error {
+		q := &query.GetAllVerifikatorQuery{
+			Type: c.Query("type"),
+		}
+		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
+
+	group.Get("/unit", func(c *fiber.Ctx) error {
+		return c.JSON([]string{
+			"Sekolah Pascasarjana",
+			"Fakultas Hukum",
+			"Fakultas Ekonomi dan Bisnis",
+			"Fakultas Keguruan dan Ilmu Pendidikan",
+			"Fakultas Matematika dan Ilmu Pengetahuan Alam",
+			"Fakultas Teknik",
+			"Fakultas Agama Islam",
+			"Sekolah Vokasi",
+			"ISIB",
+			"BAUM",
+			"SDM & Keuangan",
+		})
+	})
 }

@@ -462,6 +462,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           );
         },
       ),
+      isLoading: leaveBloc.isLoading,
       onSubmit: _handleSubmit,
     );
   }
@@ -492,6 +493,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           );
         },
       ),
+      isLoading: leaveBloc.isLoading,
       onSubmit: _handleSubmit,
     );
   }
@@ -526,6 +528,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           );
         },
       ),
+      isLoading: leaveBloc.isLoading,
       onSubmit: _handleSubmit,
     );
   }

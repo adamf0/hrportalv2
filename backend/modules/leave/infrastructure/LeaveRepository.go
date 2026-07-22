@@ -38,19 +38,20 @@ func (r *LeaveRepository) DeleteCuti(ctx context.Context, id uint) error {
 	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Cuti{}, id).Error
 }
 
-func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string) ([]domain.Cuti, error) {
-	if nip == "" && nidn == "" {
-		return []domain.Cuti{}, nil
-	}
+func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool) ([]domain.Cuti, error) {
 	var items []domain.Cuti
+	query := r.db.WithContext(ctx).Model(&domain.Cuti{})
 
-	var query *gorm.DB
-	if nip != "" && nidn != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Cuti{}).Where("(nip = ? OR nidn = ?)", nip, nidn)
-	} else if nip != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Cuti{}).Where("nip = ?", nip)
-	} else if nidn != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Cuti{}).Where("nidn = ?", nidn)
+	if isSdm {
+		// SDM user gets all records across all statuses (terima atasan, tolak atasan, terima sdm, tolak sdm, menunggu, etc)
+	} else if nip != "" || nidn != "" {
+		if nip != "" && nidn != "" {
+			query = query.Where("(nip = ? OR nidn = ?) or verifikasi = ?", nip, nidn, nip)
+		} else if nip != "" {
+			query = query.Where("nip = ? or verifikasi = ?", nip, nip)
+		} else {
+			query = query.Where("nidn = ?", nidn)
+		}
 	}
 
 	err := query.Order("created_at desc").Find(&items).Error

@@ -13,19 +13,25 @@ import (
 )
 
 var globalReportRepo domain.IReportRepository
+var globalExportWorker *ExportWorker
 
 func GetReportRepository() domain.IReportRepository {
 	return globalReportRepo
 }
 
+func GetExportWorker() *ExportWorker {
+	return globalExportWorker
+}
+
 func RegisterModuleReport(db *gorm.DB) error {
 	// Auto migrate rekap_laporan_bulanan table to ensure new columns (like total_libur) exist
-	if err := db.AutoMigrate(&domain.RekapLaporanBulanan{}); err != nil {
-		return err
-	}
+	// if err := db.AutoMigrate(&domain.RekapLaporanBulanan{}); err != nil {
+	// 	return err
+	// }
 
 	repo := NewReportRepository(db)
 	globalReportRepo = repo
+	globalExportWorker = NewExportWorker(db, repo)
 
 	allLaporanHandler := GetAllLaporanAbsen.NewGetAllLaporanAbsenQueryHandler(repo)
 	err := mediatr.RegisterRequestHandler[*GetAllLaporanAbsen.GetAllLaporanAbsenQuery, common.ResultValue[map[string]interface{}]](allLaporanHandler)

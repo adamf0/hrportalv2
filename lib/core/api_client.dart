@@ -19,12 +19,51 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+/// Exception for cancelled API requests due to page switches
+class ApiCancelledException implements Exception {
+  final String scope;
+  final String url;
+
+  ApiCancelledException(this.scope, this.url);
+
+  @override
+  String toString() => 'Request cancelled due to page switch ($scope | $url)';
+}
+
 /// Robust API Client handling:
 /// - Status 200, 204, 304: SUCCESS (Parses and extracts JSON data)
 /// - Non 200/204/304 Statuses: Checks if JSON -> Extracts `message` field, else uses common error
 /// - Catches network/timeout/unpredicted exceptions -> Logs full details & displays Toast/SnackBar
+/// - Supports Page Scope cancellation (cancels/blocks requests when switching pages, except whoami/auth)
 class ApiClient {
   static const String _defaultCommonError = 'Terjadi kesalahan pada server.';
+
+  static String _activeScope = 'global';
+  static int _currentScopeId = 0;
+
+  static String get activeScope => _activeScope;
+  static int get currentScopeId => _currentScopeId;
+
+  /// Set active page scope. Cancels/blocks requests from previous page scopes!
+  static void setActivePageScope(String scope) {
+    _currentScopeId++;
+    _activeScope = scope;
+    debugPrint('[ApiClient PageScope] Active page scope set to: $scope (ID: $_currentScopeId)');
+  }
+
+  /// Check if a request URL or scope is exempted from page switch cancellation (e.g. auth, whoami, check-token)
+  static bool isExemptedUrl(Uri url, String? customScope) {
+    if (customScope == 'global' || customScope == 'whoami' || customScope == 'auth') return true;
+    final path = url.path.toLowerCase();
+    if (path.contains('whoami') ||
+        path.contains('check-token') ||
+        path.contains('auth') ||
+        path.contains('login') ||
+        path.contains('logout')) {
+      return true;
+    }
+    return false;
+  }
 
   static String get baseUrl {
     if (kIsWeb) {
@@ -42,9 +81,34 @@ class ApiClient {
   static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
 
+  static String _scopeToPageTitle(String scope) {
+    switch (scope.toLowerCase()) {
+      case 'dashboard':
+        return 'Dashboard';
+      case 'sdm_report':
+        return 'Laporan SDM';
+      case 'attendance':
+        return 'Presensi';
+      case 'requests':
+        return 'Pengajuan';
+      case 'leave':
+        return 'Cuti';
+      case 'payroll':
+        return 'Gaji';
+      case 'auth':
+        return 'Autentikasi';
+      default:
+        return scope.isNotEmpty ? scope : 'Halaman';
+    }
+  }
+
   /// Display a Toast SnackBar for API errors
-  static void showToast(String message) {
-    debugPrint('[API Toast Notification]: $message');
+  static void showToast(String message, {String? scope}) {
+    final pageContext = scope ?? _activeScope;
+    final pageTitle = _scopeToPageTitle(pageContext);
+    final formattedMsg = '[$pageTitle] $message';
+    debugPrint('[API Toast Notification]: $formattedMsg');
+
     scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Row(
@@ -53,7 +117,7 @@ class ApiClient {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                message,
+                formattedMsg,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
               ),
             ),
@@ -153,10 +217,19 @@ class ApiClient {
     Map<String, String>? headers,
     Object? body,
     Duration timeout = const Duration(seconds: 10),
+    String? scope,
   }) async {
+    final reqScopeId = _currentScopeId;
+    final reqScope = scope ?? _activeScope;
+    final isExempt = isExemptedUrl(url, scope);
+
+    if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+      debugPrint('[ApiClient Pre-Check Blocked]: POST $url (Scope mismatch: $reqScope != $_activeScope)');
+      throw ApiCancelledException(reqScope, url.toString());
+    }
+
     final injectedHeaders = await _injectAuthHeaders(headers);
-    debugPrint('[API Loading State Log] Request: POST $url | State: START');
-    debugPrint('[API Request Log] POST $url | Headers: $injectedHeaders | Body: $body');
+    debugPrint('[API Loading State Log] Request: POST $url | State: START (Scope: $reqScope)');
     try {
       final response = await http.post(
         url,
@@ -164,27 +237,46 @@ class ApiClient {
         body: body,
       ).timeout(timeout);
 
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        debugPrint('[ApiClient Post-Check Cancelled]: POST $url (Page switched during request)');
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+
       debugPrint('[API Loading State Log] Request: POST $url | State: END');
       return processResponse(response);
+    } on ApiCancelledException {
+      rethrow;
     } on SocketException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST $url | State: END (TimeoutException)');
       const msg = 'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST $url | State: END (FormatException)');
       const msg = 'Format data dari server mengalami kesalahan.';
       debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST $url | State: END (Exception)');
       if (e is ApiException) rethrow;
       final msg = 'Terjadi kesalahan tidak terduga: $e';
@@ -202,10 +294,19 @@ class ApiClient {
     String? fileFieldName,
     String? filePath,
     Duration timeout = const Duration(seconds: 15),
+    String? scope,
   }) async {
+    final reqScopeId = _currentScopeId;
+    final reqScope = scope ?? _activeScope;
+    final isExempt = isExemptedUrl(url, scope);
+
+    if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+      debugPrint('[ApiClient Pre-Check Blocked]: POST MULTIPART $url (Scope mismatch: $reqScope != $_activeScope)');
+      throw ApiCancelledException(reqScope, url.toString());
+    }
+
     final injectedHeaders = await _injectAuthHeaders(headers);
-    debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: START');
-    debugPrint('[API Request Log] POST MULTIPART $url | Headers: $injectedHeaders | Fields: $fields | File: $filePath ($fileFieldName)');
+    debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: START (Scope: $reqScope)');
     try {
       final request = http.MultipartRequest('POST', url);
       request.headers.addAll(injectedHeaders);
@@ -221,27 +322,46 @@ class ApiClient {
       final streamedResponse = await request.send().timeout(timeout);
       final response = await http.Response.fromStream(streamedResponse);
 
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        debugPrint('[ApiClient Post-Check Cancelled]: POST MULTIPART $url (Page switched during request)');
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+
       debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END');
       return processResponse(response);
+    } on ApiCancelledException {
+      rethrow;
     } on SocketException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (TimeoutException)');
       const msg = 'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (FormatException)');
       const msg = 'Format data dari server mengalami kesalahan.';
       debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: POST MULTIPART $url | State: END (Exception)');
       if (e is ApiException) rethrow;
       final msg = 'Terjadi kesalahan tidak terduga: $e';
@@ -255,39 +375,142 @@ class ApiClient {
   static Future<dynamic> get(
     Uri url, {
     Map<String, String>? headers,
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = const Duration(seconds: 45),
+    String? scope,
   }) async {
+    final reqScopeId = _currentScopeId;
+    final reqScope = scope ?? _activeScope;
+    final isExempt = isExemptedUrl(url, scope);
+
+    if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+      debugPrint('[ApiClient Pre-Check Blocked]: GET $url (Scope mismatch: $reqScope != $_activeScope)');
+      throw ApiCancelledException(reqScope, url.toString());
+    }
+
     final injectedHeaders = await _injectAuthHeaders(headers);
-    debugPrint('[API Loading State Log] Request: GET $url | State: START');
-    debugPrint('[API Request Log] GET $url | Headers: $injectedHeaders');
+    debugPrint('[API Loading State Log] Request: GET $url | State: START (Scope: $reqScope)');
     try {
       final response = await http.get(
         url,
         headers: injectedHeaders,
       ).timeout(timeout);
 
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        debugPrint('[ApiClient Post-Check Cancelled]: GET $url (Page switched during request)');
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+
       debugPrint('[API Loading State Log] Request: GET $url | State: END');
       return processResponse(response);
+    } on ApiCancelledException {
+      rethrow;
     } on SocketException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: GET $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: GET $url | State: END (TimeoutException)');
       const msg = 'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: GET $url | State: END (FormatException)');
       const msg = 'Format data dari server mengalami kesalahan.';
       debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
       showToast(msg);
       throw ApiException(msg);
     } catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
       debugPrint('[API Loading State Log] Request: GET $url | State: END (Exception)');
+      if (e is ApiException) rethrow;
+      final msg = 'Terjadi kesalahan tidak terduga: $e';
+      debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    }
+  }
+
+  /// Perform PUT request
+  static Future<dynamic> put(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration timeout = const Duration(seconds: 10),
+    String? scope,
+  }) async {
+    final reqScopeId = _currentScopeId;
+    final reqScope = scope ?? _activeScope;
+    final isExempt = isExemptedUrl(url, scope);
+
+    if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+      debugPrint('[ApiClient Pre-Check Blocked]: PUT $url (Scope mismatch: $reqScope != $_activeScope)');
+      throw ApiCancelledException(reqScope, url.toString());
+    }
+
+    final injectedHeaders = await _injectAuthHeaders(headers);
+    debugPrint('[API Loading State Log] Request: PUT $url | State: START (Scope: $reqScope)');
+    try {
+      final response = await http.put(
+        url,
+        headers: injectedHeaders,
+        body: body,
+      ).timeout(timeout);
+
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        debugPrint('[ApiClient Post-Check Cancelled]: PUT $url (Page switched during request)');
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+
+      debugPrint('[API Loading State Log] Request: PUT $url | State: END');
+      return processResponse(response);
+    } on ApiCancelledException {
+      rethrow;
+    } on SocketException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint('[API Loading State Log] Request: PUT $url | State: END (SocketException)');
+      const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
+      debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on TimeoutException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint('[API Loading State Log] Request: PUT $url | State: END (TimeoutException)');
+      const msg = 'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
+      debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on FormatException catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint('[API Loading State Log] Request: PUT $url | State: END (FormatException)');
+      const msg = 'Format data dari server mengalami kesalahan.';
+      debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } catch (e, stackTrace) {
+      if (!isExempt && (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint('[API Loading State Log] Request: PUT $url | State: END (Exception)');
       if (e is ApiException) rethrow;
       final msg = 'Terjadi kesalahan tidak terduga: $e';
       debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');

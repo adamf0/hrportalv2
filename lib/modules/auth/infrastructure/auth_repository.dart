@@ -36,8 +36,9 @@ class AuthRepository implements IAuthRepository {
           final email = whoamiData['email'] ?? '';
           final nidn = whoamiData['nidn'] ?? '';
 
-          final resolvedRole = nidn.isNotEmpty ? 'Dosen' : 'Tendik';
-          final groups = resolvedRole == 'Dosen' ? ['Dosen'] : ['Tendik'];
+          final level = (whoamiData['level'] ?? whoamiData['role'] ?? '').toString();
+          final resolvedRole = level.isNotEmpty ? level : (nidn.isNotEmpty ? 'Dosen' : 'Tendik');
+          final groups = level.isNotEmpty ? [level] : (resolvedRole == 'Dosen' ? ['Dosen'] : ['Tendik']);
 
           await SsoHelper.saveSession(
             token: token,

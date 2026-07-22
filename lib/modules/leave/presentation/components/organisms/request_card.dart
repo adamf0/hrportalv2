@@ -5,10 +5,14 @@ import 'package:hrportalv2/modules/leave/domain/leave_status.dart';
 
 class RequestCard extends StatelessWidget {
   final LeaveRequest req;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
 
   const RequestCard({
     super.key,
     required this.req,
+    this.onApprove,
+    this.onReject,
   });
 
   @override
@@ -77,13 +81,56 @@ class RequestCard extends StatelessWidget {
               ],
             ),
             const Divider(height: 24, thickness: 1),
-            Text(
-              req.note,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey[650],
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    req.note,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[650],
+                    ),
+                  ),
+                ),
+                if (onApprove != null || onReject != null) ...[
+                  const SizedBox(width: 8),
+                  Row(
+                    children: [
+                      if (onReject != null)
+                        ElevatedButton.icon(
+                          onPressed: onReject,
+                          icon: const Icon(Icons.close, size: 14),
+                          label: const Text('Tolak'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red[600],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      if (onReject != null && onApprove != null) const SizedBox(width: 6),
+                      if (onApprove != null)
+                        ElevatedButton.icon(
+                          onPressed: onApprove,
+                          icon: const Icon(Icons.check, size: 14),
+                          label: const Text('ACC'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[600],
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ],
             ),
           ],
         ),

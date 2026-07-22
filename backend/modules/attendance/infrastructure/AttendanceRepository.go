@@ -47,7 +47,7 @@ func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, 
 	} else if nidn != "" {
 		query = r.db.WithContext(ctx).Model(&domain.Absen{}).Where("nidn = ?", nidn)
 	} else {
-		return nil, nil
+		query = r.db.WithContext(ctx).Model(&domain.Absen{})
 	}
 
 	err := query.Order("tanggal desc").Find(&items).Error

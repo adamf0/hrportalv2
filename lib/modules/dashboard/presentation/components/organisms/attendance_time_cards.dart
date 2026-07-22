@@ -36,14 +36,16 @@ class AttendanceTimeCards extends StatelessWidget {
 
       return Flex(
         direction: context.isWatch ? Axis.vertical : Axis.horizontal,
-        crossAxisAlignment: context.isWatch ? CrossAxisAlignment.stretch : CrossAxisAlignment.start,
+        crossAxisAlignment: context.isWatch
+            ? CrossAxisAlignment.stretch
+            : CrossAxisAlignment.start,
         children: [
-          context.isWatch ? shimmerCard : Expanded(child: shimmerCard),
+          context.isWatch ? shimmerCard : const Expanded(child: shimmerCard),
           SizedBox(
             width: context.isWatch ? 0 : 16,
             height: context.isWatch ? 12 : 0,
           ),
-          context.isWatch ? shimmerCard : Expanded(child: shimmerCard),
+          context.isWatch ? shimmerCard : const Expanded(child: shimmerCard),
         ],
       );
     }
@@ -120,7 +122,9 @@ class AttendanceTimeCards extends StatelessWidget {
 
     return Flex(
       direction: context.isWatch ? Axis.vertical : Axis.horizontal,
-      crossAxisAlignment: context.isWatch ? CrossAxisAlignment.stretch : CrossAxisAlignment.start,
+      crossAxisAlignment: context.isWatch
+          ? CrossAxisAlignment.stretch
+          : CrossAxisAlignment.start,
       children: [
         context.isWatch ? jamMasukCard : Expanded(child: jamMasukCard),
         SizedBox(

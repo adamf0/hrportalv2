@@ -107,8 +107,9 @@ class LocationWifiHelper {
   // Indonesian National Holidays Checklist (Sundays & Mapped Holidays for 2025/2026/2027)
   static bool isIndonesianHoliday(DateTime date) {
     //[pr]
-    if (date.weekday == DateTime.sunday || date.weekday == DateTime.saturday)
+    if (date.weekday == DateTime.sunday || date.weekday == DateTime.saturday) {
       return true;
+    }
 
     final year = date.year;
     final month = date.month;

@@ -15,7 +15,8 @@ class PayrollRepository implements IPayrollRepository {
   };
 
   @override
-  Future<PayrollData?> fetchPayroll(String nip, String year, String month) async {
+  Future<PayrollData?> fetchPayroll(
+      String nip, String year, String month) async {
     final yearInt = int.tryParse(year);
     if (yearInt == null || yearInt < 2000 || yearInt > 2050) {
       throw const InvalidPayrollPeriodError();
@@ -37,7 +38,7 @@ class PayrollRepository implements IPayrollRepository {
     };
 
     final numericMonth = monthMap[month] ?? "06";
-    final targetNip = nip.isNotEmpty && RegExp(r'^\d+$').hasMatch(nip) ? nip : "10616049757";
+    final targetNip = nip.isNotEmpty ? nip : "";
 
     try {
       final responseData = await ApiClient.post(
@@ -49,14 +50,16 @@ class PayrollRepository implements IPayrollRepository {
         },
       );
 
-      if (responseData is Map<String, dynamic> && responseData['data'] != null) {
+      if (responseData is Map<String, dynamic> &&
+          responseData['data'] != null) {
         return PayrollData.fromJson(responseData['data']);
       } else {
         throw const PayrollNotFoundError();
       }
     } on ApiException catch (e, stackTrace) {
-      debugPrint('[PayrollRepository API Exception]: ${e.message}\n$stackTrace');
-      
+      debugPrint(
+          '[PayrollRepository API Exception]: ${e.message}\n$stackTrace');
+
       final key = "$month-$year";
       if (_mockDatabase.containsKey(key)) {
         return _mockDatabase[key];
@@ -65,7 +68,7 @@ class PayrollRepository implements IPayrollRepository {
     } catch (e, stackTrace) {
       debugPrint('[PayrollRepository Unhandled Error]: $e\n$stackTrace');
       if (e is PayrollError) rethrow;
-      
+
       final key = "$month-$year";
       if (_mockDatabase.containsKey(key)) {
         return _mockDatabase[key];

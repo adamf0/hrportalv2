@@ -1,6 +1,10 @@
 package presentation
 
 import (
+	"fmt"
+	"path/filepath"
+	"time"
+
 	common "hrportal_backend/common/domain"
 	"hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
@@ -9,6 +13,7 @@ import (
 	"hrportal_backend/modules/report/application/GetSummaryReport"
 	"hrportal_backend/modules/report/application/StreamLaporanAbsen"
 	"hrportal_backend/modules/report/domain"
+	reportInfra "hrportal_backend/modules/report/infrastructure"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mehdihadeli/go-mediatr"
@@ -44,8 +49,8 @@ func ModuleReport(app *fiber.App) {
 	})
 
 	group.Get("/all", func(c *fiber.Ctx) error {
-		nidn := c.FormValue("nidn")
-		nip := c.FormValue("nip")
+		nidn := c.Query("nidn")
+		nip := c.Query("nip")
 
 		query := &GetAllLaporanAbsen.GetAllLaporanAbsenQuery{
 			TanggalMulai: c.Query("tanggal_mulai"),
@@ -68,8 +73,8 @@ func ModuleReport(app *fiber.App) {
 
 	// SSE Endpoint
 	group.Get("/stream", func(c *fiber.Ctx) error {
-		nidn := c.FormValue("nidn")
-		nip := c.FormValue("nip")
+		nidn := c.Query("nidn")
+		nip := c.Query("nip")
 
 		query := &StreamLaporanAbsen.StreamLaporanAbsenQuery{
 			TanggalMulai: c.Query("tanggal_mulai"),
@@ -108,5 +113,75 @@ func ModuleReport(app *fiber.App) {
 		}
 
 		return c.JSON(res.Value)
+	})
+
+	// 1. Request Background Export Job (Hangfire Concept: UUIDv4 + Queue)
+	group.Get("/export/request", func(c *fiber.Ctx) error {
+		tglMulai := c.Query("tanggal_mulai")
+		tglAkhir := c.Query("tanggal_akhir")
+		if tglMulai == "" {
+			tglMulai = time.Now().Format("2006-01") + "-01"
+		}
+		if tglAkhir == "" {
+			tglAkhir = time.Now().Format("2006-01-02")
+		}
+
+		worker := reportInfra.GetExportWorker()
+		if worker == nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Export worker not initialized"})
+		}
+
+		job, err := worker.CreateJob(c.UserContext(), tglMulai, tglAkhir)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+
+		return c.JSON(fiber.Map{
+			"task_id":  job.TaskID,
+			"status":   job.Status,
+			"message":  "Task export dimasukkan ke antrean background",
+			"progress": job.Progress,
+		})
+	})
+
+	// 2. Poll Status of Export Task
+	group.Get("/export/status/:taskId", func(c *fiber.Ctx) error {
+		taskId := c.Params("taskId")
+		worker := reportInfra.GetExportWorker()
+		if worker == nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Export worker not initialized"})
+		}
+
+		job, err := worker.GetJobStatus(c.UserContext(), taskId)
+		if err != nil {
+			return c.Status(404).JSON(fiber.Map{"error": "Task export tidak ditemukan"})
+		}
+
+		return c.JSON(fiber.Map{
+			"task_id":       job.TaskID,
+			"status":        job.Status,
+			"progress":      job.Progress,
+			"file_path":     job.FilePath,
+			"download_url":  "/api/laporan/export/download/" + job.TaskID,
+			"error_message": job.ErrorMessage,
+		})
+	})
+
+	// 3. Download Generated Excel/CSV File
+	group.Get("/export/download/:taskId", func(c *fiber.Ctx) error {
+		taskId := c.Params("taskId")
+		worker := reportInfra.GetExportWorker()
+		if worker == nil {
+			return c.Status(500).SendString("Export worker not initialized")
+		}
+
+		job, err := worker.GetJobStatus(c.UserContext(), taskId)
+		if err != nil || job.Status != "completed" || job.FilePath == "" {
+			return c.Status(404).SendString("File export belum siap atau gagal diproses.")
+		}
+
+		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filepath.Base(job.FilePath)))
+		c.Set("Content-Type", "text/csv; charset=utf-8")
+		return c.SendFile(job.FilePath)
 	})
 }

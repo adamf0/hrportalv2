@@ -3,11 +3,11 @@ import 'package:hrportalv2/core/app_theme.dart';
 
 /// Strongly-typed Enum for Leave Request Statuses following Clean Code & Value Object pattern.
 enum LeaveRequestStatus {
-  pengajuan('Pengajuan', 'Menunggu'),
-  diAccAtasan('Di ACC Atasan', 'Di ACC Atasan'),
-  accSdm('ACC SDM', 'Disetujui'),
-  tolakAtasan('Tolak Atasan', 'Tolak Atasan'),
-  tolakSdm('Tolak SDM', 'Ditolak');
+  pengajuan('pengajuan', 'menunggu'),
+  diAccAtasan('terima atasan', 'terima atasan'),
+  accSdm('acc sdm', 'disetujui'),
+  tolakAtasan('tolak atasan', 'tolak atasan'),
+  tolakSdm('tolak sdm', 'ditolak');
 
   final String label;
   final String alias;
@@ -16,15 +16,19 @@ enum LeaveRequestStatus {
 
   /// Parse raw status strings dynamically into strongly-typed LeaveRequestStatus enum
   static LeaveRequestStatus fromString(String statusStr) {
-    final normalized = statusStr.trim().toUpperCase();
-    if (normalized == 'ACC SDM' || normalized == 'DISETUJUI' || normalized == 'TERIMA SDM') {
+    final normalized = statusStr.trim().toLowerCase();
+    if (normalized == 'acc sdm' ||
+        normalized == 'disetujui' ||
+        normalized == 'terima sdm') {
       return LeaveRequestStatus.accSdm;
-    } else if (normalized == 'DI ACC ATASAN') {
+    } else if (normalized == 'terima atasan') {
       return LeaveRequestStatus.diAccAtasan;
-    } else if (normalized == 'TOLAK ATASAN') {
+    } else if (normalized == 'tolak atasan') {
       return LeaveRequestStatus.tolakAtasan;
-    } else if (normalized == 'TOLAK SDM' || normalized == 'DITOLAK') {
+    } else if (normalized == 'tolak sdm' || normalized == 'ditolak') {
       return LeaveRequestStatus.tolakSdm;
+    } else if (normalized == 'pengajuan' || normalized == 'menunggu') {
+      return LeaveRequestStatus.pengajuan;
     } else {
       return LeaveRequestStatus.pengajuan;
     }
@@ -32,7 +36,8 @@ enum LeaveRequestStatus {
 
   /// True if the leave status is in approved state
   bool get isApproved =>
-      this == LeaveRequestStatus.accSdm || this == LeaveRequestStatus.diAccAtasan;
+      this == LeaveRequestStatus.accSdm ||
+      this == LeaveRequestStatus.diAccAtasan;
 
   /// Background color for status badge rendering
   Color get tagBackgroundColor {

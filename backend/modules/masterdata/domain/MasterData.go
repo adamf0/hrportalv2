@@ -49,3 +49,14 @@ type JenisSppd struct {
 func (JenisSppd) TableName() string {
 	return "jenis_sppd"
 }
+
+type Verifikator struct {
+	Nip        string `gorm:"column:nip" json:"nip"`
+	Nama       string `gorm:"column:nama" json:"nama"`
+	Struktural string `gorm:"column:struktural" json:"struktural"`
+}
+
+func (Verifikator) TableName() string {
+	return "connect_payroll_m_pegawai"
+}
+

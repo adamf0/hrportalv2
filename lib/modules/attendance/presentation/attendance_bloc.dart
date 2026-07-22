@@ -93,7 +93,8 @@ class AttendanceBloc extends ChangeNotifier {
               _realIpLocal.startsWith('10.204.') ||
               _realIpLocal.startsWith('10.205.')))
       : (LocationWifiHelper.isPakuanIp(_simulatedIp) &&
-          !_locationStrategy.isWithinCampus(_simulatedLatitude, _simulatedLongitude));
+          !_locationStrategy.isWithinCampus(
+              _simulatedLatitude, _simulatedLongitude));
 
   bool _isLoggedIn = false;
 
@@ -152,12 +153,6 @@ class AttendanceBloc extends ChangeNotifier {
 
   Future<void> fetchCeremonyAttendances() async {
     try {
-      final session = await SsoHelper.getSession();
-      if (session == null) return;
-      final nip = session['nip'] ?? '';
-      final role = session['role'] ?? '';
-      final nidn = role == 'Dosen' ? nip : '';
-
       final responseData = await ApiClient.get(
         Uri.parse("${ApiClient.baseUrl}/api/ceremony-attendance"),
       );
@@ -165,7 +160,8 @@ class AttendanceBloc extends ChangeNotifier {
       if (responseData is List) {
         _ceremonyAttendances.clear();
         final now = DateTime.now();
-        final String todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+        final String todayStr =
+            "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
         bool upacaraToday = false;
         String upacaraTimeStr = '--:--';
 
@@ -177,7 +173,8 @@ class AttendanceBloc extends ChangeNotifier {
             if (record.createdAt.isNotEmpty) {
               try {
                 final dt = DateTime.parse(record.createdAt).toLocal();
-                upacaraTimeStr = "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+                upacaraTimeStr =
+                    "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
               } catch (_) {}
             }
           }

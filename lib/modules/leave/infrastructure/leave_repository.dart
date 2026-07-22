@@ -1,189 +1,123 @@
 import 'package:flutter/foundation.dart';
 import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/core/sso_helper.dart';
-import 'package:hrportalv2/core/location_wifi_helper.dart';
 import '../domain/leave.dart';
 import '../domain/leave_errors.dart';
 import '../domain/i_leave_repository.dart';
 
 class LeaveRepository implements ILeaveRepository {
-  final List<Supervisor> _supervisors = [
-    //[pr]
-    Supervisor(
-        id: '1110221914',
-        name: 'Sobar Sukmana, MH.',
-        role: 'Kepala Bag. Ketatanegaraan dan Hukum Internasional Fak. Hukum'),
-    Supervisor(
-        id: '1240920104',
-        name: 'Firdanianty, Dr., M.Pd',
-        role: 'Kepala Pusat Unggulan Gender Perempuan dan Anak ISIB'),
-    Supervisor(
-        id: '1250920173',
-        name: 'Yusi Febriani, SP., M. Si.',
-        role: 'Plt. Kepala Lab. Prodi PWK Fak. Tek'),
-    Supervisor(
-        id: '1151021927',
-        name: 'Ir.Agus Sasmita, MT.',
-        role: 'Plt. kepala Lab. Prodi Teknik Sipil'),
-    Supervisor(
-        id: '10497020274',
-        name: 'Yuyus Rustandi, Drs., M. Pd.',
-        role: 'Wakil Dekan 2 FISIB'),
-    Supervisor(
-        id: '11087028109',
-        name: 'Nina Agustina, SE., ME.',
-        role: 'Kepala Unpak Press'),
-    Supervisor(
-        id: '11188025119',
-        name: 'Suhermanto, SH., M.H.',
-        role: 'Wakil Dekan 3 Fakultas Hukum'),
-    Supervisor(
-        id: '10294006197',
-        name: 'Singgih Irianto, Dr., M.Si.',
-        role: 'Wakil Rektor Bidang Kemahasiswaan'),
-    Supervisor(
-        id: '196506191990032001',
-        name: 'Prof. Dr. Eri Sarimanah, M. Pd',
-        role: 'Wakil Rektor Bidang Akademik'),
-    Supervisor(
-        id: '10994030211',
-        name: 'Didik Notosudjono, Dr., Prof.',
-        role: 'Rektor'),
-    Supervisor(
-        id: '10997044290',
-        name: 'Asep Denih, P.Hd., M. Sc., S.Kom.',
-        role: 'Dekan Fakultas MIPA'),
-    Supervisor(
-        id: '10997051309',
-        name: 'Ir.Lilis Sri Mulyawati, M.Si.',
-        role: 'Dekan Fakultas Teknik'),
-    Supervisor(
-        id: '10410014512',
-        name: 'Eka Ardianto Iskandar, Dr., MH.',
-        role: 'Dekan Fakultas Hukum'),
-    Supervisor(
-        id: '1121019891',
-        name: 'Towaf Totok Irawan, ME., Ph.D',
-        role: 'Dekan Fakultas Ekonomi'),
-    Supervisor(
-        id: '10909048513',
-        name: 'Muslim, S.Sos., M.Si.',
-        role: 'Dekan Fakultas ISIB'),
-  ];
-
   @override
   Future<List<LeaveRequest>> getLeaves() async {
     try {
       final session = await SsoHelper.getSession();
       if (session == null) return [];
-      final nip = session['nip'] ?? '';
-      final role = session['role'] ?? '';
-      final nidn = role == 'Dosen' ? nip : '';
 
       final List<LeaveRequest> allRequests = [];
 
-      // 1. Fetch Cuti
-      try {
-        final cutiData = await ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/leave"),
-        );
-        if (cutiData is List) {
-          for (var json in cutiData) {
-            final startStr = json['tanggal_mulai'] as String? ?? '';
-            final endStr = json['tanggal_selesai'] as String? ?? '';
-            final startDate =
-                DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
-            final endDate =
-                DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
-            final jenisCutiId = json['jenis_cuti_id'] as int? ?? 1;
-            String type = "Cuti Tahunan";
-            if (jenisCutiId == 2) type = "Cuti Sakit";
-            if (jenisCutiId == 3) type = "Cuti Melahirkan";
-            if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
+      final results = await Future.wait([
+        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/leave"))
+            .catchError((e) {
+          debugPrint('[LeaveRepository fetch Cuti error]: $e');
+          return null;
+        }),
+        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/izin"))
+            .catchError((e) {
+          debugPrint('[LeaveRepository fetch Izin error]: $e');
+          return null;
+        }),
+        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/sppd/history"))
+            .catchError((e) {
+          debugPrint('[LeaveRepository fetch SPPD error]: $e');
+          return null;
+        }),
+      ]);
 
-            allRequests.add(LeaveRequest(
-              id: "cuti_${json['id']}",
-              type: type,
-              status: json['status'] ?? 'Pengajuan',
-              dateRange:
-                  "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
-              details: json['alasan'] ?? '',
-              note: json['catatan_atasan'] ?? 'Menunggu verifikasi',
-              startDate: startDate,
-              endDate: endDate,
-            ));
-          }
+      final cutiData = results[0];
+      final izinData = results[1];
+      final sppdData = results[2];
+
+      // 1. Process Cuti
+      if (cutiData is List) {
+        for (var json in cutiData) {
+          final startStr = json['tanggal_mulai'] as String? ?? '';
+          final endStr = json['tanggal_selesai'] as String? ?? '';
+          final startDate =
+              DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
+          final endDate =
+              DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
+          final jenisCutiId = json['jenis_cuti_id'] as int? ?? 1;
+          String type = "Cuti Tahunan";
+          if (jenisCutiId == 2) type = "Cuti Sakit";
+          if (jenisCutiId == 3) type = "Cuti Melahirkan";
+          if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
+
+          allRequests.add(LeaveRequest(
+            id: "cuti_${json['id']}",
+            type: type,
+            status: json['status'] ?? 'Pengajuan',
+            dateRange:
+                "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
+            details: json['alasan'] ?? '',
+            note: json['catatan_atasan'] ?? 'Menunggu verifikasi',
+            startDate: startDate,
+            endDate: endDate,
+          ));
         }
-      } catch (e) {
-        debugPrint('[LeaveRepository fetch Cuti error]: $e');
       }
 
-      // 2. Fetch Izin
-      try {
-        final izinData = await ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/izin"),
-        );
-        if (izinData is List) {
-          for (var json in izinData) {
-            final dateStr = json['tanggal_pengajuan'] as String? ?? '';
-            final date =
-                DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
-            final jenisIzinId = json['jenis_izin_id'] as int? ?? 1;
-            String type = "Izin Sakit";
-            if (jenisIzinId == 2) type = "Izin Sakit Tanpa Dokter";
-            if (jenisIzinId == 3) type = "Izin Melahirkan";
-            if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
+      // 2. Process Izin
+      if (izinData is List) {
+        for (var json in izinData) {
+          final dateStr = json['tanggal_pengajuan'] as String? ?? '';
+          final date = DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
+          final jenisIzinId = json['id_jenis_izin'] as int? ?? 1;
+          String type = "Izin Sakit";
+          if (jenisIzinId == 2) type = "Izin Sakit Tanpa Dokter";
+          if (jenisIzinId == 3) type = "Izin Melahirkan";
+          if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
 
-            allRequests.add(LeaveRequest(
-              id: "izin_${json['id']}",
-              type: type,
-              status: json['status'] ?? 'Pengajuan',
-              dateRange:
-                  "${date.day} ${_getMonthName(date.month)} ${date.year}",
-              details: json['tujuan'] ?? '',
-              note: 'Verifikasi Atasan',
-              startDate: date,
-              endDate: date,
-            ));
-          }
+          allRequests.add(LeaveRequest(
+            id: "izin_${json['id']}",
+            type: type,
+            status: json['status'] ?? 'Pengajuan',
+            dateRange: "${date.day} ${_getMonthName(date.month)} ${date.year}",
+            details: json['tujuan'] ?? '',
+            note: json['catatan'] ?? 'Verifikasi Atasan',
+            startDate: date,
+            endDate: date,
+          ));
         }
-      } catch (e) {
-        debugPrint('[LeaveRepository fetch Izin error]: $e');
       }
 
-      // 3. Fetch SPPD
-      try {
-        final sppdData = await ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/sppd/history"),
-        );
-        if (sppdData is Map<String, dynamic> && sppdData['data'] != null) {
-          final items = sppdData['data'] as List;
-          for (var json in items) {
-            final startStr = json['tanggal_berangkat'] as String? ?? '';
-            final endStr = json['tanggal_kembali'] as String? ?? '';
-            final startDate =
-                DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
-            final endDate =
-                DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
-            final jenisSppdId = json['jenis_sppd_id'] as int? ?? 1;
-            String type = "SPPD - Dinas Luar";
-            if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";
+      // 3. Process SPPD
+      List sppdItems = [];
+      if (sppdData is List) {
+        sppdItems = sppdData;
+      } else if (sppdData is Map<String, dynamic> && sppdData['data'] != null) {
+        sppdItems = sppdData['data'] as List;
+      }
 
-            allRequests.add(LeaveRequest(
-              id: "sppd_${json['id']}",
-              type: type,
-              status: json['status'] ?? 'Pengajuan',
-              dateRange:
-                  "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
-              details: json['tujuan'] ?? '',
-              note: json['keterangan'] ?? 'Menunggu verifikasi',
-              startDate: startDate,
-              endDate: endDate,
-            ));
-          }
-        }
-      } catch (e) {
-        debugPrint('[LeaveRepository fetch SPPD error]: $e');
+      for (var json in sppdItems) {
+        final startStr = json['tanggal_berangkat'] as String? ?? '';
+        final endStr = json['tanggal_kembali'] as String? ?? '';
+        final startDate =
+            DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
+        final endDate = DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
+        final jenisSppdId = json['jenis_sppd_id'] as int? ?? 1;
+        String type = "SPPD - Dinas Luar";
+        if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";
+
+        allRequests.add(LeaveRequest(
+          id: "sppd_${json['id']}",
+          type: type,
+          status: json['status'] ?? 'Pengajuan',
+          dateRange:
+              "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
+          details: json['tujuan'] ?? '',
+          note: json['catatan'] ?? json['keterangan'] ?? 'Menunggu verifikasi',
+          startDate: startDate,
+          endDate: endDate,
+        ));
       }
 
       allRequests.sort((a, b) => b.startDate.compareTo(a.startDate));
@@ -195,15 +129,130 @@ class LeaveRepository implements ILeaveRepository {
   }
 
   @override
+  Future<List<LeaveRequest>> getVerificationLeaves() async {
+    try {
+      final session = await SsoHelper.getSession();
+      if (session == null) return [];
+      final nip = session['nip'] ?? '';
+      final role = session['role'] ?? '';
+      final groups = session['groups'] != null
+          ? (session['groups'] as List).map((e) => e.toString()).toList()
+          : <String>[];
+
+      bool isSdmUser = role.toLowerCase() == 'sdm';
+      final name = session['name'] ?? '';
+      final email = session['email'] ?? '';
+      if (name.toLowerCase().contains('sdm') ||
+          email.toLowerCase().contains('sdm') ||
+          nip.toLowerCase().contains('sdm')) {
+        isSdmUser = true;
+      }
+      for (var g in groups) {
+        final gLower = g.toLowerCase();
+        if (gLower.contains('sdm')) {
+          isSdmUser = true;
+          break;
+        }
+      }
+
+      final List<LeaveRequest> verificationRequests = [];
+
+      final List<String> queryUrls = [];
+      if (isSdmUser) {
+        queryUrls.add("/api/leave");
+        queryUrls.add("/api/izin");
+        queryUrls.add("/api/sppd/history");
+      } else if (nip.isNotEmpty) {
+        queryUrls.add("/api/leave");
+        queryUrls.add("/api/izin");
+        queryUrls.add("/api/sppd/history");
+      }
+
+      final List<Future<dynamic>> futures = queryUrls.map((path) {
+        return ApiClient.get(Uri.parse("${ApiClient.baseUrl}$path"))
+            .catchError((e) {
+          debugPrint(
+              '[LeaveRepository fetch verification error for $path]: $e');
+          return null;
+        });
+      }).toList();
+
+      final responses = await Future.wait(futures);
+
+      for (var i = 0; i < queryUrls.length; i++) {
+        final path = queryUrls[i];
+        final res = responses[i];
+        if (res == null) continue;
+
+        List items = [];
+        if (res is List) {
+          items = res;
+        } else if (res is Map<String, dynamic> && res['data'] != null) {
+          items = res['data'] as List;
+        }
+
+        for (var json in items) {
+          final idStr = path.contains("sppd")
+              ? "sppd_${json['id']}"
+              : (path.contains("izin")
+                  ? "izin_${json['id']}"
+                  : "cuti_${json['id']}");
+
+          if (verificationRequests.any((req) => req.id == idStr)) continue;
+
+          final startStr = json['tanggal_mulai'] ??
+              json['tanggal_pengajuan'] ??
+              json['tanggal_berangkat'] ??
+              '';
+          final endStr =
+              json['tanggal_selesai'] ?? json['tanggal_kembali'] ?? startStr;
+          final startDate =
+              DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
+          final endDate =
+              DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
+
+          String type = "Cuti";
+          if (path.contains("sppd")) {
+            type = json['jenis_sppd_id'] == 2
+                ? "SPPD - Dinas Dalam Kota"
+                : "SPPD - Dinas Luar";
+          } else if (path.contains("izin")) {
+            type = "Izin";
+          } else {
+            type = "Cuti";
+          }
+
+          verificationRequests.add(LeaveRequest(
+            id: idStr,
+            type: type,
+            status: json['status'] ?? 'Pengajuan',
+            dateRange:
+                "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
+            details: json['alasan'] ?? json['tujuan'] ?? '',
+            note: json['catatan_atasan'] ??
+                json['catatan'] ??
+                'Menunggu verifikasi',
+            startDate: startDate,
+            endDate: endDate,
+          ));
+        }
+      }
+
+      verificationRequests.sort((a, b) => b.startDate.compareTo(a.startDate));
+      return verificationRequests;
+    } catch (e, stackTrace) {
+      debugPrint(
+          '[LeaveRepository getVerificationLeaves error]: $e\n$stackTrace');
+    }
+    return [];
+  }
+
+  @override
   Future<bool> submitLeave(
       LeaveRequest request, String supervisorId, String? attachmentPath) async {
     if (request.endDate.isBefore(request.startDate)) {
       throw const InvalidLeavePeriodError();
     }
-    // if (LocationWifiHelper.isIndonesianHoliday(request.startDate) ||
-    //     LocationWifiHelper.isIndonesianHoliday(request.endDate)) {
-    //   throw const HolidaySelectedError();
-    // }
 
     try {
       final session = await SsoHelper.getSession();
@@ -220,15 +269,19 @@ class LeaveRepository implements ILeaveRepository {
         if (typeLower.contains("melahirkan")) jenisIzinId = 3;
         if (typeLower.contains("mendesak")) jenisIzinId = 4;
 
+        debugPrint(
+            '{nip: $nip, nidn: $nidn, id_jenis_izin: $jenisIzinId, verifikasi: $supervisorId}');
+
         final responseData = await ApiClient.post(
           Uri.parse("${ApiClient.baseUrl}/api/izin/"),
           body: {
             "nip": nip,
             "nidn": nidn,
-            "jenis_izin_id": jenisIzinId.toString(),
+            "id_jenis_izin": jenisIzinId.toString(),
             "tanggal_pengajuan":
                 "${request.startDate.year}-${_twoDigits(request.startDate.month)}-${_twoDigits(request.startDate.day)}",
             "tujuan": request.details,
+            "verifikasi": supervisorId,
           },
         );
         return responseData != null;
@@ -248,6 +301,7 @@ class LeaveRepository implements ILeaveRepository {
                 "${request.endDate.year}-${_twoDigits(request.endDate.month)}-${_twoDigits(request.endDate.day)}",
             "tujuan": request.details,
             "keterangan": "Atasan: $supervisorId",
+            "verifikasi": supervisorId,
           },
         );
         return responseData != null;
@@ -272,6 +326,7 @@ class LeaveRepository implements ILeaveRepository {
                     .toString(),
             "alasan": request.details,
             "nip_atasan": supervisorId,
+            "verifikasi": supervisorId,
           },
           fileFieldName: "file_lampiran",
           filePath: attachmentPath,
@@ -285,8 +340,73 @@ class LeaveRepository implements ILeaveRepository {
   }
 
   @override
+  Future<bool> updateLeaveStatus(String id, String status, String? note) async {
+    try {
+      final parts = id.split('_');
+      if (parts.length < 2) return false;
+      final prefix = parts[0];
+      final realId = parts[1];
+
+      if (prefix == 'cuti') {
+        final res = await ApiClient.put(
+          Uri.parse("${ApiClient.baseUrl}/api/leave/$realId"),
+          body: {
+            "status": status,
+            "catatan_atasan": note ?? '',
+          },
+        );
+        return res != null;
+      } else if (prefix == 'izin') {
+        final res = await ApiClient.put(
+          Uri.parse("${ApiClient.baseUrl}/api/izin/$realId"),
+          body: {
+            "status": status,
+            "catatan": note ?? '',
+          },
+        );
+        return res != null;
+      } else if (prefix == 'sppd') {
+        final res = await ApiClient.put(
+          Uri.parse("${ApiClient.baseUrl}/api/sppd/$realId"),
+          body: {
+            "status": status,
+            "catatan": note ?? '',
+          },
+        );
+        return res != null;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[LeaveRepository updateLeaveStatus error]: $e\n$stackTrace');
+    }
+    return false;
+  }
+
+  @override
   Future<List<Supervisor>> getSupervisors() async {
-    return _supervisors;
+    try {
+      final responseData = await ApiClient.get(
+        Uri.parse("${ApiClient.baseUrl}/api/masterdata/verifikator?type=cuti"),
+      );
+      if (responseData is List && responseData.isNotEmpty) {
+        final List<Supervisor> list = [];
+        for (var item in responseData) {
+          final nip = item['nip']?.toString() ?? '';
+          final nama = item['nama']?.toString() ?? '';
+          final struktural = item['struktural']?.toString() ?? '';
+          if (nip.isNotEmpty && nama.isNotEmpty) {
+            list.add(Supervisor(
+              id: nip,
+              name: nama,
+              role: struktural,
+            ));
+          }
+        }
+        if (list.isNotEmpty) return list;
+      }
+    } catch (e) {
+      debugPrint('[LeaveRepository getSupervisors API error]: $e');
+    }
+    return [];
   }
 
   String _getMonthName(int month) {

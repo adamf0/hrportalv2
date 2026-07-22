@@ -3,11 +3,13 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/core/app_theme.dart';
+import '../../../auth/presentation/components/pages/login_page.dart';
 import '../../../auth/presentation/auth_bloc.dart';
 import '../../../attendance/presentation/attendance_bloc.dart';
 import '../../../leave/presentation/leave_bloc.dart';
 import '../../../../core/location_wifi_helper.dart';
 import '../../../leave/presentation/components/pages/leave_form_page.dart';
+import '../../../report/presentation/report_bloc.dart';
 
 // Atomic Design Components
 import 'package:hrportalv2/core/presentation/components/molecules/quick_menu_button.dart';
@@ -64,7 +66,7 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _selectedCalendarDay = DateTime.now();
   final Map<String, List<CalendarItem>> _calendarEvents = {};
 
-  bool _calendarLoading = false;
+  bool _calendarLoading = true;
   bool _calendarError = false;
 
   int _totalAbsen1To31 = 0;
@@ -91,7 +93,9 @@ class _DashboardPageState extends State<DashboardPage> {
     // 2. Approved events have the second highest priority (disetujui/acc/terima sdm)
     for (var ev in list) {
       final statusLower = ev.status.toLowerCase();
-      if (statusLower == "acc" || statusLower == "disetujui" || statusLower == "terima sdm") {
+      if (statusLower == "acc" ||
+          statusLower == "disetujui" ||
+          statusLower == "terima sdm") {
         return ev;
       }
     }
@@ -100,31 +104,78 @@ class _DashboardPageState extends State<DashboardPage> {
     return list.first;
   }
 
+  int? _previousTabIndex;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await LocationWifiHelper.getCurrentLocation();
-      if (!mounted) return;
+    ApiClient.setActivePageScope('dashboard');
+    _calendarLoading = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       final authBloc = context.read<AuthBloc>();
-      final attendanceBloc = context.read<AttendanceBloc>();
-      attendanceBloc.updateLoginState(authBloc.isLoggedIn);
-      await context.read<LeaveBloc>().fetchLeaves();
-      await _fetchCalendarEvents();
+      if (authBloc.isSdmUser) {
+        _calendarLoading = false;
+        context.read<ReportBloc>().fetchReportData();
+        return;
+      }
+      _fetchCalendarEvents();
+      _initDashboardDependencies();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final attendanceBloc = Provider.of<AttendanceBloc>(context);
+    final currentIndex = attendanceBloc.currentTabIndex;
+    if (_previousTabIndex != null &&
+        _previousTabIndex != 0 &&
+        currentIndex == 0) {
+      ApiClient.setActivePageScope('dashboard');
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.isSdmUser) {
+        context.read<ReportBloc>().fetchReportData();
+        _previousTabIndex = currentIndex;
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchCalendarEvents();
+        context.read<LeaveBloc>().fetchLeaves();
+      });
+    }
+    _previousTabIndex = currentIndex;
+  }
+
+  Future<void> _initDashboardDependencies() async {
+    await LocationWifiHelper.getCurrentLocation();
+    if (!mounted) return;
+    final authBloc = context.read<AuthBloc>();
+    final attendanceBloc = context.read<AttendanceBloc>();
+    attendanceBloc.updateLoginState(authBloc.isLoggedIn);
+    await context.read<LeaveBloc>().fetchLeaves();
   }
 
   String _twoDigits(int n) => n >= 10 ? "$n" : "0$n";
 
   Future<void> _fetchCalendarEvents() async {
+    if (!mounted) return;
+    if (!_calendarLoading) {
+      setState(() {
+        _calendarLoading = true;
+        _calendarError = false;
+      });
+    }
+
     final authBloc = context.read<AuthBloc>();
     final nip = authBloc.session?.nip ?? '';
-    if (nip.isEmpty) return;
-
-    setState(() {
-      _calendarLoading = true;
-      _calendarError = false;
-    });
+    if (nip.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _calendarLoading = false;
+        });
+      }
+      return;
+    }
 
     try {
       final firstDay =
@@ -138,14 +189,19 @@ class _DashboardPageState extends State<DashboardPage> {
       final endStr =
           "${gridEnd.year}-${_twoDigits(gridEnd.month)}-${_twoDigits(gridEnd.day)}";
 
-      final yearMonthStr = "${_selectedCalendarDay.year}-${_twoDigits(_selectedCalendarDay.month)}";
+      final yearMonthStr =
+          "${_selectedCalendarDay.year}-${_twoDigits(_selectedCalendarDay.month)}";
 
       // Execute all 4 requests in parallel!
       final results = await Future.wait([
-        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/calendar?start_date=$startStr&end_date=$endStr")),
-        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/holiday?year=${_selectedCalendarDay.year}")),
-        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/laporan/summary?nip=$nip&periode_type=CALENDAR&periode_key=$yearMonthStr")),
-        ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/laporan/summary?nip=$nip&periode_type=CALENDAR-CUTOFF&periode_key=$yearMonthStr")),
+        ApiClient.get(Uri.parse(
+            "${ApiClient.baseUrl}/api/calendar?start_date=$startStr&end_date=$endStr")),
+        ApiClient.get(Uri.parse(
+            "${ApiClient.baseUrl}/api/holiday?year=${_selectedCalendarDay.year}")),
+        ApiClient.get(Uri.parse(
+            "${ApiClient.baseUrl}/api/laporan/summary?periode_type=CALENDAR&periode_key=$yearMonthStr")),
+        ApiClient.get(Uri.parse(
+            "${ApiClient.baseUrl}/api/laporan/summary?periode_type=CALENDAR-CUTOFF&periode_key=$yearMonthStr")),
       ]);
 
       final responseData = results[0];
@@ -162,7 +218,9 @@ class _DashboardPageState extends State<DashboardPage> {
             final tanggal = item['tanggal'] as String? ?? '';
             if (tanggal.isNotEmpty) {
               final cleanKey = tanggal.split('T')[0];
-              _calendarEvents.putIfAbsent(cleanKey, () => []).add(CalendarItem.fromJson(item));
+              _calendarEvents
+                  .putIfAbsent(cleanKey, () => [])
+                  .add(CalendarItem.fromJson(item));
             }
           }
         }
@@ -195,42 +253,54 @@ class _DashboardPageState extends State<DashboardPage> {
       // Parse CALENDAR summary (1-31)
       if (summaryCalendar is Map<String, dynamic>) {
         _totalAbsen1To31 = summaryCalendar['total_masuk'] ?? 0;
-        _totalIzin1To31 = (summaryCalendar['total_izin'] ?? 0) + (summaryCalendar['total_cuti'] ?? 0);
+        _totalIzin1To31 = (summaryCalendar['total_izin'] ?? 0) +
+            (summaryCalendar['total_cuti'] ?? 0);
         _totalSppd1To31 = summaryCalendar['total_sppd'] ?? 0;
         _totalUpacara1To31 = summaryCalendar['total_upacara'] ?? 0;
-        
-        final start = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 1);
-        final end = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month + 1, 0);
+
+        final start =
+            DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 1);
+        final end = DateTime(
+            _selectedCalendarDay.year, _selectedCalendarDay.month + 1, 0);
         final totalLibur = summaryCalendar['total_libur'] ?? 0;
-        _tidakMasuk1To31 = _calculateTidakMasukFromDB(_totalAbsen1To31, _totalIzin1To31, _totalSppd1To31, totalLibur, start, end);
+        _tidakMasuk1To31 = _calculateTidakMasukFromDB(_totalAbsen1To31,
+            _totalIzin1To31, _totalSppd1To31, totalLibur, start, end);
       }
 
       // Parse CALENDAR-CUTOFF summary (15-15)
       if (summaryCutoff is Map<String, dynamic>) {
         _totalAbsen15To15 = summaryCutoff['total_masuk'] ?? 0;
-        _totalIzin15To15 = (summaryCutoff['total_izin'] ?? 0) + (summaryCutoff['total_cuti'] ?? 0);
+        _totalIzin15To15 = (summaryCutoff['total_izin'] ?? 0) +
+            (summaryCutoff['total_cuti'] ?? 0);
         _totalSppd15To15 = summaryCutoff['total_sppd'] ?? 0;
         _totalUpacara15To15 = summaryCutoff['total_upacara'] ?? 0;
-        
-        final start = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month - 1, 16);
-        final end = DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 15);
-        final totalLibur = summaryCutoff['total_libur'] ?? 0;
-        _tidakMasuk15To15 = _calculateTidakMasukFromDB(_totalAbsen15To15, _totalIzin15To15, _totalSppd15To15, totalLibur, start, end);
-      }
 
-      setState(() {
-        _calendarLoading = false;
-      });
+        final start = DateTime(
+            _selectedCalendarDay.year, _selectedCalendarDay.month - 1, 16);
+        final end =
+            DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 15);
+        final totalLibur = summaryCutoff['total_libur'] ?? 0;
+        _tidakMasuk15To15 = _calculateTidakMasukFromDB(_totalAbsen15To15,
+            _totalIzin15To15, _totalSppd15To15, totalLibur, start, end);
+      }
     } catch (e) {
       debugPrint("Error fetching calendar events: $e");
-      setState(() {
-        _calendarLoading = false;
-        _calendarError = true;
-      });
+      if (mounted) {
+        setState(() {
+          _calendarError = true;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _calendarLoading = false;
+        });
+      }
     }
   }
 
-  int _calculateTidakMasukFromDB(int totalAbsen, int totalIzin, int totalSppd, int totalLibur, DateTime start, DateTime end) {
+  int _calculateTidakMasukFromDB(int totalAbsen, int totalIzin, int totalSppd,
+      int totalLibur, DateTime start, DateTime end) {
     int totalDays = 0;
     int sundays = 0;
     DateTime cur = start;
@@ -243,11 +313,10 @@ class _DashboardPageState extends State<DashboardPage> {
       }
       cur = cur.add(const Duration(days: 1));
     }
-    final missing = totalDays - totalAbsen - totalIzin - totalSppd - sundays - totalLibur;
+    final missing =
+        totalDays - totalAbsen - totalIzin - totalSppd - sundays - totalLibur;
     return missing > 0 ? missing : 0;
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -351,9 +420,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     getDayStatusColor: (day) =>
                         _getCalendarDayStatusColor(day, attendanceBloc),
                     getDayTextColor: (day, isFaded, isRed, isSelected) {
-                      final key = "${day.year}-${_twoDigits(day.month)}-${_twoDigits(day.day)}";
+                      final key =
+                          "${day.year}-${_twoDigits(day.month)}-${_twoDigits(day.day)}";
                       final event = _getPriorityEvent(key);
-                      final isHoliday = event != null && event.type.toLowerCase() == "holiday";
+                      final isHoliday = event != null &&
+                          event.type.toLowerCase() == "holiday";
 
                       Color textColor = Colors.black;
                       if (isFaded) {
@@ -394,6 +465,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   sisaCuti: leaveBloc.sisaCuti,
                   cutiDiambil: leaveBloc.cutiDiambil,
                   cutiPending: leaveBloc.cutiPending,
+                  summaries: leaveBloc.cutiTypeSummaries,
                 ),
                 const SizedBox(height: 24),
                 QuickMenuSection(
@@ -629,6 +701,12 @@ class _DashboardPageState extends State<DashboardPage> {
               Navigator.pop(context);
               await authBloc.logout();
               attendanceBloc.updateLoginState(false);
+              if (context.mounted) {
+                Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                  (route) => false,
+                );
+              }
             },
             child: Text('Keluar',
                 style: GoogleFonts.inter(
@@ -645,7 +723,8 @@ class _DashboardPageState extends State<DashboardPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.surfaceContainer),
+        border:
+            Border.all(color: Theme.of(context).colorScheme.surfaceContainer),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -683,7 +762,8 @@ class _DashboardPageState extends State<DashboardPage> {
           const SizedBox(height: 16),
           const PulsingSkeleton(width: 80, height: 12),
           const SizedBox(height: 8),
-          const PulsingSkeleton(width: double.infinity, height: 52, borderRadius: 8),
+          const PulsingSkeleton(
+              width: double.infinity, height: 52, borderRadius: 8),
         ],
       ),
     );
@@ -697,7 +777,8 @@ class _DashboardPageState extends State<DashboardPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).colorScheme.surfaceContainer),
+        border:
+            Border.all(color: Theme.of(context).colorScheme.surfaceContainer),
       ),
       child: Center(
         child: Column(
@@ -731,7 +812,8 @@ class _DashboardPageState extends State<DashboardPage> {
                 style: GoogleFonts.inter(fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),

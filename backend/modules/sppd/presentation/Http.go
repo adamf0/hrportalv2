@@ -25,6 +25,11 @@ func ModuleSppd(app *fiber.App) {
 		_ = c.BodyParser(&command)
 		if command.JenisSppdID == 0 && command.TanggalBerangkat == "" {
 			jenisSppdID, _ := strconv.Atoi(c.FormValue("jenis_sppd_id"))
+			var verifikasi *string
+			vStr := c.FormValue("verifikasi")
+			if vStr != "" {
+				verifikasi = &vStr
+			}
 			command = CreateSppd.CreateSppdCommand{
 				Nidn:             c.FormValue("nidn"),
 				Nip:              c.FormValue("nip"),
@@ -33,6 +38,7 @@ func ModuleSppd(app *fiber.App) {
 				TanggalBerangkat: c.FormValue("tanggal_berangkat"),
 				TanggalKembali:   c.FormValue("tanggal_kembali"),
 				Keterangan:       c.FormValue("keterangan"),
+				Verifikasi:       verifikasi,
 			}
 		}
 
@@ -100,12 +106,14 @@ func ModuleSppd(app *fiber.App) {
 	})
 
 	group.Get("/history", func(c *fiber.Ctx) error {
-		nidn := c.FormValue("nidn")
 		nip := c.FormValue("nip")
+		nidn := c.FormValue("nidn")
+		isSdm := c.FormValue("role") == "sdm" || c.Query("is_sdm") == "true" || c.Query("tanggal_mulai") != "" || (nip == "" && nidn == "")
 
 		query := &GetSppdHistory.GetSppdHistoryQuery{
-			Nip:  nip,
-			Nidn: nidn,
+			Nip:   nip,
+			Nidn:  nidn,
+			IsSdm: isSdm,
 		}
 
 		res, err := mediatr.Send[*GetSppdHistory.GetSppdHistoryQuery, common.ResultValue[[]domain.Sppd]](c.UserContext(), query)

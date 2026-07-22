@@ -73,7 +73,7 @@ func ModuleLeave(app *fiber.App) {
 		id, _ := strconv.Atoi(c.Params("id"))
 		jenisCutiID, _ := strconv.Atoi(c.FormValue("jenis_cuti_id"))
 		if jenisCutiID == 0 {
-			jenisCutiID, _ = strconv.Atoi(c.FormValue("jenis_izin_id"))
+			jenisCutiID, _ = strconv.Atoi(c.FormValue("id_jenis_izin"))
 		}
 		jumlahHari, _ := strconv.Atoi(c.FormValue("jumlah_hari"))
 
@@ -162,10 +162,12 @@ func ModuleLeave(app *fiber.App) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nip := c.FormValue("nip")
 		nidn := c.FormValue("nidn")
+		isSdm := c.FormValue("role") == "sdm" || c.Query("is_sdm") == "true" || c.Query("tanggal_mulai") != "" || (nip == "" && nidn == "")
 
 		query := &GetAllCuti.GetAllCutiQuery{
-			Nip:  nip,
-			Nidn: nidn,
+			Nip:   nip,
+			Nidn:  nidn,
+			IsSdm: isSdm,
 		}
 
 		res, err := mediatr.Send[*GetAllCuti.GetAllCutiQuery, common.ResultValue[[]domain.Cuti]](c.UserContext(), query)

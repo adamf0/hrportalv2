@@ -35,18 +35,22 @@ func (r *IzinRepository) GetByID(ctx context.Context, id uint) (*domain.Izin, er
 	}
 	return &izin, nil
 }
-func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string) ([]domain.Izin, error) {
+func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, isSdm bool) ([]domain.Izin, error) {
 	var izins []domain.Izin
 	query := r.db.WithContext(ctx).Model(&domain.Izin{})
-	if nip != "" && nidn != "" {
-		query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
-	} else if nip != "" {
-		query = query.Where("nip = ?", nip)
-	} else if nidn != "" {
-		query = query.Where("nidn = ?", nidn)
-	} else {
-		return []domain.Izin{}, nil
+
+	if isSdm {
+		// SDM user gets all records across all statuses (terima atasan, tolak atasan, terima sdm, tolak sdm, menunggu, etc)
+	} else if nip != "" || nidn != "" {
+		if nip != "" && nidn != "" {
+			query = query.Where("(nip = ? OR nidn = ?) or verifikasi = ?", nip, nidn, nip)
+		} else if nip != "" {
+			query = query.Where("nip = ? or verifikasi = ?", nip, nip)
+		} else {
+			query = query.Where("nidn = ?", nidn)
+		}
 	}
-	err := query.Find(&izins).Error
+
+	err := query.Order("created_at desc").Find(&izins).Error
 	return izins, err
 }

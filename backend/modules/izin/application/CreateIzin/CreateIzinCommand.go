@@ -11,11 +11,12 @@ import (
 )
 
 type CreateIzinCommand struct {
-	Nip              string `json:"nip"`
-	Nidn             string `json:"nidn"`
-	JenisIzinID      uint   `json:"jenis_izin_id"`
-	TanggalPengajuan string `json:"tanggal_pengajuan"`
-	Tujuan           string `json:"tujuan"`
+	Nip              string  `json:"nip"`
+	Nidn             string  `json:"nidn"`
+	JenisIzinID      uint    `json:"id_jenis_izin"`
+	TanggalPengajuan string  `json:"tanggal_pengajuan"`
+	Tujuan           string  `json:"tujuan"`
+	Verifikasi       *string `json:"verifikasi"`
 }
 
 func (c CreateIzinCommand) Validate() error {
@@ -46,7 +47,8 @@ func (h *CreateIzinCommandHandler) Handle(ctx context.Context, cmd *CreateIzinCo
 		JenisIzinID:      int(cmd.JenisIzinID),
 		TanggalPengajuan: cmd.TanggalPengajuan,
 		Tujuan:           cmd.Tujuan,
-		Status:           "PENDING",
+		Verifikasi:       cmd.Verifikasi,
+		Status:           "menunggu",
 		CreatedAt:        &now,
 		UpdatedAt:        &now,
 	}

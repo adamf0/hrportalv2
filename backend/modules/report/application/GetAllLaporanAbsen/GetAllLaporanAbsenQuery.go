@@ -23,9 +23,11 @@ func NewGetAllLaporanAbsenQueryHandler(repo domain.IReportRepository) *GetAllLap
 }
 
 func (h *GetAllLaporanAbsenQueryHandler) Handle(ctx context.Context, query *GetAllLaporanAbsenQuery) (common.ResultValue[map[string]interface{}], error) {
-	data, err := h.repo.GetAllLaporanAbsen(ctx, query.TanggalMulai, query.TanggalAkhir, query.Nip, query.Nidn)
+	dataList, err := h.repo.GetLaporanMergedParallel(ctx, query.TanggalMulai, query.TanggalAkhir, query.Nip, query.Nidn, "")
 	if err != nil {
 		return common.FailureValue[map[string]interface{}](domain.ReportNotFound()), err
 	}
-	return common.SuccessValue(data), nil
+	return common.SuccessValue(map[string]interface{}{
+		"list_data": dataList,
+	}), nil
 }

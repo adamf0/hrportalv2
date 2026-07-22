@@ -82,8 +82,8 @@ func ModuleAttendance(app *fiber.App) {
 
 	group.Get("/history", func(c *fiber.Ctx) error {
 		query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
-			Nidn: c.FormValue("nidn"),
-			Nip:  c.FormValue("nip"),
+			Nidn: c.Query("nidn"),
+			Nip:  c.Query("nip"),
 		}
 
 		res, err := mediatr.Send[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](c.UserContext(), query)

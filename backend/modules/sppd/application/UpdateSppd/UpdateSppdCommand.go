@@ -48,10 +48,6 @@ type UpdateSppdCommand struct {
 func (c UpdateSppdCommand) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.ID, validation.Required),
-		validation.Field(&c.Tujuan, validation.Required),
-		validation.Field(&c.JenisSppdID, validation.Required),
-		validation.Field(&c.TanggalBerangkat, validation.Required),
-		validation.Field(&c.TanggalKembali, validation.Required),
 	)
 }
 
@@ -74,13 +70,31 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	}
 
 	now := time.Now()
-	sppd.Nidn = cmd.Nidn
-	sppd.Nip = cmd.Nip
-	sppd.Tujuan = cmd.Tujuan
-	sppd.JenisSppdID = cmd.JenisSppdID
-	sppd.TanggalBerangkat = cmd.TanggalBerangkat
-	sppd.TanggalKembali = cmd.TanggalKembali
-	sppd.Keterangan = cmd.Keterangan
+	if cmd.Nidn != "" {
+		sppd.Nidn = cmd.Nidn
+	}
+	if cmd.Nip != "" {
+		sppd.Nip = cmd.Nip
+	}
+	if cmd.Tujuan != "" {
+		sppd.Tujuan = cmd.Tujuan
+	}
+	if cmd.JenisSppdID > 0 {
+		sppd.JenisSppdID = cmd.JenisSppdID
+	}
+	if cmd.TanggalBerangkat != "" {
+		sppd.TanggalBerangkat = common.FormatDateOnly(cmd.TanggalBerangkat)
+	} else {
+		sppd.TanggalBerangkat = common.FormatDateOnly(sppd.TanggalBerangkat)
+	}
+	if cmd.TanggalKembali != "" {
+		sppd.TanggalKembali = common.FormatDateOnly(cmd.TanggalKembali)
+	} else {
+		sppd.TanggalKembali = common.FormatDateOnly(sppd.TanggalKembali)
+	}
+	if cmd.Keterangan != "" {
+		sppd.Keterangan = cmd.Keterangan
+	}
 	
 	if cmd.SaranaTransportasi != nil {
 		sppd.SaranaTransportasi = cmd.SaranaTransportasi
@@ -88,7 +102,9 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	if cmd.Verifikasi != nil {
 		sppd.Verifikasi = cmd.Verifikasi
 	}
-	sppd.Status = cmd.Status
+	if cmd.Status != "" {
+		sppd.Status = cmd.Status
+	}
 	if cmd.DokumenAnggaran != nil {
 		sppd.DokumenAnggaran = cmd.DokumenAnggaran
 	}

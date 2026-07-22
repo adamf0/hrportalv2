@@ -53,3 +53,21 @@ class Supervisor {
     required this.role,
   });
 }
+
+class CutiTypeSummary {
+  final int id;
+  final String name;
+  final int sisa;
+  final int diambil;
+  final int pending;
+  final int quota;
+
+  CutiTypeSummary({
+    required this.id,
+    required this.name,
+    required this.sisa,
+    required this.diambil,
+    required this.pending,
+    required this.quota,
+  });
+}

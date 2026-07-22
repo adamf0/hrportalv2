@@ -11,20 +11,17 @@ import (
 )
 
 type UpdateIzinCommand struct {
-	ID               uint   `json:"id"`
-	JenisIzinID      uint   `json:"jenis_izin_id"`
-	TanggalPengajuan string `json:"tanggal_pengajuan"`
-	Tujuan           string `json:"tujuan"`
-	Status           string `json:"status"`
+	ID               uint    `json:"id"`
+	JenisIzinID      uint    `json:"id_jenis_izin"`
+	TanggalPengajuan string  `json:"tanggal_pengajuan"`
+	Tujuan           string  `json:"tujuan"`
+	Status           string  `json:"status"`
+	Catatan          *string `json:"catatan"`
 }
 
 func (c UpdateIzinCommand) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.ID, validation.Required),
-		validation.Field(&c.JenisIzinID, validation.Required),
-		validation.Field(&c.TanggalPengajuan, validation.Required),
-		validation.Field(&c.Tujuan, validation.Required),
-		validation.Field(&c.Status, validation.Required),
 	)
 }
 
@@ -47,10 +44,21 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	}
 
 	now := time.Now()
-	izin.JenisIzinID = int(cmd.JenisIzinID)
-	izin.TanggalPengajuan = cmd.TanggalPengajuan
-	izin.Tujuan = cmd.Tujuan
-	izin.Status = cmd.Status
+	if cmd.JenisIzinID > 0 {
+		izin.JenisIzinID = int(cmd.JenisIzinID)
+	}
+	if cmd.TanggalPengajuan != "" {
+		izin.TanggalPengajuan = cmd.TanggalPengajuan
+	}
+	if cmd.Tujuan != "" {
+		izin.Tujuan = cmd.Tujuan
+	}
+	if cmd.Status != "" {
+		izin.Status = cmd.Status
+	}
+	if cmd.Catatan != nil {
+		izin.Catatan = cmd.Catatan
+	}
 	izin.UpdatedAt = &now
 
 	if err := h.Repo.Update(ctx, izin); err != nil {

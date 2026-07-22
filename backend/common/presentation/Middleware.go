@@ -19,6 +19,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/websocket/v2"
+	"github.com/goforj/godump"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/text/unicode/norm"
 )
@@ -448,6 +449,8 @@ func RBACMiddleware() fiber.Handler {
 		if err != nil {
 			return err
 		}
+
+		godump.Dump(user)
 
 		if isAdmin(user) {
 			log.Println("[RBAC] User is admin, access granted")

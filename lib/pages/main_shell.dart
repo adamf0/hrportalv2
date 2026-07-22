@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/core/app_theme.dart';
 import '../modules/attendance/presentation/attendance_bloc.dart';
 import '../core/responsive_helper.dart';
@@ -8,19 +9,31 @@ import '../modules/dashboard/presentation/pages/dashboard_page.dart';
 import '../modules/attendance/presentation/components/pages/attendance_page.dart';
 import '../modules/leave/presentation/components/pages/leave_list_page.dart';
 import '../modules/payroll/presentation/components/pages/salary_slip_page.dart';
+import '../modules/report/presentation/components/pages/sdm_report_page.dart';
+import '../modules/auth/presentation/auth_bloc.dart';
 
 class MainShell extends StatelessWidget {
   const MainShell({super.key});
 
+  void _onTabSelect(int index, AttendanceBloc attendanceBloc) {
+    attendanceBloc.setTabIndex(index);
+    final scopes = ['dashboard', 'attendance', 'requests', 'payroll'];
+    if (index < scopes.length) {
+      ApiClient.setActivePageScope(scopes[index]);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final attendanceBloc = Provider.of<AttendanceBloc>(context);
-    
+    final authBloc = Provider.of<AuthBloc>(context);
+    final isSdm = authBloc.isSdmUser;
+
     final List<Widget> pages = [
-      const DashboardPage(),
-      const AttendancePage(),
+      isSdm ? const SdmReportPage() : const DashboardPage(),
+      isSdm ? const SizedBox() : const AttendancePage(),
       const LeaveListPage(),
-      const SalarySlipPage(),
+      isSdm ? const SizedBox() : const SalarySlipPage(),
     ];
 
     return Scaffold(
@@ -56,13 +69,14 @@ class MainShell extends StatelessWidget {
                 label: 'Home',
                 attendanceBloc: attendanceBloc,
               ),
-              _buildBottomNavItem(
-                context,
-                index: 1,
-                icon: Icons.face_retouching_natural,
-                label: 'Attendance',
-                attendanceBloc: attendanceBloc,
-              ),
+              if (!isSdm)
+                _buildBottomNavItem(
+                  context,
+                  index: 1,
+                  icon: Icons.face_retouching_natural,
+                  label: 'Attendance',
+                  attendanceBloc: attendanceBloc,
+                ),
               _buildBottomNavItem(
                 context,
                 index: 2,
@@ -70,13 +84,14 @@ class MainShell extends StatelessWidget {
                 label: 'Requests',
                 attendanceBloc: attendanceBloc,
               ),
-              _buildBottomNavItem(
-                context,
-                index: 3,
-                icon: Icons.payments_outlined,
-                label: 'Payroll',
-                attendanceBloc: attendanceBloc,
-              ),
+              if (!isSdm)
+                _buildBottomNavItem(
+                  context,
+                  index: 3,
+                  icon: Icons.payments_outlined,
+                  label: 'Payroll',
+                  attendanceBloc: attendanceBloc,
+                ),
             ],
           ),
         ),
@@ -95,10 +110,10 @@ class MainShell extends StatelessWidget {
     final bool isWatch = context.isWatch;
     final primaryColor = Theme.of(context).colorScheme.primary;
     final secondaryColor = Theme.of(context).colorScheme.secondary;
-    
+
     if (isWatch) {
       return GestureDetector(
-        onTap: () => attendanceBloc.setTabIndex(index),
+        onTap: () => _onTabSelect(index, attendanceBloc),
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -110,9 +125,9 @@ class MainShell extends StatelessWidget {
         ),
       );
     }
-    
+
     return GestureDetector(
-      onTap: () => attendanceBloc.setTabIndex(index),
+      onTap: () => _onTabSelect(index, attendanceBloc),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

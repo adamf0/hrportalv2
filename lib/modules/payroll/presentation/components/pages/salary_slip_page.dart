@@ -1,10 +1,14 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hrportalv2/modules/payroll/presentation/payroll_bloc.dart';
+import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
 import 'package:hrportalv2/modules/auth/presentation/auth_bloc.dart';
 
 import 'package:hrportalv2/modules/payroll/presentation/components/organisms/printable_salary_slip.dart';
+import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/modules/payroll/presentation/components/helpers/pdf_generator_helper.dart';
 import 'package:open_filex/open_filex.dart';
 
@@ -21,18 +25,53 @@ class SalarySlipPage extends StatefulWidget {
 }
 
 class _SalarySlipPageState extends State<SalarySlipPage> {
-  final List<String> _months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+  final List<String> _months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "Mei",
+    "Jun",
+    "Jul",
+    "Agu",
+    "Sep",
+    "Okt",
+    "Nov",
+    "Des"
+  ];
+
+  int? _previousTabIndex;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final userNip = context.read<AuthBloc>().session?.nip ?? "10616049757";
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.isSdmUser) return;
+      ApiClient.setActivePageScope('payroll');
+      final userNip = authBloc.session?.nip ?? "10616049757";
       context.read<PayrollBloc>().fetchPayroll(userNip);
     });
   }
 
-
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final attendanceBloc = Provider.of<AttendanceBloc>(context);
+    final currentIndex = attendanceBloc.currentTabIndex;
+    if (_previousTabIndex != null &&
+        _previousTabIndex != 3 &&
+        currentIndex == 3) {
+      final authBloc = context.read<AuthBloc>();
+      if (authBloc.isSdmUser) return;
+      ApiClient.setActivePageScope('payroll');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final userNip = authBloc.session?.nip ?? "10616049757";
+        context.read<PayrollBloc>().fetchPayroll(userNip);
+      });
+    }
+    _previousTabIndex = currentIndex;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,12 +111,12 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
                       color: Colors.white,
                       border: Border.all(color: Colors.grey[200]!),
                     ),
-                    child: Icon(Icons.notifications_none, color: onSurface, size: 22),
+                    child: Icon(Icons.notifications_none,
+                        color: onSurface, size: 22),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-
               YearSelector(
                 selectedYear: payrollBloc.selectedPayrollYear,
                 onChanged: (newValue) {
@@ -87,7 +126,6 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
                 },
               ),
               const SizedBox(height: 16),
-
               MonthSelector(
                 months: _months,
                 selectedMonth: payrollBloc.selectedPayrollMonth,
@@ -96,7 +134,6 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
                 },
               ),
               const SizedBox(height: 24),
-
               payrollBloc.isLoading
                   ? Center(
                       child: Padding(
@@ -111,26 +148,30 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
                           children: [
                             PrintableSalarySlip(slip: slip),
                             const SizedBox(height: 24),
-
                             ElevatedButton.icon(
                               onPressed: () async {
                                 try {
-                                  final file = await PdfGeneratorHelper.generateSalarySlipPdf(slip);
+                                  final file = await PdfGeneratorHelper
+                                      .generateSalarySlipPdf(slip);
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Unduh PDF slip gaji ${slip.bulan} ${slip.tahun} berhasil!'),
+                                      content: Text(
+                                          'Unduh PDF slip gaji ${slip.bulan} ${slip.tahun} berhasil!'),
                                       backgroundColor: primaryColor,
                                       action: SnackBarAction(
                                         label: 'BUKA',
                                         textColor: Colors.white,
                                         onPressed: () async {
-                                          final result = await OpenFilex.open(file.path);
+                                          final result =
+                                              await OpenFilex.open(file.path);
                                           if (result.type != ResultType.done) {
                                             if (!mounted) return;
-                                            ScaffoldMessenger.of(context).showSnackBar(
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(
                                               SnackBar(
-                                                content: Text('Gagal membuka file: ${result.message}'),
+                                                content: Text(
+                                                    'Gagal membuka file: ${result.message}'),
                                                 backgroundColor: Colors.red,
                                               ),
                                             );
@@ -143,7 +184,8 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
                                   if (!mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Gagal mengunduh/membuat file PDF slip gaji.'),
+                                      content: Text(
+                                          'Gagal mengunduh/membuat file PDF slip gaji.'),
                                       backgroundColor: Colors.red,
                                     ),
                                   );
@@ -152,8 +194,10 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: primaryColor,
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12)),
                                 elevation: 0,
                               ),
                               icon: const Icon(Icons.download, size: 20),
@@ -174,6 +218,4 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
       ),
     );
   }
-
-
 }

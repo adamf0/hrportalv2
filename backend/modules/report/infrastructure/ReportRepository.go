@@ -143,7 +143,7 @@ func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai 
 	q1.Find(&rekapsV1)
 
 	// 2. Versi 2 (Cutoff Period)
-	v2Start := time.Date(now.Year(), now.Month()-1, 16, 0, 0, 0, 0, now.Location())
+	v2Start := time.Date(now.Year(), now.Month()-1, 15, 0, 0, 0, 0, now.Location())
 	v2End := time.Date(now.Year(), now.Month(), 15, 0, 0, 0, 0, now.Location())
 	v2Key := now.Format("2006-01")
 
@@ -225,7 +225,7 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	go func() {
 		defer wg.Done()
 		q := r.db.WithContext(ctx).Model(&permissionDomain.Izin{}).
-			Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND status = 'terima sdm'", tanggalMulai, tanggalAkhir)
+			Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalMulai, tanggalAkhir)
 		if nip != "" {
 			q = q.Where("nip = ? OR nidn = ?", nip, nidn)
 		}
@@ -239,7 +239,7 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	go func() {
 		defer wg.Done()
 		q := r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}).
-			Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND status = 'terima sdm'", tanggalAkhir, tanggalMulai)
+			Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
 		if nip != "" {
 			q = q.Where("nip = ? OR nidn = ?", nip, nidn)
 		}
@@ -253,7 +253,7 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	go func() {
 		defer wg.Done()
 		q := r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}).
-			Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND status = 'terima sdm'", tanggalAkhir, tanggalMulai)
+			Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
 		if nip != "" {
 			q = q.Where("nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
 		}
@@ -328,43 +328,57 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	}
 
 	for _, c := range cutis {
-		rec := domain.RecordItem{
-			ID:      c.ID,
-			Tanggal: c.TanggalMulai,
-			Type:    "cuti",
-			Info: map[string]interface{}{
-				"alasan": c.Alasan,
-				"status": c.Status,
-			},
+		start, _ := time.Parse("2006-01-02", c.TanggalMulai)
+		end, _ := time.Parse("2006-01-02", c.TanggalSelesai)
+		if end.Before(start) {
+			end = start
 		}
-		if c.Nip != "" {
-			recordsByNip[c.Nip] = append(recordsByNip[c.Nip], rec)
-		} else if c.Nidn != "" {
-			recordsByNidn[c.Nidn] = append(recordsByNidn[c.Nidn], rec)
+		for cur := start; !cur.After(end); cur = cur.AddDate(0, 0, 1) {
+			rec := domain.RecordItem{
+				ID:      c.ID,
+				Tanggal: cur.Format("2006-01-02"),
+				Type:    "cuti",
+				Info: map[string]interface{}{
+					"alasan": c.Alasan,
+					"status": c.Status,
+				},
+			}
+			if c.Nip != "" {
+				recordsByNip[c.Nip] = append(recordsByNip[c.Nip], rec)
+			} else if c.Nidn != "" {
+				recordsByNidn[c.Nidn] = append(recordsByNidn[c.Nidn], rec)
+			}
 		}
 	}
 
 	for _, sp := range sppds {
-		rec := domain.RecordItem{
-			ID:      sp.ID,
-			Tanggal: sp.TanggalBerangkat,
-			Type:    "sppd",
-			Info: map[string]interface{}{
-				"maksud": sp.Keterangan,
-				"tujuan": sp.Tujuan,
-			},
+		start, _ := time.Parse("2006-01-02", sp.TanggalBerangkat)
+		end, _ := time.Parse("2006-01-02", sp.TanggalKembali)
+		if end.Before(start) {
+			end = start
 		}
-		if sp.Nip != "" {
-			recordsByNip[sp.Nip] = append(recordsByNip[sp.Nip], rec)
-		} else if sp.Nidn != "" {
-			recordsByNidn[sp.Nidn] = append(recordsByNidn[sp.Nidn], rec)
-		}
+		for cur := start; !cur.After(end); cur = cur.AddDate(0, 0, 1) {
+			rec := domain.RecordItem{
+				ID:      sp.ID,
+				Tanggal: cur.Format("2006-01-02"),
+				Type:    "sppd",
+				Info: map[string]interface{}{
+					"maksud": sp.Keterangan,
+					"tujuan": sp.Tujuan,
+				},
+			}
+			if sp.Nip != "" {
+				recordsByNip[sp.Nip] = append(recordsByNip[sp.Nip], rec)
+			} else if sp.Nidn != "" {
+				recordsByNidn[sp.Nidn] = append(recordsByNidn[sp.Nidn], rec)
+			}
 
-		for _, member := range anggotaBySppdID[sp.ID] {
-			if member.Nip != "" {
-				recordsByNip[member.Nip] = append(recordsByNip[member.Nip], rec)
-			} else if member.Nidn != "" {
-				recordsByNidn[member.Nidn] = append(recordsByNidn[member.Nidn], rec)
+			for _, member := range anggotaBySppdID[sp.ID] {
+				if member.Nip != "" {
+					recordsByNip[member.Nip] = append(recordsByNip[member.Nip], rec)
+				} else if member.Nidn != "" {
+					recordsByNidn[member.Nidn] = append(recordsByNidn[member.Nidn], rec)
+				}
 			}
 		}
 	}
@@ -513,9 +527,9 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 	// Find distinct months across all activity tables filtered by status
 	var mAbsen, mIzin, mCuti, mSppd, mUpacara []string
 	qAbsen := r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}).Where("absen_masuk IS NOT NULL")
-	qIzin := r.db.WithContext(ctx).Model(&permissionDomain.Izin{}).Where("status = 'terima sdm'")
-	qCuti := r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}).Where("status = 'terima sdm'")
-	qSppd := r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}).Where("status = 'terima sdm'")
+	qIzin := r.db.WithContext(ctx).Model(&permissionDomain.Izin{}).Where("status IN ('terima sdm', 'Disetujui')")
+	qCuti := r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}).Where("status IN ('terima sdm', 'Disetujui')")
+	qSppd := r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}).Where("status IN ('terima sdm', 'Disetujui')")
 	qUpacara := r.db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{})
 
 	qAbsen.Select("DISTINCT DATE_FORMAT(tanggal, '%Y-%m')").Pluck("DISTINCT DATE_FORMAT(tanggal, '%Y-%m')", &mAbsen)
@@ -608,19 +622,19 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 					go func() {
 						defer wgCount.Done()
 						buildUserWhere(r.db.WithContext(ctx).Model(&permissionDomain.Izin{}), nipVal, nidnVal).
-							Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND status = 'terima sdm'", v1Start.Format("2006-01-02"), v1End.Format("2006-01-02")).
+							Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND status IN ('terima sdm', 'Disetujui')", v1Start.Format("2006-01-02"), v1End.Format("2006-01-02")).
 							Count(&cIzinV1)
 					}()
 					go func() {
 						defer wgCount.Done()
 						buildUserWhere(r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}), nipVal, nidnVal).
-							Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND status = 'terima sdm'", v1End.Format("2006-01-02"), v1Start.Format("2006-01-02")).
+							Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND status IN ('terima sdm', 'Disetujui')", v1End.Format("2006-01-02"), v1Start.Format("2006-01-02")).
 							Count(&cCutiV1)
 					}()
 					go func() {
 						defer wgCount.Done()
 						buildSppdUserWhere(r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}), nipVal, nidnVal).
-							Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND status = 'terima sdm'", v1End.Format("2006-01-02"), v1Start.Format("2006-01-02")).
+							Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND status IN ('terima sdm', 'Disetujui')", v1End.Format("2006-01-02"), v1Start.Format("2006-01-02")).
 							Count(&cSppdV1)
 					}()
 					go func() {
@@ -640,19 +654,19 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 					go func() {
 						defer wgCount.Done()
 						buildUserWhere(r.db.WithContext(ctx).Model(&permissionDomain.Izin{}), nipVal, nidnVal).
-							Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND status = 'terima sdm'", v2Start.Format("2006-01-02"), v2End.Format("2006-01-02")).
+							Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND status IN ('terima sdm', 'Disetujui')", v2Start.Format("2006-01-02"), v2End.Format("2006-01-02")).
 							Count(&cIzinV2)
 					}()
 					go func() {
 						defer wgCount.Done()
 						buildUserWhere(r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}), nipVal, nidnVal).
-							Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND status = 'terima sdm'", v2End.Format("2006-01-02"), v2Start.Format("2006-01-02")).
+							Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND status IN ('terima sdm', 'Disetujui')", v2End.Format("2006-01-02"), v2Start.Format("2006-01-02")).
 							Count(&cCutiV2)
 					}()
 					go func() {
 						defer wgCount.Done()
 						buildSppdUserWhere(r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}), nipVal, nidnVal).
-							Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND status = 'terima sdm'", v2End.Format("2006-01-02"), v2Start.Format("2006-01-02")).
+							Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND status IN ('terima sdm', 'Disetujui')", v2End.Format("2006-01-02"), v2Start.Format("2006-01-02")).
 							Count(&cSppdV2)
 					}()
 					go func() {
