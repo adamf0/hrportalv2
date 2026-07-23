@@ -194,15 +194,39 @@ class LeaveRepository implements ILeaveRepository {
           final endDate =
               DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
 
-          String type = "Cuti";
+          String type = "Cuti Tahunan";
           if (path.contains("sppd")) {
-            type = json['jenis_sppd_id'] == 2
-                ? "SPPD - Dinas Dalam Kota"
-                : "SPPD - Dinas Luar";
+            final jenisSppdId = json['jenis_sppd_id'] as int? ?? json['id_jenis_sppd'] as int? ?? 1;
+            type = "SPPD - Dinas Luar";
+            if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";
+            if (jenisSppdId == 3) type = "SPPD - Konsultasi / Diklat";
+            if (jenisSppdId == 4) type = "SPPD - Workshop / Seminar";
+            if (jenisSppdId == 5) type = "SPPD - Kerjasama Luar Negeri";
+            if (json['nama_jenis_sppd'] != null && json['nama_jenis_sppd'].toString().isNotEmpty) {
+              type = json['nama_jenis_sppd'].toString();
+            }
           } else if (path.contains("izin")) {
-            type = "Izin";
+            final jenisIzinId = json['id_jenis_izin'] as int? ?? json['jenis_izin_id'] as int? ?? 1;
+            type = "Izin Sakit";
+            if (jenisIzinId == 2) type = "Izin Sakit Tanpa Dokter";
+            if (jenisIzinId == 3) type = "Izin Melahirkan";
+            if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
+            if (jenisIzinId == 5) type = "Izin Terlambat Masuk";
+            if (jenisIzinId == 6) type = "Izin Pulang Cepat";
+            if (json['nama_jenis_izin'] != null && json['nama_jenis_izin'].toString().isNotEmpty) {
+              type = json['nama_jenis_izin'].toString();
+            }
           } else {
-            type = "Cuti";
+            final jenisCutiId = json['jenis_cuti_id'] as int? ?? json['id_jenis_cuti'] as int? ?? 1;
+            type = "Cuti Tahunan";
+            if (jenisCutiId == 2) type = "Cuti Sakit";
+            if (jenisCutiId == 3) type = "Cuti Melahirkan";
+            if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
+            if (jenisCutiId == 5) type = "Cuti Besar";
+            if (jenisCutiId == 6) type = "Cuti Alasan Penting";
+            if (json['nama_jenis_cuti'] != null && json['nama_jenis_cuti'].toString().isNotEmpty) {
+              type = json['nama_jenis_cuti'].toString();
+            }
           }
 
           final appName = json['nama'] as String? ??

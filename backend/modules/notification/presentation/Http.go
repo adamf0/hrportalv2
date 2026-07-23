@@ -33,9 +33,23 @@ func GetNotificationsHandler(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"data": items, "count": len(items)})
 }
 
+func MarkNotificationDoneHandler(c *fiber.Ctx) error {
+	id := c.FormValue("id")
+	if id == "" {
+		id = c.Query("id")
+	}
+	if id != "" {
+		helper.GlobalFcmManager.MarkNotificationAsDone(id)
+		return c.JSON(fiber.Map{"status": "ok", "message": "Notification marked as done"})
+	}
+	return c.Status(400).JSON(fiber.Map{"error": "Missing notification id"})
+}
+
 func ModuleNotification(app *fiber.App) {
 	app.Post("/api/account/fcm-token", RegisterFcmTokenHandler)
 	app.Get("/api/account/notifications", GetNotificationsHandler)
+	app.Post("/api/account/notifications/mark-done", MarkNotificationDoneHandler)
 	app.Post("/api/notification/fcm-token", RegisterFcmTokenHandler)
 	app.Get("/api/notification/notifications", GetNotificationsHandler)
+	app.Post("/api/notification/mark-done", MarkNotificationDoneHandler)
 }

@@ -384,7 +384,40 @@ func (m *FcmManager) DispatchNotification(targetNips []string, title string, bod
 			go m.controlledFcmPush(db, &dbModel, token, title, body, payload)
 		} else {
 			log.Printf("[FCM Control] Target NIP %s has no active FCM token, notification stored in DB & in-app inbox.", nip)
+			if db != nil && dbModel.ID > 0 {
+				db.Model(&dbModel).Updates(map[string]interface{}{
+					"status":     "done",
+					"updated_at": time.Now(),
+				})
+			}
 		}
+	}
+}
+
+// MarkNotificationAsDone updates a notification status to "done" in DB and memory
+func (m *FcmManager) MarkNotificationAsDone(notificationID string) {
+	notificationID = strings.TrimSpace(notificationID)
+	if notificationID == "" {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.db != nil {
+		m.db.Model(&NotificationModel{}).Where("notification_id = ?", notificationID).Updates(map[string]interface{}{
+			"status":     "done",
+			"updated_at": time.Now(),
+		})
+	}
+
+	for nip, list := range m.notifications {
+		for i := range list {
+			if list[i].ID == notificationID {
+				list[i].Status = "done"
+			}
+		}
+		m.notifications[nip] = list
 	}
 }
 
@@ -400,10 +433,10 @@ func (m *FcmManager) controlledFcmPush(db *gorm.DB, dbModel *NotificationModel, 
 
 	if err == nil {
 		db.Model(dbModel).Updates(map[string]interface{}{
-			"status":     "sent",
+			"status":     "done",
 			"updated_at": time.Now(),
 		})
-		log.Printf("[FCM Control] Notification ID %d pushed successfully! DB Status updated to 'sent'.", dbModel.ID)
+		log.Printf("[FCM Control] Notification ID %d pushed successfully! DB Status updated to 'done'.", dbModel.ID)
 	} else {
 		db.Model(dbModel).Updates(map[string]interface{}{
 			"status":        "failed",

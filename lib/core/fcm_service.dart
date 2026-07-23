@@ -227,8 +227,17 @@ class FcmService {
       if (!_shownNotificationIds.contains(notif.id)) {
         _shownNotificationIds.add(notif.id);
         _showSystemDrawerNotification(notif);
+        markNotificationAsDone(notif.id);
       }
     }
+  }
+
+  /// Marks notification status as done on server
+  static Future<void> markNotificationAsDone(String id) async {
+    try {
+      final url = Uri.parse('${ApiClient.baseUrl}/api/account/notifications/mark-done');
+      await http.post(url, body: {'id': id}).timeout(const Duration(seconds: 3));
+    } catch (_) {}
   }
 
   /// Fetches in-app notification history for a specific NIP
