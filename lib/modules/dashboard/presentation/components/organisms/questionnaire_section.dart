@@ -27,11 +27,11 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
     });
   }
 
-  /// Checks if current date is within the quarterly audit window (e.g. 01-01 s/d 31-01, 01-03 s/d 31-03, 01-06 s/d 30-06, 01-09 s/d 30-09, 01-12 s/d 31-12, etc.)
+  /// Checks if current date is within the quarterly audit window (months 3, 6, 9, 12)
   bool get _isQuarterlyAuditPeriod {
     final now = DateTime.now();
-    // Quarterly audit months: Jan (1), Mar (3), Apr (4), Jun (6), Jul (7), Sep (9), Oct (10), Dec (12)
-    final auditMonths = [1, 3, 4, 6, 7, 9, 10, 12];
+    final auditMonths = [3, 6, 9, 12];
+    debugPrint("now.month: ${now.month}");
     return auditMonths.contains(now.month);
   }
 
@@ -40,7 +40,7 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Kuesioner evaluasi hanya dapat diisi pada periode audit kuartalan (misal: 01 Jan-31 Jan, 01 Mar-31 Mar, dst).',
+            'Kuesioner evaluasi hanya dapat diisi pada periode audit kuartalan (Maret, Juni, September, Desember).',
             style: GoogleFonts.inter(),
           ),
           backgroundColor: Colors.amber[900],
@@ -251,68 +251,67 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        // Quarterly Evaluation Card (Only shown in months 3, 6, 9, 12)
+        if (_isQuarterlyAuditPeriod) ...[
+          const SizedBox(height: 16),
+          InkWell(
+            onTap: () => _openGoogleForm(context),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey[200]!),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.01),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Purple Google Form Icon container
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.purple[50],
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.assignment_outlined,
+                      color: Colors.purple[700],
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
 
-        // Quarterly Evaluation Card (Every 3 months / Google Form evaluation)
-        InkWell(
-          onTap: () => _openGoogleForm(context),
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey[200]!),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.01),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                // Purple Google Form Icon container
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.purple[50],
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.assignment_outlined,
-                    color: Colors.purple[700],
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-
-                // Description and Call to Action
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Evaluasi Aplikasi (Google Form)',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[800],
+                  // Description and Call to Action
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Evaluasi Aplikasi (Google Form)',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[800],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Seberapa baik/buruk aplikasi HR Portal? Bantu kami meningkatkan layanan (3 Bulanan).',
-                        style: GoogleFonts.inter(
-                          fontSize: 10,
-                          color: Colors.grey[600],
+                        const SizedBox(height: 2),
+                        Text(
+                          'Seberapa baik/buruk aplikasi HR Portal? Bantu kami meningkatkan layanan (3 Bulanan).',
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (_isQuarterlyAuditPeriod) ...[
                   const SizedBox(width: 8),
 
                   // Open button
@@ -326,10 +325,10 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ],
     );
   }
