@@ -401,7 +401,7 @@ class AttendanceBloc extends ChangeNotifier {
 
   void _initRealTimeIpAndGpsTracking() async {
     _ipCheckTimer?.cancel();
-    _ipCheckTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+    _ipCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       try {
         final ip = await LocationWifiHelper.getActiveDeviceIp();
         final localIp = await LocationWifiHelper.getLocalInterfaceIp();

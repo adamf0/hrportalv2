@@ -8,7 +8,7 @@ type IAttendanceRepository interface {
 	FindByNipAndTanggal(ctx context.Context, nip string, nidn string, tanggal string) (*Absen, error)
 	CreateAbsen(ctx context.Context, absen *Absen) error
 	UpdateAbsen(ctx context.Context, absen *Absen) error
-	GetHistoryByNip(ctx context.Context, nip string, nidn string) ([]Absen, error)
+	GetHistoryByNip(ctx context.Context, nip string, nidn string, tanggal_mulai *string, tanggal_akhir *string) ([]Absen, error)
 	CreateKlaim(ctx context.Context, klaim *KlaimAbsen) error
 
 	FindByNipAndTanggalUpacara(ctx context.Context, nip string, nidn string, tanggal string) (*AbsenUpacara, error)

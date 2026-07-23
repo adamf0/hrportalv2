@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	common "hrportal_backend/common/domain"
+	"hrportal_backend/common/helper"
 	"hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 	"hrportal_backend/modules/attendance/application/CheckIn"
@@ -82,8 +83,10 @@ func ModuleAttendance(app *fiber.App) {
 
 	group.Get("/history", func(c *fiber.Ctx) error {
 		query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
-			Nidn: c.Query("nidn"),
-			Nip:  c.Query("nip"),
+			Nidn:         c.Query("nidn"),
+			Nip:          c.Query("nip"),
+			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
+			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
 		}
 
 		res, err := mediatr.Send[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](c.UserContext(), query)

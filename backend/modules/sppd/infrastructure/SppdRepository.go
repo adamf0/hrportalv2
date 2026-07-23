@@ -40,14 +40,14 @@ func (r *SppdRepository) DeleteSppd(ctx context.Context, id uint) error {
 	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Sppd{}, id).Error
 }
 
-func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool) ([]domain.Sppd, error) {
+func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Sppd, error) {
 	var items []domain.Sppd
 	var total int64
 
 	query := r.db.WithContext(ctx).Model(&domain.Sppd{})
 
-	if isSdm {
-		// SDM user gets all records across all statuses (terima atasan, tolak atasan, terima sdm, tolak sdm, menunggu, etc)
+	if isSdm && tanggal_mulai != nil && tanggal_akhir != nil {
+		query = query.Where("tanggal_berangkat >= ? and ? <= tanggal_kembali", tanggal_mulai, tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			query = query.Where("verifikasi = ? or (nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?))", nip, nip, nidn, nip, nidn)

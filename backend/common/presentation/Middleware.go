@@ -19,7 +19,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/websocket/v2"
-	"github.com/goforj/godump"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/text/unicode/norm"
 )
@@ -450,35 +449,30 @@ func RBACMiddleware() fiber.Handler {
 			return err
 		}
 
-		godump.Dump(user)
+		c.Request().PostArgs().Set("role", user.Role)
+		c.Request().PostArgs().Set("sid", user.SID)
+		c.Request().PostArgs().Set("nidn", user.NIDN)
+		c.Request().PostArgs().Set("nip", user.NIP)
+		c.Request().PostArgs().Set("kode_fakultas", user.KodeFakultas)
+		c.Request().PostArgs().Set("kode_prodi", user.KodeProdi)
+		c.Request().PostArgs().Set("Fakultas", user.Fakultas)
+		c.Request().PostArgs().Set("prodi", user.Prodi)
+		c.Request().PostArgs().Set("unit", user.Unit)
+		c.Request().PostArgs().Set("source", user.Source)
 
 		if isAdmin(user) {
 			log.Println("[RBAC] User is admin, access granted")
-			c.Request().PostArgs().Set("role", user.Role)
-			c.Request().PostArgs().Set("sid", user.SID)
-			c.Request().PostArgs().Set("nidn", user.NIDN)
-			c.Request().PostArgs().Set("nip", user.NIP)
-			c.Request().PostArgs().Set("kode_fakultas", user.KodeFakultas)
-			c.Request().PostArgs().Set("kode_prodi", user.KodeProdi)
-			c.Request().PostArgs().Set("Fakultas", user.Fakultas)
-			c.Request().PostArgs().Set("prodi", user.Prodi)
-			c.Request().PostArgs().Set("unit", user.Unit)
-			c.Request().PostArgs().Set("source", user.Source)
 			return c.Next()
 		}
 
 		if isDosen(user) || isTendik(user) {
 			log.Println("[RBAC] User is Dosen/Tendik, access granted")
-			c.Request().PostArgs().Set("role", user.Role)
-			c.Request().PostArgs().Set("sid", user.SID)
-			c.Request().PostArgs().Set("nidn", user.NIDN)
-			c.Request().PostArgs().Set("nip", user.NIP)
-			c.Request().PostArgs().Set("kode_fakultas", user.KodeFakultas)
-			c.Request().PostArgs().Set("kode_prodi", user.KodeProdi)
-			c.Request().PostArgs().Set("Fakultas", user.Fakultas)
-			c.Request().PostArgs().Set("prodi", user.Prodi)
-			c.Request().PostArgs().Set("unit", user.Unit)
-			c.Request().PostArgs().Set("source", user.Source)
+			log.Println("[RBAC] Middleware passed, continue to handler")
+			return c.Next()
+		}
+
+		if isSdm(user) || isBaum(user) {
+			log.Println("[RBAC] User is SDM/BAUM, access granted")
 			log.Println("[RBAC] Middleware passed, continue to handler")
 			return c.Next()
 		}
@@ -552,21 +546,39 @@ func handleWhoAmIError(body []byte, c *fiber.Ctx) error {
 // ========================
 
 func isAdmin(user *Account) bool {
-	return user.Level == "admin"
+	role := strings.ToLower(user.Role)
+	src := strings.ToLower(user.Source)
+	lvl := strings.ToLower(user.Level)
+
+	return role == "adm_pusat" || role == "adm_hr" || (lvl == "admin" && src == "local")
 }
 
 func isDosen(user *Account) bool { //[pr]
 	role := strings.ToLower(user.Role)
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
-	return user.NIDN != "" || role == "dosen" || src == "simak" || lvl == "dosen"
+	return role == "dosen" || (src == "simak" && lvl == "dosen")
 }
 
 func isTendik(user *Account) bool {
 	role := strings.ToLower(user.Role)
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
-	return user.NIP != "" || role == "tendik" || src == "simpeg" || lvl == "tendik"
+	return role == "tendik" || (src == "simpeg" && lvl == "tendik")
+}
+
+func isSdm(user *Account) bool {
+	role := strings.ToLower(user.Role)
+	src := strings.ToLower(user.Source)
+	lvl := strings.ToLower(user.Level)
+	return role == "sdm" || (src == "local" && lvl == "sdm")
+}
+
+func isBaum(user *Account) bool {
+	role := strings.ToLower(user.Role)
+	src := strings.ToLower(user.Source)
+	lvl := strings.ToLower(user.Level)
+	return role == "baum" || (src == "local" && lvl == "baum")
 }
 
 func WSError(conn *websocket.Conn, code string, msg string) error {

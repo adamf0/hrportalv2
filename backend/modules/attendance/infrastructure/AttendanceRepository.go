@@ -36,7 +36,7 @@ func (r *AttendanceRepository) UpdateAbsen(ctx context.Context, absen *domain.Ab
 	return commoninfra.GetTx(ctx, r.db).Save(absen).Error
 }
 
-func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string) ([]domain.Absen, error) {
+func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Absen, error) {
 	var items []domain.Absen
 
 	var query *gorm.DB
@@ -48,6 +48,10 @@ func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, 
 		query = r.db.WithContext(ctx).Model(&domain.Absen{}).Where("nidn = ?", nidn)
 	} else {
 		query = r.db.WithContext(ctx).Model(&domain.Absen{})
+	}
+
+	if tanggal_mulai != nil && tanggal_akhir != nil {
+		query = query.Where("tanggal between ? and ?", tanggal_mulai, tanggal_akhir)
 	}
 
 	err := query.Order("tanggal desc").Find(&items).Error

@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	common "hrportal_backend/common/domain"
+	"hrportal_backend/common/helper"
 	"hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 	"hrportal_backend/modules/leave/application/DeleteCuti"
@@ -162,12 +163,14 @@ func ModuleLeave(app *fiber.App) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nip := c.FormValue("nip")
 		nidn := c.FormValue("nidn")
-		isSdm := c.FormValue("role") == "sdm" || c.Query("is_sdm") == "true" || c.Query("tanggal_mulai") != "" || (nip == "" && nidn == "")
+		isSdm := c.FormValue("role") == "sdm"
 
 		query := &GetAllCuti.GetAllCutiQuery{
-			Nip:   nip,
-			Nidn:  nidn,
-			IsSdm: isSdm,
+			Nip:          nip,
+			Nidn:         nidn,
+			IsSdm:        isSdm,
+			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
+			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
 		}
 
 		res, err := mediatr.Send[*GetAllCuti.GetAllCutiQuery, common.ResultValue[[]domain.Cuti]](c.UserContext(), query)

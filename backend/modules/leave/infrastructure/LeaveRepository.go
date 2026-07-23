@@ -38,12 +38,12 @@ func (r *LeaveRepository) DeleteCuti(ctx context.Context, id uint) error {
 	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Cuti{}, id).Error
 }
 
-func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool) ([]domain.Cuti, error) {
+func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Cuti, error) {
 	var items []domain.Cuti
 	query := r.db.WithContext(ctx).Model(&domain.Cuti{})
 
-	if isSdm {
-		// SDM user gets all records across all statuses (terima atasan, tolak atasan, terima sdm, tolak sdm, menunggu, etc)
+	if isSdm && tanggal_mulai != nil && tanggal_akhir != nil {
+		query = query.Where("tanggal_mulai >= ? and ? <= tanggal_akhir", tanggal_mulai, tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			query = query.Where("(nip = ? OR nidn = ?) or verifikasi = ?", nip, nidn, nip)

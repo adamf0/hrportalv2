@@ -7,6 +7,7 @@ import (
 	"github.com/mehdihadeli/go-mediatr"
 
 	commondomain "hrportal_backend/common/domain"
+	"hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 	create "hrportal_backend/modules/izin/application/CreateIzin"
@@ -122,12 +123,14 @@ func ModuleIzin(app *fiber.App) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nidn := c.FormValue("nidn")
 		nip := c.FormValue("nip")
-		isSdm := c.FormValue("role") == "sdm" || c.Query("is_sdm") == "true" || c.Query("tanggal_mulai") != "" || (nip == "" && nidn == "")
+		isSdm := c.FormValue("role") == "sdm"
 
 		query := getAll.GetAllIzinsQuery{
-			Nidn:  nidn,
-			Nip:   nip,
-			IsSdm: isSdm,
+			Nidn:         nidn,
+			Nip:          nip,
+			IsSdm:        isSdm,
+			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
+			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
 		}
 
 		res, err := mediatr.Send[*getAll.GetAllIzinsQuery, commondomain.ResultValue[[]domain.Izin]](c.UserContext(), &query)

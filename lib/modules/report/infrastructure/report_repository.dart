@@ -53,35 +53,41 @@ class ReportRepository implements IReportRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> fetchLaporanMatrix(ReportPeriodFilter filter) async {
+  Future<Map<String, dynamic>> fetchLaporanMatrix(
+      ReportPeriodFilter filter) async {
     final startStr = _formatDateKey(filter.startDate);
     final endStr = _formatDateKey(filter.endDate);
 
     try {
       final results = await Future.wait([
         ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/laporan/all?tanggal_mulai=$startStr&tanggal_akhir=$endStr"),
-          timeout: const Duration(seconds: 45),
+          Uri.parse(
+              "${ApiClient.baseUrl}/api/laporan/stream?tanggal_mulai=$startStr&tanggal_akhir=$endStr"),
+          timeout: const Duration(seconds: 180),
         ),
         ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/attendance/history?tanggal_mulai=$startStr&tanggal_akhir=$endStr&is_sdm=true"),
-          timeout: const Duration(seconds: 45),
+          Uri.parse(
+              "${ApiClient.baseUrl}/api/attendance/history?tanggal_mulai=$startStr&tanggal_akhir=$endStr"),
+          timeout: const Duration(seconds: 180),
         ),
         ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/izin?tanggal_mulai=$startStr&tanggal_akhir=$endStr&role=sdm&is_sdm=true"),
-          timeout: const Duration(seconds: 45),
+          Uri.parse(
+              "${ApiClient.baseUrl}/api/izin?tanggal_mulai=$startStr&tanggal_akhir=$endStr"),
+          timeout: const Duration(seconds: 180),
         ),
         ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/leave?tanggal_mulai=$startStr&tanggal_akhir=$endStr&role=sdm&is_sdm=true"),
-          timeout: const Duration(seconds: 45),
+          Uri.parse(
+              "${ApiClient.baseUrl}/api/leave?tanggal_mulai=$startStr&tanggal_akhir=$endStr"),
+          timeout: const Duration(seconds: 180),
         ),
         ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/sppd/history?tanggal_mulai=$startStr&tanggal_akhir=$endStr&role=sdm&is_sdm=true"),
-          timeout: const Duration(seconds: 45),
+          Uri.parse(
+              "${ApiClient.baseUrl}/api/sppd/history?tanggal_mulai=$startStr&tanggal_akhir=$endStr"),
+          timeout: const Duration(seconds: 180),
         ),
         ApiClient.get(
           Uri.parse("${ApiClient.baseUrl}/api/holiday"),
-          timeout: const Duration(seconds: 45),
+          timeout: const Duration(seconds: 180),
         ),
       ]);
 
@@ -97,7 +103,8 @@ class ReportRepository implements IReportRepository {
       for (var item in _extractList(holidayData)) {
         if (item is Map<String, dynamic>) {
           final hDate = item['tanggal']?.toString() ?? '';
-          if (hDate.isNotEmpty) holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+          if (hDate.isNotEmpty)
+            holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
         }
       }
 
@@ -117,17 +124,20 @@ class ReportRepository implements IReportRepository {
   }
 
   @override
-  Stream<Map<String, dynamic>> streamLaporanMatrix(ReportPeriodFilter filter) async* {
+  Stream<Map<String, dynamic>> streamLaporanMatrix(
+      ReportPeriodFilter filter) async* {
     final startStr = _formatDateKey(filter.startDate);
     final endStr = _formatDateKey(filter.endDate);
 
     final Set<String> holidays = {};
     try {
-      final hRes = await ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/holiday"));
+      final hRes =
+          await ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/holiday"));
       for (var item in _extractList(hRes)) {
         if (item is Map<String, dynamic>) {
           final hDate = item['tanggal']?.toString() ?? '';
-          if (hDate.isNotEmpty) holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+          if (hDate.isNotEmpty)
+            holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
         }
       }
     } catch (_) {}
@@ -152,7 +162,9 @@ class ReportRepository implements IReportRepository {
       final response = await client.send(request);
       final List<dynamic> accumulatedRecords = [];
 
-      final stream = response.stream.transform(utf8.decoder).transform(const LineSplitter());
+      final stream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
 
       DateTime lastYieldTime = DateTime.now();
       await for (final line in stream) {
@@ -170,7 +182,8 @@ class ReportRepository implements IReportRepository {
               final now = DateTime.now();
               if (now.difference(lastYieldTime).inMilliseconds >= 300) {
                 lastYieldTime = now;
-                yield _processLaporanAllStream(accumulatedRecords, filter, holidays);
+                yield _processLaporanAllStream(
+                    accumulatedRecords, filter, holidays);
               }
             } catch (_) {}
           }
@@ -192,7 +205,8 @@ class ReportRepository implements IReportRepository {
       if (data['list_data'] is List) return data['list_data'] as List;
       if (data['records'] is List) return data['records'] as List;
       if (data['data'] is List) return data['data'] as List;
-      if (data['versi_1_calendar'] is Map && data['versi_1_calendar']['list_data'] is List) {
+      if (data['versi_1_calendar'] is Map &&
+          data['versi_1_calendar']['list_data'] is List) {
         return data['versi_1_calendar']['list_data'] as List;
       }
     }
@@ -221,7 +235,8 @@ class ReportRepository implements IReportRepository {
 
     void addRawEvent(String empId, String dateStr, Map<String, dynamic> event) {
       if (empId.isEmpty || dateStr.isEmpty) return;
-      final cleanDate = dateStr.length >= 10 ? dateStr.substring(0, 10) : dateStr;
+      final cleanDate =
+          dateStr.length >= 10 ? dateStr.substring(0, 10) : dateStr;
       rawEventMap.putIfAbsent(empId, () => {});
       rawEventMap[empId]!.putIfAbsent(cleanDate, () => []);
       rawEventMap[empId]![cleanDate]!.add(event);
@@ -252,7 +267,9 @@ class ReportRepository implements IReportRepository {
       if (found != null && found.isNotEmpty) return found;
 
       registerEmployee(json);
-      return nipToEmpId[rawNip] ?? nidnToEmpId[rawNidn] ?? (rawNip.isNotEmpty ? rawNip : rawNidn);
+      return nipToEmpId[rawNip] ??
+          nidnToEmpId[rawNidn] ??
+          (rawNip.isNotEmpty ? rawNip : rawNidn);
     }
 
     // 1. Process Employee Master from laporanAllData
@@ -261,7 +278,9 @@ class ReportRepository implements IReportRepository {
         Map<String, dynamic>? empJson;
         if (item['pengguna'] is Map<String, dynamic>) {
           empJson = item['pengguna'] as Map<String, dynamic>;
-        } else if (item['nama'] != null || item['nip'] != null || item['nidn'] != null) {
+        } else if (item['nama'] != null ||
+            item['nip'] != null ||
+            item['nidn'] != null) {
           empJson = item;
         }
 
@@ -275,10 +294,15 @@ class ReportRepository implements IReportRepository {
               if (rec is Map<String, dynamic>) {
                 final dateStr = rec['tanggal']?.toString() ?? '';
                 final recType = rec['type']?.toString() ?? '';
-                final info = rec['info'] is Map<String, dynamic> ? rec['info'] as Map<String, dynamic> : <String, dynamic>{};
-                final createdAt = rec['created_at'] != null || info['masuk'] != null
-                    ? _parseCleanDate((rec['created_at'] ?? info['masuk'] ?? dateStr).toString())
-                    : null;
+                final info = rec['info'] is Map<String, dynamic>
+                    ? rec['info'] as Map<String, dynamic>
+                    : <String, dynamic>{};
+                final createdAt =
+                    rec['created_at'] != null || info['masuk'] != null
+                        ? _parseCleanDate(
+                            (rec['created_at'] ?? info['masuk'] ?? dateStr)
+                                .toString())
+                        : null;
 
                 addRawEvent(empId, dateStr, {
                   'type': recType,
@@ -315,8 +339,13 @@ class ReportRepository implements IReportRepository {
     for (var json in _extractList(izinData)) {
       if (json is! Map<String, dynamic>) continue;
       final empId = resolveEmpId(json);
-      final dateStr = json['tanggal_pengajuan']?.toString() ?? json['tanggal']?.toString() ?? json['tanggal_mulai']?.toString() ?? '';
-      final dt = json['created_at'] != null ? _parseCleanDate(json['created_at'].toString()) : null;
+      final dateStr = json['tanggal_pengajuan']?.toString() ??
+          json['tanggal']?.toString() ??
+          json['tanggal_mulai']?.toString() ??
+          '';
+      final dt = json['created_at'] != null
+          ? _parseCleanDate(json['created_at'].toString())
+          : null;
 
       addRawEvent(empId, dateStr, {
         'type': 'izin',
@@ -333,11 +362,15 @@ class ReportRepository implements IReportRepository {
       if (json is! Map<String, dynamic>) continue;
       final empId = resolveEmpId(json);
       final startStr = json['tanggal_mulai']?.toString() ?? '';
-      final endStr = (json['tanggal_selesai'] ?? json['tanggal_akhir'])?.toString() ?? startStr;
+      final endStr =
+          (json['tanggal_selesai'] ?? json['tanggal_akhir'])?.toString() ??
+              startStr;
 
       final startDate = _parseCleanDate(startStr);
       final endDate = _parseCleanDate(endStr);
-      final dt = json['created_at'] != null ? _parseCleanDate(json['created_at'].toString()) : null;
+      final dt = json['created_at'] != null
+          ? _parseCleanDate(json['created_at'].toString())
+          : null;
 
       if (startDate != null) {
         DateTime cur = startDate;
@@ -362,13 +395,22 @@ class ReportRepository implements IReportRepository {
       if (json is! Map<String, dynamic>) continue;
 
       final mainEmpId = resolveEmpId(json);
-      final sppdObj = json['sppd'] is Map<String, dynamic> ? json['sppd'] as Map<String, dynamic> : json;
-      final startStr = (sppdObj['tanggal_berangkat'] ?? json['tanggal_berangkat'])?.toString() ?? '';
-      final endStr = (sppdObj['tanggal_kembali'] ?? json['tanggal_kembali'])?.toString() ?? startStr;
+      final sppdObj = json['sppd'] is Map<String, dynamic>
+          ? json['sppd'] as Map<String, dynamic>
+          : json;
+      final startStr =
+          (sppdObj['tanggal_berangkat'] ?? json['tanggal_berangkat'])
+                  ?.toString() ??
+              '';
+      final endStr =
+          (sppdObj['tanggal_kembali'] ?? json['tanggal_kembali'])?.toString() ??
+              startStr;
 
       final startDate = _parseCleanDate(startStr);
       final endDate = _parseCleanDate(endStr);
-      final dt = json['created_at'] != null ? _parseCleanDate(json['created_at'].toString()) : null;
+      final dt = json['created_at'] != null
+          ? _parseCleanDate(json['created_at'].toString())
+          : null;
 
       final List<String> memberEmpIds = [if (mainEmpId.isNotEmpty) mainEmpId];
 
@@ -412,7 +454,9 @@ class ReportRepository implements IReportRepository {
     // Event Priority Helper
     int getEventPriority(Map<String, dynamic> event) {
       final typeLower = (event['type'] ?? '').toString().toLowerCase();
-      final info = event['info'] is Map<String, dynamic> ? event['info'] as Map<String, dynamic> : <String, dynamic>{};
+      final info = event['info'] is Map<String, dynamic>
+          ? event['info'] as Map<String, dynamic>
+          : <String, dynamic>{};
       final statusLower = (info['status'] ?? '').toString().toLowerCase();
 
       if (statusLower.contains('tolak')) return 0; // Rejected items ignored
@@ -420,13 +464,13 @@ class ReportRepository implements IReportRepository {
       if (typeLower.contains('absen') || typeLower == 'masuk') {
         return 100; // Priority 1: Absen Umum
       } else if (typeLower.contains('izin')) {
-        return 80;  // Priority 2: Izin (terima sdm)
+        return 80; // Priority 2: Izin (terima sdm)
       } else if (typeLower.contains('cuti')) {
-        return 80;  // Priority 2: Cuti (terima sdm)
+        return 80; // Priority 2: Cuti (terima sdm)
       } else if (typeLower.contains('sppd')) {
-        return 80;  // Priority 2: SPPD (terima sdm)
+        return 80; // Priority 2: SPPD (terima sdm)
       } else if (typeLower.contains('upacara')) {
-        return 10;  // Upacara (low priority, does not override Izin/Cuti/SPPD/Absen)
+        return 10; // Upacara (low priority, does not override Izin/Cuti/SPPD/Absen)
       }
       return 1;
     }
@@ -442,7 +486,8 @@ class ReportRepository implements IReportRepository {
 
         for (var dt in dateList) {
           final dateStr = _formatDateKey(dt);
-          final monthPrefix = "${dt.year}-${dt.month < 10 ? '0${dt.month}' : '${dt.month}'}";
+          final monthPrefix =
+              "${dt.year}-${dt.month < 10 ? '0${dt.month}' : '${dt.month}'}";
           int upacaraCount = 0;
 
           final empEvents = rawEventMap[empId] ?? {};
@@ -450,10 +495,16 @@ class ReportRepository implements IReportRepository {
             if (eventDateStr.startsWith(monthPrefix)) {
               for (var ev in events) {
                 final typeLower = (ev['type'] ?? '').toString().toLowerCase();
-                final info = ev['info'] is Map<String, dynamic> ? ev['info'] as Map<String, dynamic> : <String, dynamic>{};
-                final noteLower = (info['catatan'] ?? info['note'] ?? info['kode'] ?? '').toString().toLowerCase();
+                final info = ev['info'] is Map<String, dynamic>
+                    ? ev['info'] as Map<String, dynamic>
+                    : <String, dynamic>{};
+                final noteLower =
+                    (info['catatan'] ?? info['note'] ?? info['kode'] ?? '')
+                        .toString()
+                        .toLowerCase();
 
-                if (typeLower.contains('upacara') || noteLower.contains('upacara')) {
+                if (typeLower.contains('upacara') ||
+                    noteLower.contains('upacara')) {
                   upacaraCount++;
                   break;
                 }
@@ -463,7 +514,9 @@ class ReportRepository implements IReportRepository {
 
           annualTotal += upacaraCount;
           cellMatrix[empId]![dateStr] = ReportCellData(
-            status: upacaraCount > 0 ? ReportCellStatus.absen : ReportCellStatus.tidakMasuk,
+            status: upacaraCount > 0
+                ? ReportCellStatus.absen
+                : ReportCellStatus.tidakMasuk,
             text: upacaraCount > 0 ? "$upacaraCount" : "0",
           );
         }
@@ -513,13 +566,16 @@ class ReportRepository implements IReportRepository {
 
           if (selectedPriority <= 0) {
             cellMatrix[empId]![dateStr] = ReportCellData(
-              status: isSunday || isHoliday ? ReportCellStatus.libur : ReportCellStatus.tidakMasuk,
+              status: isSunday || isHoliday
+                  ? ReportCellStatus.libur
+                  : ReportCellStatus.tidakMasuk,
               text: isSunday ? 'Minggu' : (isHoliday ? 'Libur' : 'Alpa'),
             );
             continue;
           }
 
-          final typeLower = (selectedEvent['type'] ?? '').toString().toLowerCase();
+          final typeLower =
+              (selectedEvent['type'] ?? '').toString().toLowerCase();
           final info = selectedEvent['info'] is Map<String, dynamic>
               ? selectedEvent['info'] as Map<String, dynamic>
               : <String, dynamic>{};
@@ -542,8 +598,12 @@ class ReportRepository implements IReportRepository {
                 ? (keluar.isNotEmpty ? "$masuk - $keluar" : masuk)
                 : "Absen";
 
-            note = (info['catatan'] ?? info['note'] ?? info['kode'] ?? '').toString();
-            if (note.contains('G') || note.contains('V') || note.contains('Verifikasi') || info['is_anomaly'] == true) {
+            note = (info['catatan'] ?? info['note'] ?? info['kode'] ?? '')
+                .toString();
+            if (note.contains('G') ||
+                note.contains('V') ||
+                note.contains('Verifikasi') ||
+                info['is_anomaly'] == true) {
               cellStatus = ReportCellStatus.absenAnomaly;
               hasAnomaly = true;
             } else {
@@ -565,11 +625,15 @@ class ReportRepository implements IReportRepository {
             cellText = 'SPPD';
             note = (info['tujuan'] ?? info['maksud'] ?? '').toString();
           } else if (typeLower.contains('upacara')) {
-            cellStatus = isSunday || isHoliday ? ReportCellStatus.libur : ReportCellStatus.tidakMasuk;
+            cellStatus = isSunday || isHoliday
+                ? ReportCellStatus.libur
+                : ReportCellStatus.tidakMasuk;
             cellText = isSunday ? 'Minggu' : (isHoliday ? 'Libur' : 'Alpa');
             note = 'Absen Upacara';
           } else {
-            cellStatus = isSunday || isHoliday ? ReportCellStatus.libur : ReportCellStatus.tidakMasuk;
+            cellStatus = isSunday || isHoliday
+                ? ReportCellStatus.libur
+                : ReportCellStatus.tidakMasuk;
             cellText = isSunday ? 'Minggu' : (isHoliday ? 'Libur' : 'Alpa');
           }
 

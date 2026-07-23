@@ -35,12 +35,12 @@ func (r *IzinRepository) GetByID(ctx context.Context, id uint) (*domain.Izin, er
 	}
 	return &izin, nil
 }
-func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, isSdm bool) ([]domain.Izin, error) {
+func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Izin, error) {
 	var izins []domain.Izin
 	query := r.db.WithContext(ctx).Model(&domain.Izin{})
 
-	if isSdm {
-		// SDM user gets all records across all statuses (terima atasan, tolak atasan, terima sdm, tolak sdm, menunggu, etc)
+	if isSdm && tanggal_mulai != nil && tanggal_akhir != nil {
+		query = query.Where("tanggal_pengajuan between ? and ?", tanggal_mulai, tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			query = query.Where("(nip = ? OR nidn = ?) or verifikasi = ?", nip, nidn, nip)

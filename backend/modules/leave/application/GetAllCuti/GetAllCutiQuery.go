@@ -8,9 +8,11 @@ import (
 )
 
 type GetAllCutiQuery struct {
-	Nip   string
-	Nidn  string
-	IsSdm bool
+	Nip          string
+	Nidn         string
+	IsSdm        bool
+	TanggalMulai *string
+	TanggalAkhir *string
 }
 
 type GetAllCutiQueryHandler struct {
@@ -22,7 +24,7 @@ func NewGetAllCutiQueryHandler(leaveRepo domain.ILeaveRepository) *GetAllCutiQue
 }
 
 func (h *GetAllCutiQueryHandler) Handle(ctx context.Context, query *GetAllCutiQuery) (common.ResultValue[[]domain.Cuti], error) {
-	cutis, err := h.leaveRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.IsSdm)
+	cutis, err := h.leaveRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.IsSdm, query.TanggalMulai, query.TanggalAkhir)
 	if err != nil {
 		return common.FailureValue[[]domain.Cuti](domain.LeaveNotFound()), err
 	}

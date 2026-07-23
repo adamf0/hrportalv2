@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	common "hrportal_backend/common/domain"
+	"hrportal_backend/common/helper"
 	"hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 	"hrportal_backend/modules/sppd/application/CreateSppd"
@@ -108,12 +109,14 @@ func ModuleSppd(app *fiber.App) {
 	group.Get("/history", func(c *fiber.Ctx) error {
 		nip := c.FormValue("nip")
 		nidn := c.FormValue("nidn")
-		isSdm := c.FormValue("role") == "sdm" || c.Query("is_sdm") == "true" || c.Query("tanggal_mulai") != "" || (nip == "" && nidn == "")
+		isSdm := c.FormValue("role") == "sdm"
 
 		query := &GetSppdHistory.GetSppdHistoryQuery{
-			Nip:   nip,
-			Nidn:  nidn,
-			IsSdm: isSdm,
+			Nip:          nip,
+			Nidn:         nidn,
+			IsSdm:        isSdm,
+			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
+			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
 		}
 
 		res, err := mediatr.Send[*GetSppdHistory.GetSppdHistoryQuery, common.ResultValue[[]domain.Sppd]](c.UserContext(), query)

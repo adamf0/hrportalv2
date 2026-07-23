@@ -8,8 +8,10 @@ import (
 )
 
 type GetAttendanceHistoryQuery struct {
-	Nidn string
-	Nip  string
+	Nidn         string
+	Nip          string
+	TanggalMulai *string
+	TanggalAkhir *string
 }
 
 type GetAttendanceHistoryQueryHandler struct {
@@ -21,7 +23,7 @@ func NewGetAttendanceHistoryQueryHandler(attendanceRepo domain.IAttendanceReposi
 }
 
 func (h *GetAttendanceHistoryQueryHandler) Handle(ctx context.Context, query *GetAttendanceHistoryQuery) (common.ResultValue[[]domain.Absen], error) {
-	list, err := h.attendanceRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn)
+	list, err := h.attendanceRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.TanggalMulai, query.TanggalAkhir)
 	if err != nil {
 		return common.FailureValue[[]domain.Absen](domain.AttendanceNotFound()), err
 	}

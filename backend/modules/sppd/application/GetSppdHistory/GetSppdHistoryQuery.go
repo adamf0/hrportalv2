@@ -8,9 +8,11 @@ import (
 )
 
 type GetSppdHistoryQuery struct {
-	Nip   string
-	Nidn  string
-	IsSdm bool
+	Nip          string
+	Nidn         string
+	IsSdm        bool
+	TanggalMulai *string
+	TanggalAkhir *string
 }
 
 type GetSppdHistoryQueryHandler struct {
@@ -22,7 +24,7 @@ func NewGetSppdHistoryQueryHandler(sppdRepo domain.ISppdRepository) *GetSppdHist
 }
 
 func (h *GetSppdHistoryQueryHandler) Handle(ctx context.Context, query *GetSppdHistoryQuery) (common.ResultValue[[]domain.Sppd], error) {
-	paged, err := h.sppdRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.IsSdm)
+	paged, err := h.sppdRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.IsSdm, query.TanggalMulai, query.TanggalAkhir)
 	if err != nil {
 		return common.FailureValue[[]domain.Sppd](domain.SppdNotFound()), err
 	}

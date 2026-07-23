@@ -167,7 +167,7 @@ class LocationWifiHelper {
     http
         .get(Uri.parse('https://api.ipify.org'))
         .timeout(
-          const Duration(seconds: 2),
+          const Duration(seconds: 120),
         )
         .then((response) {
       _isFetchingPublicIp = false;
@@ -184,7 +184,7 @@ class LocationWifiHelper {
     try {
       final response =
           await http.get(Uri.parse('https://api.ipify.org')).timeout(
-                const Duration(milliseconds: 1500),
+                const Duration(milliseconds: 120),
               );
       if (response.statusCode == 200) {
         final ip = response.body.trim();
