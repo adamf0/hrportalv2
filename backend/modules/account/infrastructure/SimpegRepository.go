@@ -2,9 +2,8 @@ package infrastructure
 
 import (
 	"context"
-	"crypto/sha1"
-	"encoding/hex"
 	"errors"
+	"strings"
 
 	"hrportal_backend/common/helper"
 	"hrportal_backend/modules/account/domain"
@@ -16,86 +15,188 @@ type SimpegRepository struct {
 	dbSimpeg *gorm.DB
 }
 
-func NewSimpegRepository(dbSimpeg *gorm.DB) domain.ISimpegRepository {
-	return &SimpegRepository{dbSimpeg: dbSimpeg}
+func NewSimpegRepository(dbSimpeg *gorm.DB) *SimpegRepository {
+	return &SimpegRepository{
+		dbSimpeg: dbSimpeg,
+	}
 }
 
 func (r *SimpegRepository) Authenticate(ctx context.Context, username, password string) (*domain.AuthResult, error) {
-	var userSimpeg []struct {
-		Username string `gorm:"column:username"`
-		Password string `gorm:"column:password"`
-		Status   string `gorm:"column:status"`
-	}
-	_ = r.dbSimpeg.WithContext(ctx).Table("pengguna").Where("username = ?", username).Where("level = ?", "PEGAWAI").Find(&userSimpeg)
-
-	var matchedUsernames []string
-	hashedPassSimpeg := r.hashSimpeg(password)
-	for _, us := range userSimpeg {
-		if us.Password == hashedPassSimpeg {
-			if us.Status != "AKTIF" {
-				return nil, errors.New("akun sudah tidak aktif")
-			}
-			matchedUsernames = append(matchedUsernames, us.Username)
-		}
+	if r.dbSimpeg == nil {
+		return nil, errors.New("database SIMPEG connection not available")
 	}
 
-	if len(matchedUsernames) > 1 {
-		return nil, errors.New("akun " + username + " lebih dari 1")
-	}
-	if len(matchedUsernames) == 0 {
-		return nil, errors.New("akun tidak ditemukan")
-	}
+	rawUsername := strings.TrimSpace(username)
 
-	nip := matchedUsernames[0]
+	// Query e_pribadi (Dosen)
+	var ePribadi struct {
+		Nip         *string `gorm:"column:nip"`
+		Nidn        *string `gorm:"column:nidn"`
+		Nama        *string `gorm:"column:nama"`
+		NamaLengkap *string `gorm:"column:nama_lengkap"`
+	}
+	_ = r.dbSimpeg.WithContext(ctx).Table("e_pribadi").Where("nidn = ? OR nip = ?", rawUsername, rawUsername).First(&ePribadi)
+
+	// Query n_pribadi (Pegawai/Tendik)
 	var nPribadi struct {
-		Nip  *string `gorm:"column:nip"`
-		Nama *string `gorm:"column:nama"`
+		Nip         *string `gorm:"column:nip"`
+		Nama        *string `gorm:"column:nama"`
+		NamaLengkap *string `gorm:"column:nama_lengkap"`
+		NamaPegawai *string `gorm:"column:nama_pegawai"`
 	}
-	_ = r.dbSimpeg.WithContext(ctx).Table("n_pribadi").Where("nip = ?", nip).First(&nPribadi)
+	_ = r.dbSimpeg.WithContext(ctx).Table("n_pribadi").Where("nip = ?", rawUsername).First(&nPribadi)
 
-	if helper.StringValue(nPribadi.Nama) == "" || helper.StringValue(nPribadi.Nip) == "" {
-		return nil, errors.New("data simpeg tidak ditemukan")
+	// Query pengguna table
+	var pengguna struct {
+		Nama *string `gorm:"column:nama"`
+		Name *string `gorm:"column:name"`
+	}
+	_ = r.dbSimpeg.WithContext(ctx).Table("pengguna").Select("nama, name").Where("username = ?", rawUsername).Scan(&pengguna)
+
+	realNip := rawUsername
+	if helper.StringValue(ePribadi.Nip) != "" {
+		realNip = helper.StringValue(ePribadi.Nip)
+	} else if helper.StringValue(nPribadi.Nip) != "" {
+		realNip = helper.StringValue(nPribadi.Nip)
+	}
+	cleanNip := strings.TrimSpace(realNip)
+
+	realNidn := ""
+	if helper.StringValue(ePribadi.Nidn) != "" {
+		realNidn = helper.StringValue(ePribadi.Nidn)
+	}
+
+	realName := ""
+	if helper.StringValue(ePribadi.Nama) != "" && helper.StringValue(ePribadi.Nama) != rawUsername && helper.StringValue(ePribadi.Nama) != cleanNip {
+		realName = helper.StringValue(ePribadi.Nama)
+	} else if helper.StringValue(ePribadi.NamaLengkap) != "" && helper.StringValue(ePribadi.NamaLengkap) != rawUsername && helper.StringValue(ePribadi.NamaLengkap) != cleanNip {
+		realName = helper.StringValue(ePribadi.NamaLengkap)
+	} else if helper.StringValue(nPribadi.Nama) != "" && helper.StringValue(nPribadi.Nama) != rawUsername && helper.StringValue(nPribadi.Nama) != cleanNip {
+		realName = helper.StringValue(nPribadi.Nama)
+	} else if helper.StringValue(nPribadi.NamaLengkap) != "" && helper.StringValue(nPribadi.NamaLengkap) != rawUsername && helper.StringValue(nPribadi.NamaLengkap) != cleanNip {
+		realName = helper.StringValue(nPribadi.NamaLengkap)
+	} else if helper.StringValue(nPribadi.NamaPegawai) != "" && helper.StringValue(nPribadi.NamaPegawai) != rawUsername && helper.StringValue(nPribadi.NamaPegawai) != cleanNip {
+		realName = helper.StringValue(nPribadi.NamaPegawai)
+	} else if helper.StringValue(pengguna.Nama) != "" && helper.StringValue(pengguna.Nama) != rawUsername && helper.StringValue(pengguna.Nama) != cleanNip {
+		realName = helper.StringValue(pengguna.Nama)
+	} else if helper.StringValue(pengguna.Name) != "" && helper.StringValue(pengguna.Name) != rawUsername && helper.StringValue(pengguna.Name) != cleanNip {
+		realName = helper.StringValue(pengguna.Name)
+	}
+
+	if realName == "" {
+		realName = rawUsername
 	}
 
 	return &domain.AuthResult{
-		Sid:    helper.StringValue(nPribadi.Nip),
+		Sid:    rawUsername,
 		Source: "simpeg",
+		Name:   realName,
+		Nip:    realNip,
+		Nidn:   realNidn,
 	}, nil
 }
 
 func (r *SimpegRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
-	var nPribadi struct {
-		Nip   *string `gorm:"column:nip"`
-		Nama  *string `gorm:"column:nama"`
-		Email *string `gorm:"column:email"`
+	cleanSid := strings.TrimSpace(sid)
+
+	// Query e_pribadi (Dosen)
+	var ePribadi struct {
+		Nip       *string `gorm:"column:nip"`
+		Nidn      *string `gorm:"column:nidn"`
+		Nama      *string `gorm:"column:nama"`
+		Email     *string `gorm:"column:email"`
+		UnitKerja *string `gorm:"column:unit_kerja"`
 	}
-	err := r.dbSimpeg.WithContext(ctx).Table("n_pribadi").Where("nip = ?", sid).First(&nPribadi).Error
-	if err != nil {
-		return nil, errors.New("data simpeg tidak ditemukan")
+	_ = r.dbSimpeg.WithContext(ctx).Table("e_pribadi").Where("nidn = ? OR nip = ?", cleanSid, cleanSid).First(&ePribadi)
+
+	// Query n_pribadi (Tendik/Pegawai)
+	var nPribadi struct {
+		Nip         *string `gorm:"column:nip"`
+		Nama        *string `gorm:"column:nama"`
+		NamaLengkap *string `gorm:"column:nama_lengkap"`
+		NamaPegawai *string `gorm:"column:nama_pegawai"`
+		Email       *string `gorm:"column:email"`
+		UnitKerja   *string `gorm:"column:unit_kerja"`
+	}
+	_ = r.dbSimpeg.WithContext(ctx).Table("n_pribadi").Where("nip = ?", cleanSid).First(&nPribadi)
+
+	// Query pengguna table as additional fallback
+	var pengguna struct {
+		Nama *string `gorm:"column:nama"`
+		Name *string `gorm:"column:name"`
+	}
+	_ = r.dbSimpeg.WithContext(ctx).Table("pengguna").Select("nama, name").Where("username = ?", cleanSid).Scan(&pengguna)
+
+	realNip := cleanSid
+	if helper.StringValue(ePribadi.Nip) != "" {
+		realNip = helper.StringValue(ePribadi.Nip)
+	} else if helper.StringValue(nPribadi.Nip) != "" {
+		realNip = helper.StringValue(nPribadi.Nip)
+	}
+	cleanNip := strings.TrimSpace(realNip)
+
+	realNidn := ""
+	if helper.StringValue(ePribadi.Nidn) != "" {
+		realNidn = helper.StringValue(ePribadi.Nidn)
+	}
+
+	realName := ""
+	if helper.StringValue(ePribadi.Nama) != "" && helper.StringValue(ePribadi.Nama) != cleanSid && helper.StringValue(ePribadi.Nama) != cleanNip {
+		realName = helper.StringValue(ePribadi.Nama)
+	} else if helper.StringValue(nPribadi.Nama) != "" && helper.StringValue(nPribadi.Nama) != cleanSid && helper.StringValue(nPribadi.Nama) != cleanNip {
+		realName = helper.StringValue(nPribadi.Nama)
+	} else if helper.StringValue(pengguna.Nama) != "" && helper.StringValue(pengguna.Nama) != cleanSid && helper.StringValue(pengguna.Nama) != cleanNip {
+		realName = helper.StringValue(pengguna.Nama)
+	} else if helper.StringValue(pengguna.Name) != "" && helper.StringValue(pengguna.Name) != cleanSid && helper.StringValue(pengguna.Name) != cleanNip {
+		realName = helper.StringValue(pengguna.Name)
+	}
+
+	if realName == "" {
+		realName = cleanSid
+	}
+
+	realEmail := ""
+	if helper.StringValue(ePribadi.Email) != "" {
+		realEmail = helper.StringValue(ePribadi.Email)
+	} else if helper.StringValue(nPribadi.Email) != "" {
+		realEmail = helper.StringValue(nPribadi.Email)
 	}
 
 	var unitKerja string
-	if nPribadi.Nip != nil {
+	if helper.StringValue(ePribadi.UnitKerja) != "" {
+		unitKerja = helper.StringValue(ePribadi.UnitKerja)
+	} else if helper.StringValue(nPribadi.UnitKerja) != "" {
+		unitKerja = helper.StringValue(nPribadi.UnitKerja)
+	}
+
+	if unitKerja == "" && cleanNip != "" {
 		_ = r.dbSimpeg.WithContext(ctx).Table("n_pengangkatan").
-			Where("nip = ?", *nPribadi.Nip).
+			Where("nip = ?", cleanNip).
+			Pluck("unit_kerja", &unitKerja)
+	}
+	if unitKerja == "" && cleanNip != "" {
+		_ = r.dbSimpeg.WithContext(ctx).Table("e_pengangkatan").
+			Where("nip = ?", cleanNip).
 			Pluck("unit_kerja", &unitKerja)
 	}
 
-	return &domain.UserInfo{
-		Sid:      sid,
-		Source:   "simpeg",
-		Fakultas: "",
-		Prodi:    "",
-		Unit:     unitKerja,
-		Level:    "tendik",
-		Name:     helper.StringValue(nPribadi.Nama),
-		Email:    helper.StringValue(nPribadi.Email),
-		Nip:      helper.StringValue(nPribadi.Nip),
-		Nidn:     "",
-	}, nil
-}
+	level := "tendik"
+	if (ePribadi.Nama != nil && *ePribadi.Nama != "") || (ePribadi.Nidn != nil && *ePribadi.Nidn != "") {
+		level = "dosen"
+	}
 
-func (r *SimpegRepository) hashSimpeg(password string) string {
-	hSHA1 := sha1.Sum([]byte(password))
-	return hex.EncodeToString(hSHA1[:])
+	return &domain.UserInfo{
+		Sid:          cleanSid,
+		Source:       "simpeg",
+		Fakultas:     "",
+		Prodi:        "",
+		KodeFakultas: "",
+		KodeProdi:    "",
+		Unit:         unitKerja,
+		Level:        level,
+		Name:         realName,
+		Email:        realEmail,
+		Nip:          cleanNip,
+		Nidn:         realNidn,
+	}, nil
 }

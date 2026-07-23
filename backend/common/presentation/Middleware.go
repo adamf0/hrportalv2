@@ -557,7 +557,7 @@ func isDosen(user *Account) bool { //[pr]
 	role := strings.ToLower(user.Role)
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
-	return role == "dosen" || (src == "simak" && lvl == "dosen")
+	return role == "dosen" || ((src == "simak" || src == "simpeg") && lvl == "dosen")
 }
 
 func isTendik(user *Account) bool {

@@ -113,12 +113,27 @@ func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nid
 }
 
 func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, periodeType domain.PeriodeType, periodeKey string) (*domain.RekapLaporanBulanan, error) {
+	if periodeKey == "" {
+		periodeKey = time.Now().Format("2006-01")
+	}
 	var rekap domain.RekapLaporanBulanan
 	err := r.db.WithContext(ctx).
-		Where("nip = ? AND periode_type = ? AND periode_key = ?", nip, periodeType, periodeKey).
+		Where("(nip = ? OR nidn = ?) AND periode_type = ? AND periode_key = ?", nip, nip, periodeType, periodeKey).
 		First(&rekap).Error
 	if err != nil {
-		return nil, err
+		now := time.Now()
+		return &domain.RekapLaporanBulanan{
+			Nip:          nip,
+			Nidn:         nip,
+			PeriodeType:  periodeType,
+			PeriodeKey:   periodeKey,
+			TotalMasuk:   0,
+			TotalIzin:    0,
+			TotalCuti:    0,
+			TotalSppd:    0,
+			TotalUpacara: 0,
+			UpdatedAt:    &now,
+		}, nil
 	}
 	return &rekap, nil
 }

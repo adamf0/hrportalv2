@@ -2,6 +2,7 @@ package GetSummaryReport
 
 import (
 	"context"
+	"time"
 
 	common "hrportal_backend/common/domain"
 	"hrportal_backend/modules/report/domain"
@@ -23,9 +24,26 @@ func NewGetSummaryReportQueryHandler(repo domain.IReportRepository) *GetSummaryR
 }
 
 func (h *GetSummaryReportQueryHandler) Handle(ctx context.Context, query *GetSummaryReportQuery) (common.ResultValue[*domain.RekapLaporanBulanan], error) {
-	summary, err := h.repo.GetReportSummary(ctx, query.Nip, query.PeriodeType, query.PeriodeKey)
+	targetNip := query.Nip
+	if targetNip == "" {
+		targetNip = query.Nidn
+	}
+
+	summary, err := h.repo.GetReportSummary(ctx, targetNip, query.PeriodeType, query.PeriodeKey)
 	if err != nil || summary == nil {
-		return common.FailureValue[*domain.RekapLaporanBulanan](domain.ReportNotFound()), nil
+		now := time.Now()
+		summary = &domain.RekapLaporanBulanan{
+			Nip:          targetNip,
+			Nidn:         targetNip,
+			PeriodeType:  query.PeriodeType,
+			PeriodeKey:   query.PeriodeKey,
+			TotalMasuk:   0,
+			TotalIzin:    0,
+			TotalCuti:    0,
+			TotalSppd:    0,
+			TotalUpacara: 0,
+			UpdatedAt:    &now,
+		}
 	}
 	return common.SuccessValue(summary), nil
 }

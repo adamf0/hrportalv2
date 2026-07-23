@@ -11,6 +11,7 @@ import '../modules/leave/presentation/components/pages/leave_list_page.dart';
 import '../modules/payroll/presentation/components/pages/salary_slip_page.dart';
 import '../modules/report/presentation/components/pages/sdm_report_page.dart';
 import '../modules/auth/presentation/auth_bloc.dart';
+import '../core/fcm_service.dart';
 
 class MainShell extends StatelessWidget {
   const MainShell({super.key});
@@ -28,6 +29,13 @@ class MainShell extends StatelessWidget {
     final attendanceBloc = Provider.of<AttendanceBloc>(context);
     final authBloc = Provider.of<AuthBloc>(context);
     final isSdm = authBloc.isSdmUser;
+
+    if (authBloc.session != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final targetNip = authBloc.session!.nip.isNotEmpty ? authBloc.session!.nip : 'SDM';
+        FcmService.registerFcmToken(targetNip, isSdm: isSdm);
+      });
+    }
 
     final List<Widget> pages = [
       isSdm ? const SdmReportPage() : const DashboardPage(),

@@ -192,6 +192,13 @@ class LeaveRepository implements ILeaveRepository {
             type = "Cuti";
           }
 
+          final appName = json['nama'] as String? ??
+              json['nama_pegawai'] as String? ??
+              json['nama_pemohon'] as String? ??
+              json['user_nama'] as String?;
+          final appNip = json['nip'] as String? ?? json['nip_pemohon'] as String?;
+          final appNidn = json['nidn'] as String? ?? json['nidn_pemohon'] as String?;
+
           verificationRequests.add(LeaveRequest(
             id: idStr,
             type: type,
@@ -204,6 +211,9 @@ class LeaveRepository implements ILeaveRepository {
                 'Menunggu verifikasi',
             startDate: startDate,
             endDate: endDate,
+            applicantName: (appName != null && appName.isNotEmpty) ? appName : null,
+            applicantNip: (appNip != null && appNip.isNotEmpty) ? appNip : null,
+            applicantNidn: (appNidn != null && appNidn.isNotEmpty) ? appNidn : null,
           ));
         }
       }

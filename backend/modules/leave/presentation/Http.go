@@ -67,6 +67,18 @@ func ModuleLeave(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
+		// Trigger FCM Notification for Submit Cuti
+		if res.Value != nil {
+			cutiData := res.Value
+			if cutiData.NipAtasan != nil && *cutiData.NipAtasan != "" {
+				targets := []string{*cutiData.NipAtasan}
+				title := "Pengajuan Cuti Baru"
+				body := "Pegawai NIP " + cutiData.Nip + " mengajukan Cuti baru. Mohon verifikasi."
+				payload := map[string]string{"type": "cuti", "id": strconv.Itoa(int(cutiData.ID)), "status": cutiData.Status}
+				helper.GlobalFcmManager.DispatchNotification(targets, title, body, "cuti", payload)
+			}
+		}
+
 		return c.JSON(res.Value)
 	})
 
@@ -117,6 +129,40 @@ func ModuleLeave(app *fiber.App) {
 
 		if !res.IsSuccess {
 			return infrastructure.HandleError(c, res.Error)
+		}
+
+		// Trigger FCM Notification for Update/Verify Cuti
+		if res.Value != nil {
+			cutiData := res.Value
+			status := cutiData.Status
+
+			atasanNip := ""
+			if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
+				atasanNip = *cutiData.Verifikasi
+			} else if cutiData.NipAtasan != nil && *cutiData.NipAtasan != "" {
+				atasanNip = *cutiData.NipAtasan
+			}
+
+			switch status {
+			case "terima atasan":
+				helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Disetujui Atasan", "Pengajuan Cuti Anda telah disetujui Atasan. Menunggu verifikasi SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+				helper.GlobalFcmManager.DispatchNotification([]string{"SDM_BROADCAST"}, "Verifikasi SDM Cuti", "Pengajuan Cuti NIP "+cutiData.Nip+" telah disetujui Atasan. Mohon verifikasi final SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+
+			case "tolak atasan":
+				helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Ditolak Atasan", "Pengajuan Cuti Anda ditolak oleh Atasan.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+
+			case "terima sdm":
+				helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Disetujui SDM", "Selamat! Pengajuan Cuti Anda telah disetujui oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+				if atasanNip != "" && atasanNip != cutiData.Nip {
+					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Cuti", "Pengajuan Cuti NIP "+cutiData.Nip+" telah disetujui oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+				}
+
+			case "tolak sdm":
+				helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Ditolak SDM", "Pengajuan Cuti Anda ditolak oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+				if atasanNip != "" && atasanNip != cutiData.Nip {
+					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Cuti", "Pengajuan Cuti NIP "+cutiData.Nip+" ditolak oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+				}
+			}
 		}
 
 		return c.JSON(res.Value)

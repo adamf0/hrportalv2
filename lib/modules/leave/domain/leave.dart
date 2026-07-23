@@ -3,12 +3,16 @@ import 'leave_errors.dart';
 class LeaveRequest {
   final String id;
   final String type;
-  final String status; // 'Pengajuan', 'Di ACC Atasan', 'ACC SDM', 'Tolak Atasan', 'Tolak SDM'
+  final String
+      status; // 'Pengajuan', 'Di ACC Atasan', 'Terima SDM', 'Tolak Atasan', 'Tolak SDM'
   final String dateRange;
   final String details;
   final String note;
   final DateTime startDate;
   final DateTime endDate;
+  final String? applicantName;
+  final String? applicantNip;
+  final String? applicantNidn;
 
   LeaveRequest({
     required this.id,
@@ -19,6 +23,9 @@ class LeaveRequest {
     required this.note,
     required this.startDate,
     required this.endDate,
+    this.applicantName,
+    this.applicantNip,
+    this.applicantNidn,
   });
 
   /// Domain Invariant Rule Validation (Domain Business Rules)

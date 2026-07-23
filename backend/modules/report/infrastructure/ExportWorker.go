@@ -36,9 +36,7 @@ type ExportWorker struct {
 
 func NewExportWorker(db *gorm.DB, repo domain.IReportRepository) *ExportWorker {
 	_ = os.MkdirAll("exports", 0755)
-	w := &ExportWorker{db: db, repo: repo}
-	go w.startQueueProcessor()
-	return w
+	return &ExportWorker{db: db, repo: repo}
 }
 
 func (w *ExportWorker) CreateJob(ctx context.Context, tglMulai, tglAkhir string) (*domain.ExportJob, error) {
@@ -67,6 +65,12 @@ func (w *ExportWorker) GetJobStatus(ctx context.Context, taskId string) (*domain
 		return nil, err
 	}
 	return &job, nil
+}
+
+// ProcessQueueLoop processes queued export jobs continuously (for standalone worker binary)
+func (w *ExportWorker) ProcessQueueLoop() {
+	log.Println("[Export Worker] Standalone Export Queue Worker active. Polling for pending jobs...")
+	w.startQueueProcessor()
 }
 
 func (w *ExportWorker) startQueueProcessor() {

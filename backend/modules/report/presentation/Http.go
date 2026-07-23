@@ -23,11 +23,20 @@ func ModuleReport(app *fiber.App) {
 	group := app.Group("/api/laporan", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
 
 	group.Get("/summary", func(c *fiber.Ctx) error {
-		nidn := c.FormValue("nidn")
-		nip := c.FormValue("nip")
+		nidn := c.Query("nidn")
+		if nidn == "" {
+			nidn = c.FormValue("nidn")
+		}
+		nip := c.Query("nip")
+		if nip == "" {
+			nip = c.FormValue("nip")
+		}
 
 		periodeTypeStr := c.Query("periode_type", "CALENDAR")
 		periodeKey := c.Query("periode_key")
+		if periodeKey == "" {
+			periodeKey = time.Now().Format("2006-01")
+		}
 
 		query := &GetSummaryReport.GetSummaryReportQuery{
 			Nip:         nip,

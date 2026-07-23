@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'core/mediator/mediator.dart';
 import 'core/api_client.dart';
 import 'core/app_theme.dart';
+import 'core/fcm_service.dart';
 
 // Auth Module
 import 'modules/auth/domain/auth.dart';
@@ -64,14 +65,9 @@ import 'modules/report/presentation/report_bloc.dart';
 
 // Navigation Shell
 import 'pages/main_shell.dart';
+import 'core/auto_attendance_service.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-
+void setupMediator() {
   // Configure custom Mediator and register routing handlers
   final mediator = Mediator();
 
@@ -113,6 +109,21 @@ void main() {
   final IPayrollRepository payrollRepo = PayrollRepository();
   mediator.registerHandler<GetSalarySlipQuery, PayrollData?>(
       GetSalarySlipQueryHandler(payrollRepo));
+}
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Setup Dependency Injection / Mediator
+  setupMediator();
+
+  // Initialize System Notification Drawer & Background Auto-Attendance Worker
+  FcmService.initLocalNotifications();
+  AutoAttendanceService.instance.initialize();
 
   runApp(
     MultiProvider(
@@ -150,7 +161,11 @@ class AuthenticationWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final authBloc = Provider.of<AuthBloc>(context);
 
-    if (authBloc.isLoggedIn) {
+    if (authBloc.isLoggedIn && authBloc.session != null) {
+      AutoAttendanceService.instance.updateUserSession(
+        authBloc.session!.nip,
+        authBloc.session!.nip,
+      );
       return const MainShell();
     } else {
       return const LoginPage();

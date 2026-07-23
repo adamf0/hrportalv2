@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # 1. Main HTTP API Server (Pure Domain API only)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: hrportal_api
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      DB_HRPORTAL: "root:password@tcp(db:3306)/unpak_hrportal?charset=utf8mb4&parseTime=True&loc=Local"
+      DB_SIMPEG: "root:password@tcp(db:3306)/simpeg_db?charset=utf8mb4&parseTime=True&loc=Local"
+    depends_on:
+      - db
+
+  # 2. Standalone Notification Microservice (FCM Token Registration & Notification Inbox)
+  service-notification:
+    build:
+      context: .
+      dockerfile: Dockerfile.notificationservice
+    container_name: hrportal_service_notification
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: "3001"
+    depends_on:
+      - api
+
+  # 3. Standalone Background Job: SDM Auto-Verify (1x24h Worker)
+  job-autoverifysdm:
+    build:
+      context: .
+      dockerfile: Dockerfile.autoverifysdm
+    container_name: hrportal_job_autoverifysdm
+    restart: always
+    environment:
+      DB_HRPORTAL: "root:password@tcp(db:3306)/unpak_hrportal?charset=utf8mb4&parseTime=True&loc=Local"
+    depends_on:
+      - db
+      - api
+
+  # 4. Standalone Background Job: Holiday Sync (24h Worker)
+  job-holidaysync:
+    build:
+      context: .
+      dockerfile: Dockerfile.holidaysync
+    container_name: hrportal_job_holidaysync
+    restart: always
+    environment:
+      DB_HRPORTAL: "root:password@tcp(db:3306)/unpak_hrportal?charset=utf8mb4&parseTime=True&loc=Local"
+    depends_on:
+      - db
+
+  # 5. Standalone Background Job: Export Queue Worker
+  job-exportworker:
+    build:
+      context: .
+      dockerfile: Dockerfile.exportworker
+    container_name: hrportal_job_exportworker
+    restart: always
+    environment:
+      DB_HRPORTAL: "root:password@tcp(db:3306)/unpak_hrportal?charset=utf8mb4&parseTime=True&loc=Local"
+    depends_on:
+      - db
+
+  # MySQL Database Container
+  db:
+    image: mysql:8.0
+    container_name: hrportal_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: "password"
+      MYSQL_DATABASE: "unpak_hrportal"
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+volumes:
+  db_data:

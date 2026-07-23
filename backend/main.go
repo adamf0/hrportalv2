@@ -17,6 +17,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 
@@ -49,6 +50,8 @@ import (
 
 	holidayInfrastructure "hrportal_backend/modules/holiday/infrastructure"
 	holidayPresentation "hrportal_backend/modules/holiday/presentation"
+
+	notificationPresentation "hrportal_backend/modules/notification/presentation"
 )
 
 var startupErrors []fiber.Map
@@ -157,7 +160,9 @@ func main() {
 	mustStart("Database", func() error {
 		var err error
 		db, err = NewMySQL()
-
+		if err == nil && db != nil {
+			commonhelper.GlobalFcmManager.SetDB(db)
+		}
 		return err
 	})
 
@@ -271,7 +276,9 @@ func main() {
 	calendarPresentation.ModuleCalendar(app)
 	reportPresentation.ModuleReport(app)
 	holidayPresentation.ModuleHoliday(app, db)
+	notificationPresentation.ModuleNotification(app)
 
+	// Note: Background Jobs (SDM Auto-Verify, Holiday Sync, Export Worker) are separated into standalone binaries in /cmd
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok", "service": "Unpak HRPortal Backend API"})
 	})

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/mediator/mediator.dart';
+import '../../../../core/fcm_service.dart';
 import '../application/check_token/check_token_query.dart';
 import '../application/login/login_command.dart';
 import '../application/logout/logout_command.dart';
@@ -84,6 +85,8 @@ class AuthBloc extends ChangeNotifier {
         _session = sessionResult;
         _isLoading = false;
         notifyListeners();
+        final targetNip = _session!.nip.isNotEmpty ? _session!.nip : 'SDM';
+        FcmService.registerFcmToken(targetNip, isSdm: isSdmUser);
         return true;
       } else {
         _errorMessage = 'Gagal masuk via SSO.';
@@ -121,6 +124,7 @@ class AuthBloc extends ChangeNotifier {
           );
           _isLoading = false;
           notifyListeners();
+          FcmService.registerFcmToken(_session!.nip);
           return true;
         }
       }

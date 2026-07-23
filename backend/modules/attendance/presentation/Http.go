@@ -42,6 +42,18 @@ func ModuleAttendance(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
+		// Trigger FCM Notification for Self Attendance Success
+		if res.Value != nil {
+			absenData := res.Value
+			helper.GlobalFcmManager.DispatchNotification(
+				[]string{absenData.Nip},
+				"Presensi Otomatis Berhasil",
+				"Sistem sudah melakukan absensi otomatis",
+				"attendance",
+				map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
+			)
+		}
+
 		return c.JSON(res.Value)
 	})
 
@@ -58,6 +70,18 @@ func ModuleAttendance(app *fiber.App) {
 
 		if !res.IsSuccess {
 			return infrastructure.HandleError(c, res.Error)
+		}
+
+		// Trigger FCM Notification for Ceremony Attendance Success
+		if res.Value != nil {
+			absenData := res.Value
+			helper.GlobalFcmManager.DispatchNotification(
+				[]string{absenData.Nip},
+				"Presensi Upacara Otomatis Berhasil",
+				"Sistem sudah melakukan absensi upacara otomatis",
+				"attendance",
+				map[string]string{"type": "check-in-upacara", "id": strconv.Itoa(int(absenData.ID))},
+			)
 		}
 
 		return c.JSON(res.Value)
@@ -78,7 +102,38 @@ func ModuleAttendance(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
+		if res.Value != nil {
+			absenData := res.Value
+			helper.GlobalFcmManager.DispatchNotification(
+				[]string{absenData.Nip},
+				"Presensi Pulang Berhasil",
+				"Sistem sudah mencatat jam pulang presensi Anda.",
+				"attendance",
+				map[string]string{"type": "check-out", "id": strconv.Itoa(int(absenData.ID))},
+			)
+		}
+
 		return c.JSON(res.Value)
+	})
+
+	group.Post("/notify-fail", func(c *fiber.Ctx) error {
+		nip := c.FormValue("nip")
+		reason := c.FormValue("reason")
+		if reason == "" {
+			reason = "sistem gagal melakukan absensi otomatis karena anda berada di luar radius kampus / tidak terkoneksi jaringan, butuh presensi manual"
+		}
+
+		if nip != "" {
+			helper.GlobalFcmManager.DispatchNotification(
+				[]string{nip},
+				"Presensi Otomatis Gagal",
+				reason,
+				"attendance_fail",
+				map[string]string{"type": "fail"},
+			)
+			return c.JSON(fiber.Map{"status": "ok", "message": "Notification dispatched"})
+		}
+		return c.Status(400).JSON(fiber.Map{"error": "Missing nip"})
 	})
 
 	group.Get("/history", func(c *fiber.Ctx) error {

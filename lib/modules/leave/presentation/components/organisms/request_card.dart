@@ -48,6 +48,67 @@ class RequestCard extends StatelessWidget {
                 _buildStatusTag(req.status),
               ],
             ),
+            // Applicant Info Badge (Pemohon & NIP/NIDN)
+            if (req.applicantName != null || req.applicantNip != null || req.applicantNidn != null) ...[
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[100]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.person, size: 16, color: Colors.blue[800]),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'Pemohon: ',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[900],
+                              ),
+                            ),
+                            TextSpan(
+                              text: req.applicantName ?? 'Pegawai',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue[900],
+                              ),
+                            ),
+                            if (req.applicantNip != null && req.applicantNip!.isNotEmpty)
+                              TextSpan(
+                                text: '  (NIP: ${req.applicantNip})',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: Colors.blue[800],
+                                ),
+                              ),
+                            if (req.applicantNidn != null &&
+                                req.applicantNidn!.isNotEmpty &&
+                                req.applicantNidn != req.applicantNip)
+                              TextSpan(
+                                text: '  (NIDN: ${req.applicantNidn})',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: Colors.blue[800],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [

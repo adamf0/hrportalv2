@@ -53,12 +53,13 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 		}
 		_ = r.dbSimak.WithContext(ctx).Table("m_dosen").Where("NIDN = ?", userid).First(&dosen)
 
-		if dosen.NIDN == nil || *dosen.NIDN == "" {
-			return nil, errors.New("data simak tidak ditemukan")
+		sid := userid
+		if dosen.NIDN != nil && *dosen.NIDN != "" {
+			sid = *dosen.NIDN
 		}
 
 		return &domain.AuthResult{
-			Sid:    *dosen.NIDN,
+			Sid:    sid,
 			Source: "simak",
 		}, nil
 	}

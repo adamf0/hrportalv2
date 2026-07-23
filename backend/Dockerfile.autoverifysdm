@@ -1,0 +1,31 @@
+# Build Stage
+FROM golang:1.22-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build SDM Auto-Verify Worker binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/autoverifysdm ./cmd/autoverifysdm/main.go
+
+# Production Stage
+FROM alpine:3.19
+
+WORKDIR /app
+
+RUN apk add --no-cache ca-certificates tzdata
+ENV TZ=Asia/Jakarta
+
+# Copy binary & firebase credentials for push notifications
+COPY --from=builder /app/bin/autoverifysdm /app/autoverifysdm
+COPY --from=builder /app/firebase-service-account.json /app/firebase-service-account.json
+
+CMD ["/app/autoverifysdm"]

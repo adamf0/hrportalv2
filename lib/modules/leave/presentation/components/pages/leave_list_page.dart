@@ -38,7 +38,7 @@ class _LeaveListPageState extends State<LeaveListPage> {
     'Semua Status',
     'Pengajuan',
     'Terima Atasan',
-    'ACC SDM',
+    'Terima SDM',
     'Tolak Atasan',
     'Tolak SDM',
   ];
@@ -108,7 +108,7 @@ class _LeaveListPageState extends State<LeaveListPage> {
   void _handleApprove(BuildContext context, LeaveBloc bloc,
       AuthSession? session, LeaveRequest req) {
     final isSdm = session?.isSdm ?? false;
-    final targetStatus = isSdm ? 'acc sdm' : 'terima atasan';
+    final targetStatus = isSdm ? 'terima sdm' : 'terima atasan';
 
     final noteController = TextEditingController();
 
@@ -217,7 +217,7 @@ class _LeaveListPageState extends State<LeaveListPage> {
                   note: noteController.text.trim());
               if (ok && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Pengajuan telah ditolak.')),
+                  const SnackBar(content: Text('Pengajuan berhasil ditolak.')),
                 );
               }
             },
@@ -714,30 +714,31 @@ class _LeaveListPageState extends State<LeaveListPage> {
                 ),
               ],
             ),
-            Positioned(
-              bottom: 20,
-              right: 20,
-              child: FloatingActionButton.extended(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const LeaveFormPage()),
-                  ).then((_) {
-                    leaveBloc.fetchLeaves();
-                  });
-                },
-                backgroundColor: primaryColor,
-                foregroundColor: Colors.white,
-                elevation: 4,
-                icon: const Icon(Icons.add, size: 20),
-                label: Text(
-                  'Buat Pengajuan',
-                  style: GoogleFonts.inter(
-                      fontWeight: FontWeight.bold, fontSize: 13),
+            if (_activeTab == 0)
+              Positioned(
+                bottom: 20,
+                right: 20,
+                child: FloatingActionButton.extended(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const LeaveFormPage()),
+                    ).then((_) {
+                      leaveBloc.fetchLeaves();
+                    });
+                  },
+                  backgroundColor: primaryColor,
+                  foregroundColor: Colors.white,
+                  elevation: 4,
+                  icon: const Icon(Icons.add, size: 20),
+                  label: Text(
+                    'Buat Pengajuan',
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
       ),

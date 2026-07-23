@@ -52,6 +52,18 @@ func ModuleSppd(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
+		// Trigger FCM Notification for Create SPPD
+		if res.Value != nil {
+			sp := res.Value
+			if sp.Verifikasi != nil && *sp.Verifikasi != "" {
+				targets := []string{*sp.Verifikasi}
+				title := "Pengajuan SPPD Baru"
+				body := "Pegawai NIP " + sp.Nip + " mengajukan SPPD baru. Mohon verifikasi."
+				payload := map[string]string{"type": "sppd", "id": strconv.Itoa(int(sp.ID)), "status": sp.Status}
+				helper.GlobalFcmManager.DispatchNotification(targets, title, body, "sppd", payload)
+			}
+		}
+
 		return c.JSON(res.Value)
 	})
 
@@ -82,6 +94,37 @@ func ModuleSppd(app *fiber.App) {
 
 		if !res.IsSuccess {
 			return infrastructure.HandleError(c, res.Error)
+		}
+
+		// Trigger FCM Notification for Update/Verify SPPD
+		if res.Value != nil {
+			sp := res.Value
+			status := sp.Status
+			atasanNip := ""
+			if sp.Verifikasi != nil && *sp.Verifikasi != "" {
+				atasanNip = *sp.Verifikasi
+			}
+
+			switch status {
+			case "terima atasan":
+				helper.GlobalFcmManager.DispatchNotification([]string{sp.Nip}, "Pengajuan SPPD Disetujui Atasan", "Pengajuan SPPD Anda telah disetujui Atasan. Menunggu verifikasi SDM.", "sppd", map[string]string{"id": strconv.Itoa(int(sp.ID)), "status": status})
+				helper.GlobalFcmManager.DispatchNotification([]string{"SDM_BROADCAST"}, "Verifikasi SDM SPPD", "Pengajuan SPPD NIP "+sp.Nip+" telah disetujui Atasan. Mohon verifikasi final SDM.", "sppd", map[string]string{"id": strconv.Itoa(int(sp.ID)), "status": status})
+
+			case "tolak atasan":
+				helper.GlobalFcmManager.DispatchNotification([]string{sp.Nip}, "Pengajuan SPPD Ditolak Atasan", "Pengajuan SPPD Anda ditolak oleh Atasan.", "sppd", map[string]string{"id": strconv.Itoa(int(sp.ID)), "status": status})
+
+			case "terima sdm":
+				helper.GlobalFcmManager.DispatchNotification([]string{sp.Nip}, "Pengajuan SPPD Disetujui SDM", "Selamat! Pengajuan SPPD Anda telah disetujui oleh SDM.", "sppd", map[string]string{"id": strconv.Itoa(int(sp.ID)), "status": status})
+				if atasanNip != "" {
+					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final SPPD", "Pengajuan SPPD NIP "+sp.Nip+" telah disetujui oleh SDM.", "sppd", map[string]string{"id": strconv.Itoa(int(sp.ID)), "status": status})
+				}
+
+			case "tolak sdm":
+				helper.GlobalFcmManager.DispatchNotification([]string{sp.Nip}, "Pengajuan SPPD Ditolak SDM", "Pengajuan SPPD Anda ditolak oleh SDM.", "sppd", map[string]string{"id": strconv.Itoa(int(sp.ID)), "status": status})
+				if atasanNip != "" {
+					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final SPPD", "Pengajuan SPPD NIP "+sp.Nip+" ditolak oleh SDM.", "sppd", map[string]string{"id": strconv.Itoa(int(sp.ID)), "status": status})
+				}
+			}
 		}
 
 		return c.JSON(res.Value)

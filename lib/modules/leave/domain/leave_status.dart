@@ -5,7 +5,7 @@ import 'package:hrportalv2/core/app_theme.dart';
 enum LeaveRequestStatus {
   pengajuan('pengajuan', 'menunggu'),
   diAccAtasan('terima atasan', 'terima atasan'),
-  accSdm('acc sdm', 'disetujui'),
+  accSdm('terima sdm', 'disetujui'),
   tolakAtasan('tolak atasan', 'tolak atasan'),
   tolakSdm('tolak sdm', 'ditolak');
 
@@ -17,7 +17,7 @@ enum LeaveRequestStatus {
   /// Parse raw status strings dynamically into strongly-typed LeaveRequestStatus enum
   static LeaveRequestStatus fromString(String statusStr) {
     final normalized = statusStr.trim().toLowerCase();
-    if (normalized == 'acc sdm' ||
+    if (normalized == 'terima sdm' ||
         normalized == 'disetujui' ||
         normalized == 'terima sdm') {
       return LeaveRequestStatus.accSdm;

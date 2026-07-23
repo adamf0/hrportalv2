@@ -48,6 +48,18 @@ func ModuleIzin(app *fiber.App) {
 			return commoninfra.HandleError(c, res.Error)
 		}
 
+		// Trigger FCM Notification for Create Izin
+		if res.Value != nil {
+			iz := res.Value
+			if iz.Verifikasi != nil && *iz.Verifikasi != "" {
+				targets := []string{*iz.Verifikasi}
+				title := "Pengajuan Izin Baru"
+				body := "Pegawai NIP " + iz.Nip + " mengajukan Izin baru. Mohon verifikasi."
+				payload := map[string]string{"type": "izin", "id": strconv.Itoa(int(iz.ID)), "status": iz.Status}
+				helper.GlobalFcmManager.DispatchNotification(targets, title, body, "izin", payload)
+			}
+		}
+
 		return c.JSON(res.Value)
 	})
 
@@ -77,6 +89,37 @@ func ModuleIzin(app *fiber.App) {
 
 		if !res.IsSuccess {
 			return commoninfra.HandleError(c, res.Error)
+		}
+
+		// Trigger FCM Notification for Update/Verify Izin
+		if res.Value != nil {
+			iz := res.Value
+			status := iz.Status
+			atasanNip := ""
+			if iz.Verifikasi != nil && *iz.Verifikasi != "" {
+				atasanNip = *iz.Verifikasi
+			}
+
+			switch status {
+			case "terima atasan":
+				helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Disetujui Atasan", "Pengajuan Izin Anda telah disetujui Atasan. Menunggu verifikasi SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
+				helper.GlobalFcmManager.DispatchNotification([]string{"SDM_BROADCAST"}, "Verifikasi SDM Izin", "Pengajuan Izin NIP "+iz.Nip+" telah disetujui Atasan. Mohon verifikasi final SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
+
+			case "tolak atasan":
+				helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Ditolak Atasan", "Pengajuan Izin Anda ditolak oleh Atasan.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
+
+			case "terima sdm":
+				helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Disetujui SDM", "Selamat! Pengajuan Izin Anda telah disetujui oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
+				if atasanNip != "" {
+					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Izin", "Pengajuan Izin NIP "+iz.Nip+" telah disetujui oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
+				}
+
+			case "tolak sdm":
+				helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Ditolak SDM", "Pengajuan Izin Anda ditolak oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
+				if atasanNip != "" {
+					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Izin", "Pengajuan Izin NIP "+iz.Nip+" ditolak oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
+				}
+			}
 		}
 
 		return c.JSON(res.Value)
