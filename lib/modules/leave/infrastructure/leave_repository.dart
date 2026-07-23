@@ -36,6 +36,10 @@ class LeaveRepository implements ILeaveRepository {
       final izinData = results[1];
       final sppdData = results[2];
 
+      final sessionName = session['name'] as String?;
+      final sessionNip = session['nip'] as String?;
+      final sessionNidn = session['nidn'] as String?;
+
       // 1. Process Cuti
       if (cutiData is List) {
         for (var json in cutiData) {
@@ -61,6 +65,9 @@ class LeaveRepository implements ILeaveRepository {
             note: json['catatan_atasan'] ?? 'Menunggu verifikasi',
             startDate: startDate,
             endDate: endDate,
+            applicantName: sessionName,
+            applicantNip: sessionNip,
+            applicantNidn: sessionNidn,
           ));
         }
       }
@@ -85,6 +92,9 @@ class LeaveRepository implements ILeaveRepository {
             note: json['catatan'] ?? 'Verifikasi Atasan',
             startDate: date,
             endDate: date,
+            applicantName: sessionName,
+            applicantNip: sessionNip,
+            applicantNidn: sessionNidn,
           ));
         }
       }
@@ -117,6 +127,9 @@ class LeaveRepository implements ILeaveRepository {
           note: json['catatan'] ?? json['keterangan'] ?? 'Menunggu verifikasi',
           startDate: startDate,
           endDate: endDate,
+          applicantName: sessionName,
+          applicantNip: sessionNip,
+          applicantNidn: sessionNidn,
         ));
       }
 
