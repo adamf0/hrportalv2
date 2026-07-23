@@ -80,7 +80,7 @@ func (r *LocalRepository) GetInfo(ctx context.Context, sid string) (*domain.User
 		Level:        "sdm",
 		Name:         u.Name,
 		Email:        u.Email,
-		Nip:          u.Username,
+		Nip:          "",
 		Nidn:         "",
 	}, nil
 }

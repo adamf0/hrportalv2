@@ -104,46 +104,6 @@ class LocationWifiHelper {
     return inside;
   }
 
-  // Indonesian National Holidays Checklist (Sundays & Mapped Holidays for 2025/2026/2027)
-  static bool isIndonesianHoliday(DateTime date) {
-    //[pr]
-    if (date.weekday == DateTime.sunday || date.weekday == DateTime.saturday) {
-      return true;
-    }
-
-    final year = date.year;
-    final month = date.month;
-    final day = date.day;
-
-    // Fixed-date holidays
-    if (month == 1 && day == 1) return true; // Tahun Baru
-    if (month == 5 && day == 1) return true; // Hari Buruh
-    if (month == 6 && day == 1) return true; // Lahir Pancasila
-    if (month == 8 && day == 17) return true; // Kemerdekaan RI
-    if (month == 12 && day == 25) return true; // Natal
-
-    final holidayKey =
-        "$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
-    const Set<String> holidays = {
-      // 2025 Mapped Holidays
-      "2025-01-29", "2025-01-27", "2025-03-29", "2025-03-31", "2025-04-01",
-      "2025-04-18", "2025-05-12", "2025-05-29", "2025-06-06", "2025-06-27",
-      "2025-09-05",
-
-      // 2026 Mapped Holidays
-      "2026-02-17", "2026-02-15", "2026-03-19", "2026-03-20", "2026-03-21",
-      "2026-04-03", "2026-05-14", "2026-05-27", "2026-05-31", "2026-06-16",
-      "2026-08-25",
-
-      // 2027 Mapped Holidays
-      "2027-02-06", "2027-02-04", "2027-03-09", "2027-03-10",
-      "2027-03-26", "2027-05-06", "2027-05-16", "2027-05-20", "2027-06-06",
-      "2027-08-15"
-    };
-
-    return holidays.contains(holidayKey);
-  }
-
   // Checks if the IP address matches Pakuan campus network rules:
   // Matches "103.169" (IPv4) or "2001:df0:3140" (IPv6)
   static bool isPakuanIp(String ipAddress) {

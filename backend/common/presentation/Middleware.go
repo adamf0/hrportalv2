@@ -555,7 +555,7 @@ func isAdmin(user *Account) bool {
 	return user.Level == "admin"
 }
 
-func isDosen(user *Account) bool {
+func isDosen(user *Account) bool { //[pr]
 	role := strings.ToLower(user.Role)
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
