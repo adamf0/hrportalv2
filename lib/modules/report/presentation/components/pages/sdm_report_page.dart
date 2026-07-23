@@ -696,23 +696,52 @@ class _SdmReportPageState extends State<SdmReportPage> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0,
+        titleSpacing: 16,
         title: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Laporan',
-                style: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: primaryColor)),
-            if (reportBloc.isStreaming) ...[
-              const SizedBox(width: 8),
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.amber),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.grey[200]!, width: 1.5),
               ),
-            ],
+              child: Padding(
+                padding: const EdgeInsets.all(5.0),
+                child: Image.asset(
+                  'asset_app/logo-transparent.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      'Halo, ${authBloc.session?.name ?? "User"}',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (reportBloc.isStreaming) ...[
+                    const SizedBox(width: 6),
+                    const SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.amber),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
         actions: [

@@ -37,7 +37,7 @@ class AttendanceSuccessCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'HR Connect',
+                        'HR PORTAL',
                         style: GoogleFonts.inter(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -59,7 +59,8 @@ class AttendanceSuccessCard extends StatelessWidget {
               ),
               const SizedBox(height: 48),
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
@@ -80,11 +81,14 @@ class AttendanceSuccessCard extends StatelessWidget {
                         color: AppTheme.successContainer,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.check_circle, color: AppTheme.success, size: 64),
+                      child: const Icon(Icons.check_circle,
+                          color: AppTheme.success, size: 64),
                     ),
                     const SizedBox(height: 24),
                     HeaderTitleText(
-                      text: isUpacara ? 'Presensi Upacara Berhasil' : 'Absen Masuk Berhasil',
+                      text: isUpacara
+                          ? 'Presensi Upacara Berhasil'
+                          : 'Absen Masuk Berhasil',
                       fontSize: 20,
                       color: onSurface,
                     ),
@@ -106,13 +110,15 @@ class AttendanceSuccessCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                         minimumSize: const Size(double.infinity, 48),
                         elevation: 0,
                       ),
                       child: Text(
                         'Masuk Dashboard',
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
+                        style: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold, fontSize: 14),
                       ),
                     ),
                   ],

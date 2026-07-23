@@ -19,7 +19,8 @@ class AuthRepository implements IAuthRepository {
         },
       );
 
-      if (responseData is Map<String, dynamic> && responseData['token'] != null) {
+      if (responseData is Map<String, dynamic> &&
+          responseData['token'] != null) {
         final token = responseData['token'] as String;
 
         // Fetch user info from /api/account/whoami using the token
@@ -36,9 +37,13 @@ class AuthRepository implements IAuthRepository {
           final email = whoamiData['email'] ?? '';
           final nidn = whoamiData['nidn'] ?? '';
 
-          final level = (whoamiData['level'] ?? whoamiData['role'] ?? '').toString();
-          final resolvedRole = level.isNotEmpty ? level : (nidn.isNotEmpty ? 'Dosen' : 'Tendik');
-          final groups = level.isNotEmpty ? [level] : (resolvedRole == 'Dosen' ? ['Dosen'] : ['Tendik']);
+          final level =
+              (whoamiData['level'] ?? whoamiData['role'] ?? '').toString();
+          final resolvedRole =
+              level.isNotEmpty ? level : (nidn.isNotEmpty ? 'Dosen' : 'Tendik');
+          final groups = level.isNotEmpty
+              ? [level]
+              : (resolvedRole == 'Dosen' ? ['Dosen'] : ['Tendik']);
 
           await SsoHelper.saveSession(
             token: token,
@@ -94,7 +99,9 @@ class AuthRepository implements IAuthRepository {
           email: sessionData['email'] ?? '',
           role: sessionData['role'] ?? '',
           groups: sessionData['groups'] != null
-              ? (sessionData['groups'] as List).map((e) => e.toString()).toList()
+              ? (sessionData['groups'] as List)
+                  .map((e) => e.toString())
+                  .toList()
               : [],
           token: sessionData['token'] ?? '',
         );
@@ -115,23 +122,26 @@ class AuthRepository implements IAuthRepository {
 
     try {
       final locPermission = await Geolocator.checkPermission();
-      hasLoc = locPermission == LocationPermission.always || 
-               locPermission == LocationPermission.whileInUse;
+      hasLoc = locPermission == LocationPermission.always ||
+          locPermission == LocationPermission.whileInUse;
     } catch (e, stackTrace) {
-      debugPrint("[AuthRepository checkPermissions location error]: $e\n$stackTrace");
+      debugPrint(
+          "[AuthRepository checkPermissions location error]: $e\n$stackTrace");
       hasLoc = false;
     }
 
     try {
       final cameras = await availableCameras();
       if (cameras.isNotEmpty) {
-        final controller = CameraController(cameras.first, ResolutionPreset.low);
+        final controller =
+            CameraController(cameras.first, ResolutionPreset.low);
         await controller.initialize();
         await controller.dispose();
         hasCam = true;
       }
     } catch (e, stackTrace) {
-      debugPrint("[AuthRepository checkPermissions camera error]: $e\n$stackTrace");
+      debugPrint(
+          "[AuthRepository checkPermissions camera error]: $e\n$stackTrace");
       if (e is CameraException && e.code == 'cameraPermission') {
         hasCam = false;
       } else {
@@ -149,31 +159,33 @@ class AuthRepository implements IAuthRepository {
 
     try {
       final locPermission = await Geolocator.requestPermission();
-      locOk = locPermission == LocationPermission.always || 
-              locPermission == LocationPermission.whileInUse;
+      locOk = locPermission == LocationPermission.always ||
+          locPermission == LocationPermission.whileInUse;
       if (!locOk) {
         ApiClient.showToast(PermissionDeniedError('Lokasi (GPS)').message);
       }
     } catch (e, stackTrace) {
-      debugPrint("[AuthRepository requestPermissions location error]: $e\n$stackTrace");
+      debugPrint(
+          "[AuthRepository requestPermissions location error]: $e\n$stackTrace");
       locOk = false;
     }
 
     try {
       final cameras = await availableCameras();
       if (cameras.isNotEmpty) {
-        final controller = CameraController(cameras.first, ResolutionPreset.low);
+        final controller =
+            CameraController(cameras.first, ResolutionPreset.low);
         await controller.initialize();
         await controller.dispose();
         camOk = true;
       }
     } catch (e, stackTrace) {
-      debugPrint("[AuthRepository requestPermissions camera error]: $e\n$stackTrace");
+      debugPrint(
+          "[AuthRepository requestPermissions camera error]: $e\n$stackTrace");
       ApiClient.showToast(PermissionDeniedError('Kamera').message);
       camOk = false;
     }
 
     return locOk && camOk;
   }
-
 }

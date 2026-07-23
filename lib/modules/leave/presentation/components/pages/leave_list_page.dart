@@ -59,7 +59,9 @@ class _LeaveListPageState extends State<LeaveListPage> {
     super.didChangeDependencies();
     final attendanceBloc = Provider.of<AttendanceBloc>(context);
     final currentIndex = attendanceBloc.currentTabIndex;
-    if (_previousTabIndex != null && _previousTabIndex != 2 && currentIndex == 2) {
+    if (_previousTabIndex != null &&
+        _previousTabIndex != 2 &&
+        currentIndex == 2) {
       ApiClient.setActivePageScope('requests');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.read<LeaveBloc>().fetchLeaves();
@@ -298,7 +300,7 @@ class _LeaveListPageState extends State<LeaveListPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'HR Connect',
+                            'HR PORTAL',
                             style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -334,7 +336,9 @@ class _LeaveListPageState extends State<LeaveListPage> {
                             IconButton(
                               onPressed: () => Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const SdmReportPage()),
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const SdmReportPage()),
                               ),
                               tooltip: 'Laporan Presensi SDM',
                               icon: Container(
@@ -343,7 +347,8 @@ class _LeaveListPageState extends State<LeaveListPage> {
                                   color: primaryColor.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(Icons.analytics_outlined, color: primaryColor, size: 20),
+                                child: Icon(Icons.analytics_outlined,
+                                    color: primaryColor, size: 20),
                               ),
                             ),
                         ],
@@ -509,16 +514,19 @@ class _LeaveListPageState extends State<LeaveListPage> {
                           IconButton(
                             onPressed: () => _showStatusFilterSelector(context),
                             style: IconButton.styleFrom(
-                              backgroundColor: _selectedStatusFilter != 'Semua Status'
-                                  ? primaryColor.withOpacity(0.08)
-                                  : Colors.white,
+                              backgroundColor:
+                                  _selectedStatusFilter != 'Semua Status'
+                                      ? primaryColor.withOpacity(0.08)
+                                      : Colors.white,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                                 side: BorderSide(
                                   color: _selectedStatusFilter != 'Semua Status'
                                       ? primaryColor
                                       : Colors.grey[200]!,
-                                  width: _selectedStatusFilter != 'Semua Status' ? 1.5 : 1.0,
+                                  width: _selectedStatusFilter != 'Semua Status'
+                                      ? 1.5
+                                      : 1.0,
                                 ),
                               ),
                               padding: const EdgeInsets.all(12),
