@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:provider/provider.dart';
 import 'package:hrportalv2/core/responsive_helper.dart';
 import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
+import '../molecules/human_liveness_animation_guide.dart';
 
 class CameraScannerView extends StatelessWidget {
   final bool isCameraInitialized;
@@ -131,43 +132,21 @@ class CameraScannerView extends StatelessWidget {
                               ),
                             ),
                           ),
-                        AnimatedBuilder(
-                          animation: pulseController,
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: 0.3 + (pulseController.value * 0.7),
-                              child: child,
-                            );
-                          },
-                          child: Icon(
-                            Icons.face_retouching_natural,
-                            size: context.isWatch ? 80 : 150,
-                            color: primaryColor.withOpacity(0.4),
-                          ),
-                        ),
-                        AnimatedBuilder(
-                          animation: pulseController,
-                          builder: (context, child) {
-                            return Positioned(
-                              top: (context.isWatch ? 140 : 260) *
-                                  pulseController.value,
-                              left: 0,
-                              right: 0,
-                              child: Container(
-                                height: 2,
-                                color: primaryColor.withOpacity(0.6),
-                              ),
-                            );
-                          },
+                        HumanLivenessAnimationGuide(
+                          animationController: pulseController,
+                          progress: progress,
+                          detectionStatus: detectionStatus,
                         ),
                         SizedBox(
-                          width: context.isWatch ? 120 : 230,
+                          width: context.isWatch ? 120 : 240,
+                          height: context.isWatch ? 120 : 240,
                           child: CircularProgressIndicator(
                             value: progress,
-                            strokeWidth: 4,
-                            backgroundColor: Colors.grey[300],
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(primaryColor),
+                            strokeWidth: 5,
+                            backgroundColor: Colors.grey[300]!.withOpacity(0.4),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              progress >= 1.0 ? Colors.green : primaryColor,
+                            ),
                           ),
                         ),
                       ],

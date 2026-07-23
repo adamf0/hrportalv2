@@ -103,8 +103,9 @@ class ReportRepository implements IReportRepository {
       for (var item in _extractList(holidayData)) {
         if (item is Map<String, dynamic>) {
           final hDate = item['tanggal']?.toString() ?? '';
-          if (hDate.isNotEmpty)
+          if (hDate.isNotEmpty) {
             holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+          }
         }
       }
 
@@ -136,8 +137,9 @@ class ReportRepository implements IReportRepository {
       for (var item in _extractList(hRes)) {
         if (item is Map<String, dynamic>) {
           final hDate = item['tanggal']?.toString() ?? '';
-          if (hDate.isNotEmpty)
+          if (hDate.isNotEmpty) {
             holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+          }
         }
       }
     } catch (_) {}

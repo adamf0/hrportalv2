@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class QuestionnaireSection extends StatefulWidget {
   const QuestionnaireSection({super.key});
@@ -26,17 +27,57 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
     });
   }
 
-  void _showGoogleFormSnackbar(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Membuka evaluasi Google Form: https://forms.gle/evaluation-app',
-          style: GoogleFonts.inter(),
+  /// Checks if current date is within the quarterly audit window (e.g. 01-01 s/d 31-01, 01-03 s/d 31-03, 01-06 s/d 30-06, 01-09 s/d 30-09, 01-12 s/d 31-12, etc.)
+  bool get _isQuarterlyAuditPeriod {
+    final now = DateTime.now();
+    // Quarterly audit months: Jan (1), Mar (3), Apr (4), Jun (6), Jul (7), Sep (9), Oct (10), Dec (12)
+    final auditMonths = [1, 3, 4, 6, 7, 9, 10, 12];
+    return auditMonths.contains(now.month);
+  }
+
+  Future<void> _openGoogleForm(BuildContext context) async {
+    if (!_isQuarterlyAuditPeriod) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Kuesioner evaluasi hanya dapat diisi pada periode audit kuartalan (misal: 01 Jan-31 Jan, 01 Mar-31 Mar, dst).',
+            style: GoogleFonts.inter(),
+          ),
+          backgroundColor: Colors.amber[900],
+          duration: const Duration(seconds: 3),
         ),
-        backgroundColor: Colors.purple[700],
-        duration: const Duration(seconds: 3),
-      ),
-    );
+      );
+      return;
+    }
+
+    final Uri url = Uri.parse('https://forms.gle/9tsDoM5B9imup9ch8');
+    try {
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Gagal membuka browser untuk: https://forms.gle/9tsDoM5B9imup9ch8',
+                style: GoogleFonts.inter(),
+              ),
+              backgroundColor: Colors.red[700],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Gagal membuka tautan: $e',
+              style: GoogleFonts.inter(),
+            ),
+            backgroundColor: Colors.red[700],
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -108,11 +149,15 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isFinished ? 'Sudah Tidak Ada Kuesioner LPM' : 'Belum Isi Kuesioner LPM',
+                          isFinished
+                              ? 'Sudah Tidak Ada Kuesioner LPM'
+                              : 'Belum Isi Kuesioner LPM',
                           style: GoogleFonts.inter(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: isFinished ? Colors.green[900] : Colors.blue[900],
+                            color: isFinished
+                                ? Colors.green[900]
+                                : Colors.blue[900],
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -142,7 +187,8 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: progress,
-                        backgroundColor: isFinished ? Colors.green[100] : Colors.blue[100],
+                        backgroundColor:
+                            isFinished ? Colors.green[100] : Colors.blue[100],
                         valueColor: AlwaysStoppedAnimation<Color>(
                           isFinished ? Colors.green : Colors.blue[700]!,
                         ),
@@ -173,7 +219,8 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
                       icon: const Icon(Icons.refresh, size: 16),
                       label: Text(
                         'Reset Simulasi',
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                            fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                       style: TextButton.styleFrom(
                         foregroundColor: Colors.green[800],
@@ -185,7 +232,8 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
                       icon: const Icon(Icons.edit, size: 14),
                       label: Text(
                         'Isi Kuesioner',
-                        style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                            fontSize: 11, fontWeight: FontWeight.bold),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.blue[700],
@@ -194,7 +242,8 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
                       ),
                     ),
                 ],
@@ -205,73 +254,80 @@ class _QuestionnaireSectionState extends State<QuestionnaireSection> {
         const SizedBox(height: 16),
 
         // Quarterly Evaluation Card (Every 3 months / Google Form evaluation)
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[200]!),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.01),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Purple Google Form Icon container
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.purple[50],
-                  shape: BoxShape.circle,
+        InkWell(
+          onTap: () => _openGoogleForm(context),
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey[200]!),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.01),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
-                child: Icon(
-                  Icons.assignment_outlined,
-                  color: Colors.purple[700],
-                  size: 24,
+              ],
+            ),
+            child: Row(
+              children: [
+                // Purple Google Form Icon container
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.purple[50],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.assignment_outlined,
+                    color: Colors.purple[700],
+                    size: 24,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 14),
+                const SizedBox(width: 14),
 
-              // Description and Call to Action
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Evaluasi Aplikasi (Google Form)',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
+                // Description and Call to Action
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Evaluasi Aplikasi (Google Form)',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[800],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Seberapa baik/buruk aplikasi HR Portal? Bantu kami meningkatkan layanan (3 Bulanan).',
-                      style: GoogleFonts.inter(
-                        fontSize: 10,
-                        color: Colors.grey[600],
+                      const SizedBox(height: 2),
+                      Text(
+                        'Seberapa baik/buruk aplikasi HR Portal? Bantu kami meningkatkan layanan (3 Bulanan).',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          color: Colors.grey[600],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
+                if (_isQuarterlyAuditPeriod) ...[
+                  const SizedBox(width: 8),
 
-              // Open button
-              IconButton(
-                onPressed: () => _showGoogleFormSnackbar(context),
-                icon: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.purple[700]),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.purple[50],
-                  padding: const EdgeInsets.all(8),
-                ),
-              ),
-            ],
+                  // Open button
+                  IconButton(
+                    onPressed: () => _openGoogleForm(context),
+                    icon: Icon(Icons.arrow_forward_ios,
+                        size: 16, color: Colors.purple[700]),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.purple[50],
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ],
