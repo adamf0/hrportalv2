@@ -40,7 +40,7 @@ func (r *SppdRepository) DeleteSppd(ctx context.Context, id uint) error {
 	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Sppd{}, id).Error
 }
 
-func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Sppd, error) {
+func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, verifikasi bool, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Sppd, error) {
 	var items []domain.Sppd
 	var total int64
 
@@ -50,11 +50,23 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 		query = query.Where("tanggal_berangkat >= ? and ? <= tanggal_kembali", tanggal_mulai, tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
-			query = query.Where("verifikasi = ? or (nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?))", nip, nip, nidn, nip, nidn)
+			if verifikasi {
+				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nidn)
+			} else {
+				query = query.Where("nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
+			}
 		} else if nip != "" {
-			query = query.Where("verifikasi = ? or (nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?))", nip, nip, nip)
+			if verifikasi {
+				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nip)
+			} else {
+				query = query.Where("nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
+			}
 		} else {
-			query = query.Where("(nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?))", nidn, nidn)
+			if verifikasi {
+				query = query.Where("verifikasi = ? or verifikasi = ?", nidn, nidn)
+			} else {
+				query = query.Where("(nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?))", nidn, nidn)
+			}
 		}
 	}
 

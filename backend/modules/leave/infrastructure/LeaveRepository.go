@@ -38,7 +38,7 @@ func (r *LeaveRepository) DeleteCuti(ctx context.Context, id uint) error {
 	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Cuti{}, id).Error
 }
 
-func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Cuti, error) {
+func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, verifikasi bool, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Cuti, error) {
 	var items []domain.Cuti
 	query := r.db.WithContext(ctx).Model(&domain.Cuti{})
 
@@ -46,11 +46,23 @@ func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn 
 		query = query.Where("tanggal_mulai >= ? and ? <= tanggal_akhir", tanggal_mulai, tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
-			query = query.Where("(nip = ? OR nidn = ?) or verifikasi = ?", nip, nidn, nip)
+			if verifikasi {
+				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nidn)
+			} else {
+				query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
+			}
 		} else if nip != "" {
-			query = query.Where("nip = ? or verifikasi = ?", nip, nip)
+			if verifikasi {
+				query = query.Where("verifikasi = ?", nip)
+			} else {
+				query = query.Where("nip = ?", nip)
+			}
 		} else {
-			query = query.Where("nidn = ?", nidn)
+			if verifikasi {
+				query = query.Where("verifikasi = ?", nidn)
+			} else {
+				query = query.Where("nidn = ?", nidn)
+			}
 		}
 	}
 

@@ -35,7 +35,7 @@ func (r *IzinRepository) GetByID(ctx context.Context, id uint) (*domain.Izin, er
 	}
 	return &izin, nil
 }
-func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Izin, error) {
+func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, verifikasi bool, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Izin, error) {
 	var izins []domain.Izin
 	query := r.db.WithContext(ctx).Model(&domain.Izin{})
 
@@ -43,11 +43,23 @@ func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, is
 		query = query.Where("tanggal_pengajuan between ? and ?", tanggal_mulai, tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
-			query = query.Where("(nip = ? OR nidn = ?) or verifikasi = ?", nip, nidn, nip)
+			if verifikasi {
+				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nidn)
+			} else {
+				query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
+			}
 		} else if nip != "" {
-			query = query.Where("nip = ? or verifikasi = ?", nip, nip)
+			if verifikasi {
+				query = query.Where("verifikasi = ?", nip)
+			} else {
+				query = query.Where("nip = ?", nip)
+			}
 		} else {
-			query = query.Where("nidn = ?", nidn)
+			if verifikasi {
+				query = query.Where("verifikasi = ?", nidn)
+			} else {
+				query = query.Where("nidn = ?", nidn)
+			}
 		}
 	}
 

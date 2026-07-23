@@ -693,16 +693,22 @@ class _SdmReportPageState extends State<SdmReportPage> {
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         automaticallyImplyLeading: Navigator.canPop(context),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text('Laporan',
                 style: GoogleFonts.inter(
-                    fontWeight: FontWeight.bold, fontSize: 16)),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: primaryColor)),
             if (reportBloc.isStreaming) ...[
               const SizedBox(width: 8),
               const SizedBox(
-                width: 12,
-                height: 12,
+                width: 14,
+                height: 14,
                 child: CircularProgressIndicator(
                     strokeWidth: 2, color: Colors.amber),
               ),
@@ -711,12 +717,13 @@ class _SdmReportPageState extends State<SdmReportPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, size: 20),
+            icon: Icon(Icons.refresh, size: 24, color: primaryColor),
             tooltip: 'Refresh Data',
             onPressed: () => reportBloc.fetchReportData(),
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_none_outlined, size: 20),
+            icon: Icon(Icons.notifications_none_outlined,
+                size: 24, color: primaryColor),
             tooltip: 'Notifikasi',
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -729,7 +736,7 @@ class _SdmReportPageState extends State<SdmReportPage> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.logout, size: 20, color: Colors.redAccent),
+            icon: const Icon(Icons.logout, size: 24, color: Color(0xFFFF4D4F)),
             tooltip: 'Keluar',
             onPressed: () async {
               final confirm = await showDialog<bool>(
@@ -766,6 +773,7 @@ class _SdmReportPageState extends State<SdmReportPage> {
               }
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(

@@ -128,6 +128,7 @@ func ModuleIzin(app *fiber.App) {
 		query := getAll.GetAllIzinsQuery{
 			Nidn:         nidn,
 			Nip:          nip,
+			Verifikasi:   c.Query("verifikasi") == "haxor",
 			IsSdm:        isSdm,
 			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),

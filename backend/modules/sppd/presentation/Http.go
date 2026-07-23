@@ -114,6 +114,7 @@ func ModuleSppd(app *fiber.App) {
 		query := &GetSppdHistory.GetSppdHistoryQuery{
 			Nip:          nip,
 			Nidn:         nidn,
+			Verifikasi:   c.Query("verifikasi") == "haxor",
 			IsSdm:        isSdm,
 			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),

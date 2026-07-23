@@ -131,42 +131,12 @@ class LeaveRepository implements ILeaveRepository {
   @override
   Future<List<LeaveRequest>> getVerificationLeaves() async {
     try {
-      final session = await SsoHelper.getSession();
-      if (session == null) return [];
-      final nip = session['nip'] ?? '';
-      final role = session['role'] ?? '';
-      final groups = session['groups'] != null
-          ? (session['groups'] as List).map((e) => e.toString()).toList()
-          : <String>[];
-
-      bool isSdmUser = role.toLowerCase() == 'sdm';
-      final name = session['name'] ?? '';
-      final email = session['email'] ?? '';
-      if (name.toLowerCase().contains('sdm') ||
-          email.toLowerCase().contains('sdm') ||
-          nip.toLowerCase().contains('sdm')) {
-        isSdmUser = true;
-      }
-      for (var g in groups) {
-        final gLower = g.toLowerCase();
-        if (gLower.contains('sdm')) {
-          isSdmUser = true;
-          break;
-        }
-      }
-
       final List<LeaveRequest> verificationRequests = [];
 
       final List<String> queryUrls = [];
-      if (isSdmUser) {
-        queryUrls.add("/api/leave");
-        queryUrls.add("/api/izin");
-        queryUrls.add("/api/sppd/history");
-      } else if (nip.isNotEmpty) {
-        queryUrls.add("/api/leave");
-        queryUrls.add("/api/izin");
-        queryUrls.add("/api/sppd/history");
-      }
+      queryUrls.add("/api/leave?verifikasi=haxor");
+      queryUrls.add("/api/izin?verifikasi=haxor");
+      queryUrls.add("/api/sppd/history?verifikasi=haxor");
 
       final List<Future<dynamic>> futures = queryUrls.map((path) {
         return ApiClient.get(Uri.parse("${ApiClient.baseUrl}$path"))

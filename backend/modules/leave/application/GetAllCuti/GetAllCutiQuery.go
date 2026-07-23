@@ -10,6 +10,7 @@ import (
 type GetAllCutiQuery struct {
 	Nip          string
 	Nidn         string
+	Verifikasi   bool
 	IsSdm        bool
 	TanggalMulai *string
 	TanggalAkhir *string
@@ -24,7 +25,7 @@ func NewGetAllCutiQueryHandler(leaveRepo domain.ILeaveRepository) *GetAllCutiQue
 }
 
 func (h *GetAllCutiQueryHandler) Handle(ctx context.Context, query *GetAllCutiQuery) (common.ResultValue[[]domain.Cuti], error) {
-	cutis, err := h.leaveRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.IsSdm, query.TanggalMulai, query.TanggalAkhir)
+	cutis, err := h.leaveRepo.GetHistoryByNip(ctx, query.Nip, query.Nidn, query.Verifikasi, query.IsSdm, query.TanggalMulai, query.TanggalAkhir)
 	if err != nil {
 		return common.FailureValue[[]domain.Cuti](domain.LeaveNotFound()), err
 	}

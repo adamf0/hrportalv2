@@ -317,22 +317,22 @@ func JWTMiddleware() fiber.Handler {
 		}
 		tokenStr, err := extractBearerToken(c)
 		if err != nil {
-			return err
+			return badRequest(c, err)
 		}
 
 		token, err := parseJWT(tokenStr)
 		if err != nil {
-			return err
+			return badRequest(c, err)
 		}
 
 		claims, err := validateClaims(token)
 		if err != nil {
-			return err
+			return badRequest(c, err)
 		}
 
 		err = injectRequestValues(c, claims, tokenStr)
 		if err != nil {
-			return err
+			return badRequest(c, err)
 		}
 
 		return c.Next()
@@ -441,12 +441,12 @@ func RBACMiddleware() fiber.Handler {
 
 		token, err := extractBearerToken(c)
 		if err != nil {
-			return err
+			return badRequest(c, err)
 		}
 
 		user, err := fetchWhoAmI(token, whoamiURL, c)
 		if err != nil {
-			return err
+			return badRequest(c, err)
 		}
 
 		c.Request().PostArgs().Set("role", user.Role)

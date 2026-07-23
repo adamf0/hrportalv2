@@ -168,6 +168,7 @@ func ModuleLeave(app *fiber.App) {
 		query := &GetAllCuti.GetAllCutiQuery{
 			Nip:          nip,
 			Nidn:         nidn,
+			Verifikasi:   c.Query("verifikasi") == "haxor",
 			IsSdm:        isSdm,
 			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),

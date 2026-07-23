@@ -9,5 +9,5 @@ type ISppdRepository interface {
 	FindByID(ctx context.Context, id uint) (*Sppd, error)
 	UpdateSppd(ctx context.Context, sppd *Sppd) error
 	DeleteSppd(ctx context.Context, id uint) error
-	GetHistoryByNip(ctx context.Context, nip string, nidn string, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]Sppd, error)
+	GetHistoryByNip(ctx context.Context, nip string, nidn string, verifikasi bool, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]Sppd, error)
 }
