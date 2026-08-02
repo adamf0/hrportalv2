@@ -11,6 +11,10 @@ type Izin struct {
 	ID               uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	Nip              string     `gorm:"column:nip;index" json:"nip"`
 	Nidn             string     `gorm:"column:nidn;index" json:"nidn"`
+	NamaPemohon      string     `gorm:"column:nama_pemohon" json:"nama_pemohon"`
+	Unit             string     `gorm:"column:unit" json:"unit"`
+	Fakultas         string     `gorm:"column:fakultas" json:"fakultas"`
+	Prodi            string     `gorm:"column:prodi" json:"prodi"`
 	JenisIzinID      int        `gorm:"column:id_jenis_izin;type:int" json:"id_jenis_izin"`
 	TanggalPengajuan string     `gorm:"column:tanggal_pengajuan;index" json:"tanggal_pengajuan"`
 	Tujuan           string     `gorm:"column:tujuan" json:"tujuan"`

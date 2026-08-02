@@ -35,13 +35,29 @@ Tabel dan View bawaan lama dari skema awal `unpak_hrportal`:
 
 ---
 
-## 3. 🛠️ Perubahan Struktur Kolom pada Tabel Eksisting (*Modified Schema*)
+## 3. 🛠️ Perubahan Struktur Kolom pada Tabel Eksisting (*Modified Schema & Decoupling*)
 
-Perubahan kolom yang terjadi pada tabel yang sudah ada:
+Untuk mengisolasi (*decouple*) tabel-tabel utama HRPortal v2 agar terpisah dan tidak perlu melakukan kueri gabungan (*cross-database query*) berulang kali ke `unpak_simak` dan `unpak_simpeg`, kolom snapshot profil pegawai telah ditambahkan ke masing-masing tabel:
 
-1. **Tabel `absen`**:
-   - **Kolom Baru**: `note` (`varchar(10)`)
-   - **Keterangan**: Ditambahkan untuk menyimpan kualifikasi status atau catatan khusus presensi harian pegawai.
+1. **Tabel `cuti`**:
+   - **Kolom Baru**: `nama_pemohon` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`).
+   - **Keterangan**: Menyimpan nama asli dan unit kerja pemohon cuti secara independen.
+
+2. **Tabel `izin`**:
+   - **Kolom Baru**: `nama_pemohon` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`).
+   - **Keterangan**: Menyimpan nama asli dan unit kerja pemohon izin secara independen.
+
+3. **Tabel `sppd`**:
+   - **Kolom Baru**: `nama_pemohon` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`).
+   - **Keterangan**: Menyimpan nama asli dan unit kerja pemohon SPPD secara independen.
+
+4. **Tabel `absen`**:
+   - **Kolom Baru**: `nama_pegawai` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`), `note` (`VARCHAR(10)`).
+   - **Keterangan**: Menyimpan nama pegawai dan unit kerja presensi harian serta catatan kualifikasi.
+
+5. **Tabel `klaim_absen`**:
+   - **Kolom Baru**: `nama_pegawai` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`).
+   - **Keterangan**: Menyimpan nama pegawai dan unit kerja pengajuan klaim presensi.
 
 ---
 

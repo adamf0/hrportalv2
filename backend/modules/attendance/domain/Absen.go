@@ -11,6 +11,10 @@ type Absen struct {
 	ID             uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	Nidn           string     `gorm:"column:nidn;index" json:"nidn"`
 	Nip            string     `gorm:"column:nip;index" json:"nip"`
+	NamaPegawai    string     `gorm:"column:nama_pegawai" json:"nama_pegawai"`
+	Unit           string     `gorm:"column:unit" json:"unit"`
+	Fakultas       string     `gorm:"column:fakultas" json:"fakultas"`
+	Prodi          string     `gorm:"column:prodi" json:"prodi"`
 	Tanggal        string     `gorm:"column:tanggal;index" json:"tanggal"`
 	AbsenMasuk     *time.Time `gorm:"column:absen_masuk" json:"absen_masuk"`
 	AbsenKeluar    *time.Time `gorm:"column:absen_keluar" json:"absen_keluar"`
@@ -28,8 +32,12 @@ func (Absen) TableName() string {
 
 type KlaimAbsen struct {
 	common.Entity
-	ID         uint       `gorm:"primaryKey;autoIncrement" json:"id"`
-	Nip        string     `gorm:"column:nip" json:"nip"`
+	ID          uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Nip         string     `gorm:"column:nip" json:"nip"`
+	NamaPegawai string     `gorm:"column:nama_pegawai" json:"nama_pegawai"`
+	Unit        string     `gorm:"column:unit" json:"unit"`
+	Fakultas    string     `gorm:"column:fakultas" json:"fakultas"`
+	Prodi       string     `gorm:"column:prodi" json:"prodi"`
 	Tanggal    string     `gorm:"column:tanggal" json:"tanggal"`
 	TipeKlaim  string     `gorm:"column:tipe_klaim" json:"tipe_klaim"`
 	Keterangan string     `gorm:"column:keterangan" json:"keterangan"`

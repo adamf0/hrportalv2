@@ -11,6 +11,10 @@ type Cuti struct {
 	ID             uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	Nip            string     `gorm:"column:nip;index" json:"nip"`
 	Nidn           string     `gorm:"column:nidn;index" json:"nidn"`
+	NamaPemohon    string     `gorm:"column:nama_pemohon" json:"nama_pemohon"`
+	Unit           string     `gorm:"column:unit" json:"unit"`
+	Fakultas       string     `gorm:"column:fakultas" json:"fakultas"`
+	Prodi          string     `gorm:"column:prodi" json:"prodi"`
 	JenisCutiID    uint       `gorm:"column:id_jenis_cuti" json:"jenis_cuti_id"`
 	TanggalMulai   string     `gorm:"column:tanggal_mulai;index" json:"tanggal_mulai"`
 	TanggalSelesai string     `gorm:"column:tanggal_akhir;index" json:"tanggal_selesai"`

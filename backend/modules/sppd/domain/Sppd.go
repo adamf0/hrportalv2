@@ -11,6 +11,10 @@ type Sppd struct {
 	ID                       uint               `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
 	Nidn                     string             `gorm:"column:nidn;index" json:"nidn"`
 	Nip                      string             `gorm:"column:nip;index" json:"nip"`
+	NamaPemohon              string             `gorm:"column:nama_pemohon" json:"nama_pemohon"`
+	Unit                     string             `gorm:"column:unit" json:"unit"`
+	Fakultas                 string             `gorm:"column:fakultas" json:"fakultas"`
+	Prodi                    string             `gorm:"column:prodi" json:"prodi"`
 	Tujuan                   string             `gorm:"column:tujuan" json:"tujuan"`
 	JenisSppdID              uint               `gorm:"column:id_jenis_sppd" json:"jenis_sppd_id"`
 	TanggalBerangkat         string             `gorm:"column:tanggal_berangkat;index" json:"tanggal_berangkat"`
