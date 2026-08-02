@@ -15,9 +15,9 @@ import (
 
 func ModuleHoliday(app *fiber.App, db *gorm.DB) {
 	// Register public /holiday route
-	app.Get("/holiday", func(c *fiber.Ctx) error {
-		return getHolidaysHandler(c, db)
-	})
+	// app.Get("/holiday", func(c *fiber.Ctx) error {
+	// 	return getHolidaysHandler(c, db)
+	// })
 
 	// Register protected /api/holiday route
 	group := app.Group("/api/holiday", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())

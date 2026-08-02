@@ -62,3 +62,6 @@ backend/docker-compose.yml
 backend/podman-compose.yml
 backend/mariadb/
 mariadb/
+.env
+*.env
+backend/.env

@@ -1,10 +1,4 @@
 #!/bin/bash
-
-# ==============================================================================
-# Script: start_podman.sh
-# Purpose: Builds and runs all HRPortal services & workers using Podman Compose
-# ==============================================================================
-
 set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -14,18 +8,23 @@ echo "======================================================================"
 echo "          UNPAK HRPORTAL - STARTING SERVICES WITH PODMAN             "
 echo "======================================================================"
 
-if command -v podman-compose &> /dev/null; then
-    COMPOSE_CMD="podman-compose"
-elif podman compose version &> /dev/null; then
-    COMPOSE_CMD="podman compose"
-else
-    echo "[ERROR] Podman compose plugin (podman-compose or podman compose) is not installed."
-    echo "Please install podman and podman-compose."
-    exit 1
-fi
+echo "[1/5] Building hrportal-main..."
+podman build -t hrportal-main:latest -f Containerfile.api .
 
-echo "Using compose command: $COMPOSE_CMD"
-$COMPOSE_CMD -f podman-compose.yml up -d --build
+echo "[2/5] Building hrportal-export..."
+podman build -t hrportal-export:latest -f Containerfile.exportworker .
+
+echo "[3/5] Building hrportal-notification..."
+podman build -t hrportal-notification:latest -f Containerfile.notificationservice .
+
+echo "[4/5] Building hrportal-autoverify..."
+podman build -t hrportal-autoverify:latest -f Containerfile.autoverifysdm .
+
+echo "[5/5] Building hrportal-holiday..."
+podman build -t hrportal-holiday:latest -f Containerfile.holidaysync .
+
+echo "Launching Podman containers..."
+podman-compose -f podman-compose.yml up -d
 
 echo "----------------------------------------------------------------------"
 echo " All services and workers have been launched in Podman containers!"
