@@ -20,7 +20,6 @@ type Cuti struct {
 	TanggalSelesai string     `gorm:"column:tanggal_akhir;index" json:"tanggal_selesai"`
 	JumlahHari     int        `gorm:"column:lama_cuti" json:"jumlah_hari"`
 	Alasan         string     `gorm:"column:tujuan" json:"alasan"`
-	NipAtasan      *string    `gorm:"-" json:"nip_atasan"`
 	Verifikasi     *string    `gorm:"column:verifikasi" json:"verifikasi"`
 	FileLampiran   *string    `gorm:"column:dokumen" json:"file_lampiran"`
 	Status         string     `gorm:"column:status" json:"status"`

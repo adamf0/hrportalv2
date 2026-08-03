@@ -60,7 +60,6 @@ func (h *SubmitCutiCommandHandler) Handle(ctx context.Context, cmd *SubmitCutiCo
 		TanggalSelesai: common.FormatDateOnly(cmd.TanggalSelesai),
 		JumlahHari:     cmd.JumlahHari,
 		Alasan:         cmd.Alasan,
-		NipAtasan:      cmd.NipAtasan,
 		Verifikasi:     cmd.NipAtasan,
 		FileLampiran:   cmd.FileLampiran,
 		Status:         "menunggu",

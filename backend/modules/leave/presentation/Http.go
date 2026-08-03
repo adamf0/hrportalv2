@@ -74,10 +74,10 @@ func ModuleLeave(app *fiber.App) {
 		// Trigger FCM Notification for Submit Cuti
 		if res.Value != nil {
 			cutiData := res.Value
-			if cutiData.NipAtasan != nil && *cutiData.NipAtasan != "" {
-				targets := []string{*cutiData.NipAtasan}
+			if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
+				targets := []string{*cutiData.Verifikasi}
 				title := "Pengajuan Cuti Baru"
-				body := "Pegawai NIP " + cutiData.Nip + " mengajukan Cuti baru. Mohon verifikasi."
+				body := "Pegawai NIP " + cutiData.Nip + " NIDN " + cutiData.Nidn + " mengajukan Cuti baru. Mohon verifikasi."
 				payload := map[string]string{"type": "cuti", "id": strconv.Itoa(int(cutiData.ID)), "status": cutiData.Status}
 				helper.GlobalFcmManager.DispatchNotification(targets, title, body, "cuti", payload)
 			}
@@ -147,8 +147,6 @@ func ModuleLeave(app *fiber.App) {
 			atasanNip := ""
 			if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
 				atasanNip = *cutiData.Verifikasi
-			} else if cutiData.NipAtasan != nil && *cutiData.NipAtasan != "" {
-				atasanNip = *cutiData.NipAtasan
 			}
 
 			switch status {
