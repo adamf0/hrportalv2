@@ -48,39 +48,51 @@ func processAutoVerifyRequests(db *gorm.DB) {
 
 	// 1. Auto-verify Cuti (Leave)
 	var pendingLeaves []struct {
-		ID        uint   `gorm:"column:id"`
-		Nip       string `gorm:"column:nip"`
-		NipAtasan string `gorm:"column:nip_atasan"`
-		Status    string `gorm:"column:status"`
-		CreatedAt time.Time
-		UpdatedAt time.Time
+		ID         uint   `gorm:"column:id"`
+		Nidn       string `gorm:"column:nidn"`
+		Nip        string `gorm:"column:nip"`
+		Verifikasi string `gorm:"column:verifikasi"`
+		Status     string `gorm:"column:status"`
+		CreatedAt  time.Time
+		UpdatedAt  time.Time
 	}
 
-	errLeave := db.Table("leave").
-		Select("id, nip, nip_atasan, status, created_at, updated_at").
-		Where("status = ? AND (updated_at <= ? OR created_at <= ?)", "terima atasan", thresholdTime, thresholdTime).
+	errLeave := db.Table("cuti").
+		Select("id, nidn, nip, verifikasi, status, created_at, updated_at").
+		Where("LOWER(status) IN ('terima atasan', 'disetujui atasan') AND (updated_at <= ? OR created_at <= ?)", thresholdTime, thresholdTime).
 		Find(&pendingLeaves).Error
 
 	if errLeave == nil && len(pendingLeaves) > 0 {
 		for _, leave := range pendingLeaves {
-			log.Printf("[SDM Auto-Verify Job] Auto-verifying Cuti ID %d for NIP %s (1x24h threshold met)", leave.ID, leave.Nip)
-			db.Table("leave").Where("id = ?", leave.ID).Update("status", "terima sdm")
+			log.Printf("[SDM Auto-Verify Job] Auto-verifying Cuti ID %d for NIP %s NIDN %s (1x24h threshold met)", leave.ID, leave.Nip, leave.Nidn)
+			db.Table("cuti").Where("id = ?", leave.ID).Updates(map[string]interface{}{
+				"status":     "terima sdm",
+				"updated_at": time.Now(),
+			})
 
 			// Dispatch FCM Notifications to Employee and Atasan
-			targets := []string{leave.Nip}
-			if leave.NipAtasan != "" {
-				targets = append(targets, leave.NipAtasan)
+			var targets []string
+			if leave.Nip != "" {
+				targets = append(targets, leave.Nip)
+			}
+			if leave.Nidn != "" {
+				targets = append(targets, leave.Nidn)
+			}
+			if leave.Verifikasi != "" {
+				targets = append(targets, leave.Verifikasi)
 			}
 
 			title := "Verifikasi Otomatis SDM (1x24 Jam)"
-			body := "Pengajuan Cuti NIP " + leave.Nip + " telah diverifikasi dan disetujui otomatis oleh Sistem SDM setelah 1x24 jam."
+			body := "Pengajuan Cuti NIP " + leave.Nip + " NIDN " + leave.Nidn + " telah diverifikasi dan disetujui otomatis oleh Sistem SDM setelah 1x24 jam."
 			payload := map[string]string{
-				"type":        "cuti",
-				"id":          strconvUint(leave.ID),
-				"status":      "terima sdm",
-				"autoverify":  "true",
+				"type":       "cuti",
+				"id":         strconvUint(leave.ID),
+				"status":     "terima sdm",
+				"autoverify": "true",
 			}
-			GlobalFcmManager.DispatchNotification(targets, title, body, "cuti", payload)
+			if GlobalFcmManager != nil {
+				GlobalFcmManager.DispatchNotification(targets, title, body, "cuti", payload)
+			}
 		}
 	}
 
@@ -96,13 +108,16 @@ func processAutoVerifyRequests(db *gorm.DB) {
 
 	errIzin := db.Table("izin").
 		Select("id, nip, verifikasi, status, created_at, updated_at").
-		Where("status = ? AND (updated_at <= ? OR created_at <= ?)", "terima atasan", thresholdTime, thresholdTime).
+		Where("LOWER(status) IN ('terima atasan', 'disetujui atasan') AND (updated_at <= ? OR created_at <= ?)", thresholdTime, thresholdTime).
 		Find(&pendingIzin).Error
 
 	if errIzin == nil && len(pendingIzin) > 0 {
 		for _, iz := range pendingIzin {
 			log.Printf("[SDM Auto-Verify Job] Auto-verifying Izin ID %d for NIP %s (1x24h threshold met)", iz.ID, iz.Nip)
-			db.Table("izin").Where("id = ?", iz.ID).Update("status", "terima sdm")
+			db.Table("izin").Where("id = ?", iz.ID).Updates(map[string]interface{}{
+				"status":     "terima sdm",
+				"updated_at": time.Now(),
+			})
 
 			targets := []string{iz.Nip}
 			if iz.Verifikasi != "" {
@@ -117,7 +132,9 @@ func processAutoVerifyRequests(db *gorm.DB) {
 				"status":     "terima sdm",
 				"autoverify": "true",
 			}
-			GlobalFcmManager.DispatchNotification(targets, title, body, "izin", payload)
+			if GlobalFcmManager != nil {
+				GlobalFcmManager.DispatchNotification(targets, title, body, "izin", payload)
+			}
 		}
 	}
 
@@ -133,13 +150,16 @@ func processAutoVerifyRequests(db *gorm.DB) {
 
 	errSppd := db.Table("sppd").
 		Select("id, nip, verifikasi, status, created_at, updated_at").
-		Where("status = ? AND (updated_at <= ? OR created_at <= ?)", "terima atasan", thresholdTime, thresholdTime).
+		Where("LOWER(status) IN ('terima atasan', 'disetujui atasan') AND (updated_at <= ? OR created_at <= ?)", thresholdTime, thresholdTime).
 		Find(&pendingSppd).Error
 
 	if errSppd == nil && len(pendingSppd) > 0 {
 		for _, sppd := range pendingSppd {
 			log.Printf("[SDM Auto-Verify Job] Auto-verifying SPPD ID %d for NIP %s (1x24h threshold met)", sppd.ID, sppd.Nip)
-			db.Table("sppd").Where("id = ?", sppd.ID).Update("status", "terima sdm")
+			db.Table("sppd").Where("id = ?", sppd.ID).Updates(map[string]interface{}{
+				"status":     "terima sdm",
+				"updated_at": time.Now(),
+			})
 
 			targets := []string{sppd.Nip}
 			if sppd.Verifikasi != "" {
@@ -154,7 +174,9 @@ func processAutoVerifyRequests(db *gorm.DB) {
 				"status":     "terima sdm",
 				"autoverify": "true",
 			}
-			GlobalFcmManager.DispatchNotification(targets, title, body, "sppd", payload)
+			if GlobalFcmManager != nil {
+				GlobalFcmManager.DispatchNotification(targets, title, body, "sppd", payload)
+			}
 		}
 	}
 }
