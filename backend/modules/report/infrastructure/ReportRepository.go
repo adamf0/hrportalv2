@@ -31,7 +31,7 @@ func (r *ReportRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nidn string, date time.Time, counterType string) error {
+func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nidn string, date time.Time, counterType string, nama string, unit string, fakultas string, prodi string) error {
 	nipClean := strings.TrimSpace(nip)
 	nidnClean := strings.TrimSpace(nidn)
 	if nipClean == "" && nidnClean == "" {
@@ -72,6 +72,10 @@ func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nid
 		item := domain.RekapLaporanBulanan{
 			Nip:          nip,
 			Nidn:         nidn,
+			Nama:         nama,
+			Unit:         unit,
+			Fakultas:     fakultas,
+			Prodi:        prodi,
 			PeriodeType:  p.pType,
 			PeriodeKey:   p.pKey,
 			TanggalMulai: p.start,
@@ -96,12 +100,26 @@ func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nid
 
 		conflictCols := []clause.Column{{Name: "nip"}, {Name: "nidn"}, {Name: "periode_type"}, {Name: "periode_key"}}
 
+		assignments := map[string]interface{}{
+			columnToInc:  gorm.Expr("rekap_laporan_bulanan."+columnToInc+" + ?", 1),
+			"updated_at": now,
+		}
+		if nama != "" {
+			assignments["nama"] = nama
+		}
+		if unit != "" {
+			assignments["unit"] = unit
+		}
+		if fakultas != "" {
+			assignments["fakultas"] = fakultas
+		}
+		if prodi != "" {
+			assignments["prodi"] = prodi
+		}
+
 		err := commoninfra.GetTx(ctx, r.db).Clauses(clause.OnConflict{
-			Columns: conflictCols,
-			DoUpdates: clause.Assignments(map[string]interface{}{
-				columnToInc:  gorm.Expr("rekap_laporan_bulanan."+columnToInc+" + ?", 1),
-				"updated_at": now,
-			}),
+			Columns:   conflictCols,
+			DoUpdates: clause.Assignments(assignments),
 		}).Create(&item).Error
 
 		if err != nil {
@@ -470,13 +488,17 @@ func (r *ReportRepository) GetFlatLaporanMergedParallel(ctx context.Context, tan
 func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]interface{}, error) {
 	// Query unique employees from local activity tables to bypass view_pegawai (connect_m_dosen, connect_e_pribadi, connect_n_pribadi queries)
 	type employee struct {
-		Nip  string `gorm:"column:nip"`
-		Nidn string `gorm:"column:nidn"`
+		Nip      string `gorm:"column:nip"`
+		Nidn     string `gorm:"column:nidn"`
+		Nama     string `gorm:"column:nama"`
+		Fakultas string `gorm:"column:fakultas"`
+		Prodi    string `gorm:"column:prodi"`
+		Unit     string `gorm:"column:unit"`
 	}
 	empSet := make(map[employee]bool)
 
 	var eAbsen []employee
-	r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}).Select("DISTINCT nip, nidn").Find(&eAbsen)
+	r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}).Select("DISTINCT nip, nidn, nama_pegawai AS nama, fakultas, prodi, unit").Find(&eAbsen)
 	for _, e := range eAbsen {
 		if e.Nip != "" || e.Nidn != "" {
 			empSet[e] = true
@@ -484,7 +506,7 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 	}
 
 	var eIzin []employee
-	r.db.WithContext(ctx).Model(&permissionDomain.Izin{}).Select("DISTINCT nip, nidn").Find(&eIzin)
+	r.db.WithContext(ctx).Model(&permissionDomain.Izin{}).Select("DISTINCT nip, nidn, nama_pemohon AS nama, fakultas, prodi, unit").Find(&eIzin)
 	for _, e := range eIzin {
 		if e.Nip != "" || e.Nidn != "" {
 			empSet[e] = true
@@ -492,7 +514,7 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 	}
 
 	var eCuti []employee
-	r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}).Select("DISTINCT nip, nidn").Find(&eCuti)
+	r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}).Select("DISTINCT nip, nidn, nama_pemohon AS nama, fakultas, prodi, unit").Find(&eCuti)
 	for _, e := range eCuti {
 		if e.Nip != "" || e.Nidn != "" {
 			empSet[e] = true
@@ -500,7 +522,7 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 	}
 
 	var eSppd []employee
-	r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}).Select("DISTINCT nip, nidn").Find(&eSppd)
+	r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}).Select("DISTINCT nip, nidn, nama_pemohon AS nama, fakultas, prodi, unit").Find(&eSppd)
 	for _, e := range eSppd {
 		if e.Nip != "" || e.Nidn != "" {
 			empSet[e] = true
@@ -508,7 +530,7 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 	}
 
 	var eSppdAnggota []employee
-	r.db.WithContext(ctx).Model(&sppdDomain.SppdAnggota{}).Select("DISTINCT nip, nidn").Find(&eSppdAnggota)
+	r.db.WithContext(ctx).Model(&sppdDomain.SppdAnggota{}).Select("DISTINCT nip, nidn, nama, fakultas, prodi, unit").Find(&eSppdAnggota)
 	for _, e := range eSppdAnggota {
 		if e.Nip != "" || e.Nidn != "" {
 			empSet[e] = true
@@ -516,7 +538,7 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 	}
 
 	var eUpacara []employee
-	r.db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{}).Select("DISTINCT nip, nidn").Find(&eUpacara)
+	r.db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{}).Select("DISTINCT nip, nidn, nama, fakultas, prodi, unit").Find(&eUpacara)
 	for _, e := range eUpacara {
 		if e.Nip != "" || e.Nidn != "" {
 			empSet[e] = true
@@ -530,9 +552,19 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 		if (nipVal == "" || nipVal == "-" || nipVal == "--") && (nidnVal == "" || nidnVal == "-" || nidnVal == "--") {
 			continue
 		}
+
+		unitVal := emp.Unit
+		fakultasVal := emp.Fakultas
+		prodiVal := emp.Prodi
+
 		pegawais = append(pegawais, accountDomain.Pegawai{
-			Nip:  nipVal,
-			Nidn: nidnVal,
+			Nip:       nipVal,
+			Nidn:      nidnVal,
+			Nama:      emp.Nama,
+			UnitKerja: &unitVal,
+			Unit:      &unitVal,
+			Fakultas:  &fakultasVal,
+			Prodi:     &prodiVal,
 		})
 	}
 
@@ -693,9 +725,29 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 
 					wgCount.Wait()
 
+					namaVal := p.Nama
+					unitVal := ""
+					if p.UnitKerja != nil && *p.UnitKerja != "" {
+						unitVal = *p.UnitKerja
+					} else if p.Unit != nil {
+						unitVal = *p.Unit
+					}
+					fakultasVal := ""
+					if p.Fakultas != nil {
+						fakultasVal = *p.Fakultas
+					}
+					prodiVal := ""
+					if p.Prodi != nil {
+						prodiVal = *p.Prodi
+					}
+
 					itemV1 := domain.RekapLaporanBulanan{
 						Nip:          nipVal,
 						Nidn:         nidnVal,
+						Nama:         namaVal,
+						Unit:         unitVal,
+						Fakultas:     fakultasVal,
+						Prodi:        prodiVal,
 						PeriodeType:  domain.PeriodeCalendar,
 						PeriodeKey:   v1Key,
 						TanggalMulai: v1Start.Format("2006-01-02"),
@@ -719,6 +771,10 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 					itemV2 := domain.RekapLaporanBulanan{
 						Nip:          nipVal,
 						Nidn:         nidnVal,
+						Nama:         namaVal,
+						Unit:         unitVal,
+						Fakultas:     fakultasVal,
+						Prodi:        prodiVal,
 						PeriodeType:  domain.PeriodeCutoff,
 						PeriodeKey:   v2Key,
 						TanggalMulai: v2Start.Format("2006-01-02"),

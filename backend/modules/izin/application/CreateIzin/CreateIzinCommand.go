@@ -13,6 +13,10 @@ import (
 type CreateIzinCommand struct {
 	Nip              string  `json:"nip"`
 	Nidn             string  `json:"nidn"`
+	NamaPemohon      string  `json:"nama_pemohon"`
+	Unit             string  `json:"unit"`
+	Fakultas         string  `json:"fakultas"`
+	Prodi            string  `json:"prodi"`
 	JenisIzinID      uint    `json:"id_jenis_izin"`
 	TanggalPengajuan string  `json:"tanggal_pengajuan"`
 	Tujuan           string  `json:"tujuan"`
@@ -44,6 +48,10 @@ func (h *CreateIzinCommandHandler) Handle(ctx context.Context, cmd *CreateIzinCo
 	izin := &domain.Izin{
 		Nip:              cmd.Nip,
 		Nidn:             cmd.Nidn,
+		NamaPemohon:      cmd.NamaPemohon,
+		Unit:             cmd.Unit,
+		Fakultas:         cmd.Fakultas,
+		Prodi:            cmd.Prodi,
 		JenisIzinID:      int(cmd.JenisIzinID),
 		TanggalPengajuan: cmd.TanggalPengajuan,
 		Tujuan:           cmd.Tujuan,

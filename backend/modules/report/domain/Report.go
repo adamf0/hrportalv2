@@ -18,6 +18,10 @@ type RekapLaporanBulanan struct {
 	ID           uint        `gorm:"primaryKey;autoIncrement" json:"id"`
 	Nip          string      `gorm:"column:nip;type:varchar(100);not null;default:'';uniqueIndex:rekap_emp_periode_IDX,priority:1" json:"nip"`
 	Nidn         string      `gorm:"column:nidn;type:varchar(100);not null;default:'';uniqueIndex:rekap_emp_periode_IDX,priority:2" json:"nidn"`
+	Nama         string      `gorm:"column:nama" json:"nama"`
+	Unit         string      `gorm:"column:unit" json:"unit"`
+	Fakultas     string      `gorm:"column:fakultas" json:"fakultas"`
+	Prodi        string      `gorm:"column:prodi" json:"prodi"`
 	PeriodeType  PeriodeType `gorm:"column:periode_type;type:varchar(50);not null;default:'CALENDAR';uniqueIndex:rekap_emp_periode_IDX,priority:3" json:"periode_type"`
 	PeriodeKey   string      `gorm:"column:periode_key;type:varchar(50);not null;default:'';uniqueIndex:rekap_emp_periode_IDX,priority:4" json:"periode_key"`
 	TanggalMulai string      `gorm:"column:tanggal_mulai;type:date;not null" json:"tanggal_mulai"`

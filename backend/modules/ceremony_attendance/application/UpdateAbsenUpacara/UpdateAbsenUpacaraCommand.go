@@ -12,10 +12,14 @@ import (
 )
 
 type UpdateAbsenUpacaraCommand struct {
-	ID      uint   `json:"id"`
-	Nip     string `json:"nip"`
-	Nidn    string `json:"nidn"`
-	Tanggal string `json:"tanggal"`
+	ID       uint   `json:"id"`
+	Nip      string `json:"nip"`
+	Nidn     string `json:"nidn"`
+	Nama     string `json:"nama"`
+	Unit     string `json:"unit"`
+	Fakultas string `json:"fakultas"`
+	Prodi    string `json:"prodi"`
+	Tanggal  string `json:"tanggal"`
 }
 
 func (c UpdateAbsenUpacaraCommand) Validate() error {

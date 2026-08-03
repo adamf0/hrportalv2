@@ -5,7 +5,8 @@ import 'package:http/http.dart' as http;
 import 'api_client.dart';
 
 class AutoAttendanceService with WidgetsBindingObserver {
-  static final AutoAttendanceService instance = AutoAttendanceService._internal();
+  static final AutoAttendanceService instance =
+      AutoAttendanceService._internal();
 
   AutoAttendanceService._internal();
 
@@ -69,7 +70,8 @@ class AutoAttendanceService with WidgetsBindingObserver {
 
     // Prevent duplicate attempts within 10 seconds
     if (_lastAutoAttempt != null &&
-        DateTime.now().difference(_lastAutoAttempt!) < const Duration(seconds: 10) &&
+        DateTime.now().difference(_lastAutoAttempt!) <
+            const Duration(seconds: 10) &&
         !isExplicit) {
       return;
     }
@@ -78,7 +80,8 @@ class AutoAttendanceService with WidgetsBindingObserver {
     _lastAutoAttempt = DateTime.now();
 
     try {
-      debugPrint('[AutoAttendanceService] Evaluating location & network for auto-attendance...');
+      debugPrint(
+          '[AutoAttendanceService] Evaluating location & network for auto-attendance...');
 
       // 1. Simulate/Evaluate Location & Campus Radius Connection
       // In production/emulator, check GPS coordinates & Network connection status
@@ -86,26 +89,33 @@ class AutoAttendanceService with WidgetsBindingObserver {
 
       if (isInsideRadiusOrNetwork) {
         // SUCCESS CASE: Inside Campus Radius or Connected to Campus Network
-        debugPrint('[AutoAttendanceService] User is INSIDE campus radius / network.');
+        debugPrint(
+            '[AutoAttendanceService] User is INSIDE campus radius / network.');
 
         // Perform Auto Check-in
-        final successCheckIn = await _performAutoCheckIn(_cachedNip!, _cachedNidn!);
+        final successCheckIn =
+            await _performAutoCheckIn(_cachedNip!, _cachedNidn!);
         if (successCheckIn) {
-          debugPrint('[AutoAttendanceService] Auto-attendance check-in SUCCESS.');
+          debugPrint(
+              '[AutoAttendanceService] Auto-attendance check-in SUCCESS.');
         }
 
         // Perform Auto Ceremony Check-in (if today is ceremony day e.g. Monday/17th)
-        final successUpacara = await _performAutoUpacaraCheckIn(_cachedNip!, _cachedNidn!);
+        final successUpacara =
+            await _performAutoUpacaraCheckIn(_cachedNip!, _cachedNidn!);
         if (successUpacara) {
-          debugPrint('[AutoAttendanceService] Auto-ceremony-attendance check-in SUCCESS.');
+          debugPrint(
+              '[AutoAttendanceService] Auto-ceremony-attendance check-in SUCCESS.');
         }
       } else {
         // FAILURE CASE: Outside Campus Radius or No Network
-        debugPrint('[AutoAttendanceService] User is OUTSIDE campus radius or disconnected.');
+        debugPrint(
+            '[AutoAttendanceService] User is OUTSIDE campus radius or disconnected.');
         await _notifyAutoAttendanceFailed(_cachedNip!);
       }
     } catch (e) {
-      debugPrint('[AutoAttendanceService Error] Auto-attendance check failed: $e');
+      debugPrint(
+          '[AutoAttendanceService Error] Auto-attendance check failed: $e');
     } finally {
       _isAutoAttendanceRunning = false;
     }
@@ -117,8 +127,10 @@ class AutoAttendanceService with WidgetsBindingObserver {
     const double currentLat = -6.5888;
     const double currentLon = 106.8066;
 
-    final distance = _calculateDistanceMeters(currentLat, currentLon, _campusLat, _campusLon);
-    debugPrint('[AutoAttendanceService] Distance to campus center: ${distance.toStringAsFixed(2)} meters');
+    final distance = _calculateDistanceMeters(
+        currentLat, currentLon, _campusLat, _campusLon);
+    debugPrint(
+        '[AutoAttendanceService] Distance to campus center: ${distance.toStringAsFixed(2)} meters');
 
     return distance <= _allowedRadiusMeters;
   }
@@ -148,12 +160,17 @@ class AutoAttendanceService with WidgetsBindingObserver {
   /// Performs Auto Ceremony Check-In API call
   Future<bool> _performAutoUpacaraCheckIn(String nip, String nidn) async {
     try {
-      final url = Uri.parse('${ApiClient.baseUrl}/api/attendance/check-in-upacara');
+      final now = DateTime.now();
+      final todayStr =
+          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+      final url =
+          Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance');
       final response = await http.post(
         url,
         body: {
           'nip': nip,
           'nidn': nidn,
+          'tanggal': todayStr,
           'note': 'Auto Ceremony Attendance (Background Job)',
         },
       ).timeout(const Duration(seconds: 5));
@@ -183,7 +200,8 @@ class AutoAttendanceService with WidgetsBindingObserver {
   }
 
   /// Haversine distance formula calculation in meters
-  double _calculateDistanceMeters(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistanceMeters(
+      double lat1, double lon1, double lat2, double lon2) {
     const p = 0.017453292519943295;
     final a = 0.5 -
         cos((lat2 - lat1) * p) / 2 +

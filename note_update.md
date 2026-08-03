@@ -59,6 +59,19 @@ Untuk mengisolasi (*decouple*) tabel-tabel utama HRPortal v2 agar terpisah dan t
    - **Kolom Baru**: `nama_pegawai` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`).
    - **Keterangan**: Menyimpan nama pegawai dan unit kerja pengajuan klaim presensi.
 
+6. **Tabel `sppd_anggota` & `absen_upacara`**:
+   - **Kolom Baru**: `nama` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`).
+   - **Keterangan**: Menyimpan nama dan unit kerja pegawai anggota SPPD serta presensi upacara.
+
+7. **Tabel `rekap_laporan_bulanan`**:
+   - **Kolom Baru**: `nama` (`VARCHAR(255)`), `unit` (`VARCHAR(191)`), `fakultas` (`VARCHAR(191)`), `prodi` (`VARCHAR(191)`).
+   - **Keterangan**: Menyimpan snapshot nama, unit, fakultas, dan prodi pegawai pada rekapitulasi laporan bulanan.
+
+> **Alur CRUD Terintegrasi (Presentation ➡️ Application ➡️ Repository)**:
+> - **Input Presentation (HTTP)**: Menangkap parameter `nama_pemohon` / `nama_pegawai`, `unit`, `fakultas`, dan `prodi` dari Form/JSON body.
+> - **Otomatisasi Resolver (`ProfileResolver`)**: Jika nilai tidak dikirim oleh client, `ResolveProfileMetadata` di layer aplikasi secara otomatis melakukan *fallback lookup* 1x saat simpan/update ke SIMPEG/SIMAK dan menyimpannya secara permanen ke tabel action.
+> - **Isolasi Pembacaan (Read Queries)**: Seluruh pencarian GET (`GetAllCuti`, `GetCuti`, `GetAllIzin`, `GetAllSppd`, `GetAttendance`) kini membaca field `nama_pemohon`/`nama_pegawai`, `unit`, `fakultas`, dan `prodi` langsung dari tabel `cuti`, `izin`, `sppd`, `absen`, dan `klaim_absen` tanpa kueri ulang ke SIMPEG/SIMAK.
+
 ---
 
 ## 4. 🧹 Tabel Legacy / Security Firewall yang Dibersihkan

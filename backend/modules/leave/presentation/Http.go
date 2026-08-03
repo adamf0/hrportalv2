@@ -49,6 +49,10 @@ func ModuleLeave(app *fiber.App) {
 		command := SubmitCuti.SubmitCutiCommand{
 			Nidn:           c.FormValue("nidn"),
 			Nip:            c.FormValue("nip"),
+			NamaPemohon:    c.FormValue("nama"),
+			Unit:           c.FormValue("unit"),
+			Fakultas:       c.FormValue("fakultas"),
+			Prodi:          c.FormValue("prodi"),
 			JenisCutiID:    uint(jenisCutiID),
 			TanggalMulai:   c.FormValue("tanggal_mulai"),
 			TanggalSelesai: c.FormValue("tanggal_selesai"),
@@ -112,6 +116,10 @@ func ModuleLeave(app *fiber.App) {
 
 		command := UpdateCuti.UpdateCutiCommand{
 			ID:             uint(id),
+			NamaPemohon:    c.FormValue("nama"),
+			Unit:           c.FormValue("unit"),
+			Fakultas:       c.FormValue("fakultas"),
+			Prodi:          c.FormValue("prodi"),
 			JenisCutiID:    uint(jenisCutiID),
 			TanggalMulai:   c.FormValue("tanggal_mulai"),
 			TanggalSelesai: c.FormValue("tanggal_selesai"),

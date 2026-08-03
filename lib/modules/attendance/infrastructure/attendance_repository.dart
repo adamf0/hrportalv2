@@ -23,18 +23,27 @@ class AttendanceRepository implements IAttendanceRepository {
       final nidn = role == 'Dosen' ? nip : '';
 
       final endpoint = isUpacara
-          ? "/api/attendance/check-in-upacara"
+          ? "/api/ceremony-attendance"
           : "/api/attendance/check-in";
+
+      final now = DateTime.now();
+      final todayStr =
+          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+      final Map<String, String> bodyData = {
+        "nip": nip,
+        "nidn": nidn,
+        "latitude": lat.toString(),
+        "longitude": lon.toString(),
+        "note": note,
+      };
+      if (isUpacara) {
+        bodyData["tanggal"] = todayStr;
+      }
 
       final responseData = await ApiClient.post(
         Uri.parse("${ApiClient.baseUrl}$endpoint"),
-        body: {
-          "nip": nip,
-          "nidn": nidn,
-          "latitude": lat.toString(),
-          "longitude": lon.toString(),
-          "note": note,
-        },
+        body: bodyData,
       );
 
       return responseData != null;

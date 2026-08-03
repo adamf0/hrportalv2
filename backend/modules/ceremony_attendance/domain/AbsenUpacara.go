@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"context"
 	"time"
 
 	common "hrportal_backend/common/domain"
@@ -12,6 +11,10 @@ type AbsenUpacara struct {
 	ID        uint       `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
 	Nidn      string     `gorm:"column:nidn" json:"nidn"`
 	Nip       string     `gorm:"column:nip" json:"nip"`
+	Nama      string     `gorm:"column:nama" json:"nama"`
+	Unit      string     `gorm:"column:unit" json:"unit"`
+	Fakultas  string     `gorm:"column:fakultas" json:"fakultas"`
+	Prodi     string     `gorm:"column:prodi" json:"prodi"`
 	Tanggal   string     `gorm:"column:tanggal;type:date" json:"tanggal"`
 	CreatedAt *time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt *time.Time `gorm:"column:updated_at" json:"updated_at"`
@@ -19,12 +22,4 @@ type AbsenUpacara struct {
 
 func (AbsenUpacara) TableName() string {
 	return "absen_upacara"
-}
-
-type ICeremonyAttendanceRepository interface {
-	Create(ctx context.Context, upacara *AbsenUpacara) error
-	Update(ctx context.Context, upacara *AbsenUpacara) error
-	Delete(ctx context.Context, id uint) error
-	GetByID(ctx context.Context, id uint) (*AbsenUpacara, error)
-	GetAll(ctx context.Context, nip string, nidn string, tanggal string) ([]AbsenUpacara, error)
 }

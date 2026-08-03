@@ -33,6 +33,10 @@ func ModuleIzin(app *fiber.App) {
 		cmd := create.CreateIzinCommand{
 			Nip:              c.FormValue("nip"),
 			Nidn:             c.FormValue("nidn"),
+			NamaPemohon:      c.FormValue("nama"),
+			Unit:             c.FormValue("unit"),
+			Fakultas:         c.FormValue("fakultas"),
+			Prodi:            c.FormValue("prodi"),
 			JenisIzinID:      uint(jenisIzinID),
 			TanggalPengajuan: c.FormValue("tanggal_pengajuan"),
 			Tujuan:           c.FormValue("tujuan"),
@@ -75,6 +79,10 @@ func ModuleIzin(app *fiber.App) {
 
 		cmd := update.UpdateIzinCommand{
 			ID:               uint(id),
+			NamaPemohon:      c.FormValue("nama"),
+			Unit:             c.FormValue("unit"),
+			Fakultas:         c.FormValue("fakultas"),
+			Prodi:            c.FormValue("prodi"),
 			JenisIzinID:      uint(jenisIzinID),
 			TanggalPengajuan: c.FormValue("tanggal_pengajuan"),
 			Tujuan:           c.FormValue("tujuan"),

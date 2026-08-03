@@ -8,7 +8,6 @@ import (
 	"hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 	"hrportal_backend/modules/attendance/application/CheckIn"
-	"hrportal_backend/modules/attendance/application/CheckInUpacara"
 	"hrportal_backend/modules/attendance/application/CheckOut"
 	"hrportal_backend/modules/attendance/application/DeleteEmptyAttendance"
 	"hrportal_backend/modules/attendance/application/GetAttendanceHistory"
@@ -26,11 +25,15 @@ func ModuleAttendance(app *fiber.App) {
 		lon, _ := strconv.ParseFloat(c.FormValue("longitude"), 64)
 
 		command := CheckIn.CheckInCommand{
-			Nip:       c.FormValue("nip"),
-			Nidn:      c.FormValue("nidn"),
-			Latitude:  lat,
-			Longitude: lon,
-			Note:      c.FormValue("note"),
+			Nip:         c.FormValue("nip"),
+			Nidn:        c.FormValue("nidn"),
+			NamaPegawai: c.FormValue("nama"),
+			Unit:        c.FormValue("unit"),
+			Fakultas:    c.FormValue("fakultas"),
+			Prodi:       c.FormValue("prodi"),
+			Latitude:    lat,
+			Longitude:   lon,
+			Note:        c.FormValue("note"),
 		}
 
 		res, err := mediatr.Send[*CheckIn.CheckInCommand, common.ResultValue[*domain.Absen]](c.UserContext(), &command)
@@ -51,36 +54,6 @@ func ModuleAttendance(app *fiber.App) {
 				"Sistem sudah melakukan absensi otomatis",
 				"attendance",
 				map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
-			)
-		}
-
-		return c.JSON(res.Value)
-	})
-
-	group.Post("/check-in-upacara", func(c *fiber.Ctx) error {
-		command := CheckInUpacara.CheckInUpacaraCommand{
-			Nip:  c.FormValue("nip"),
-			Nidn: c.FormValue("nidn"),
-		}
-
-		res, err := mediatr.Send[*CheckInUpacara.CheckInUpacaraCommand, common.ResultValue[*domain.AbsenUpacara]](c.UserContext(), &command)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-
-		// Trigger FCM Notification for Ceremony Attendance Success
-		if res.Value != nil {
-			absenData := res.Value
-			helper.GlobalFcmManager.DispatchNotification(
-				[]string{absenData.Nip},
-				"Presensi Upacara Otomatis Berhasil",
-				"Sistem sudah melakukan absensi upacara otomatis",
-				"attendance",
-				map[string]string{"type": "check-in-upacara", "id": strconv.Itoa(int(absenData.ID))},
 			)
 		}
 

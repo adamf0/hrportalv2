@@ -15,6 +15,10 @@ import (
 type SubmitCutiCommand struct {
 	Nip            string  `json:"nip"`
 	Nidn           string  `json:"nidn"`
+	NamaPemohon    string  `json:"nama_pemohon"`
+	Unit           string  `json:"unit"`
+	Fakultas       string  `json:"fakultas"`
+	Prodi          string  `json:"prodi"`
 	JenisCutiID    uint    `json:"jenis_cuti_id"`
 	TanggalMulai   string  `json:"tanggal_mulai"`
 	TanggalSelesai string  `json:"tanggal_selesai"`
@@ -43,9 +47,14 @@ func NewSubmitCutiCommandHandler(leaveRepo domain.ILeaveRepository) *SubmitCutiC
 
 func (h *SubmitCutiCommandHandler) Handle(ctx context.Context, cmd *SubmitCutiCommand) (common.ResultValue[*domain.Cuti], error) {
 	now := time.Now()
+
 	cuti := &domain.Cuti{
 		Nip:            cmd.Nip,
 		Nidn:           cmd.Nidn,
+		NamaPemohon:    cmd.NamaPemohon,
+		Unit:           cmd.Unit,
+		Fakultas:       cmd.Fakultas,
+		Prodi:          cmd.Prodi,
 		JenisCutiID:    cmd.JenisCutiID,
 		TanggalMulai:   common.FormatDateOnly(cmd.TanggalMulai),
 		TanggalSelesai: common.FormatDateOnly(cmd.TanggalSelesai),
@@ -75,7 +84,7 @@ func (h *SubmitCutiCommandHandler) Handle(ctx context.Context, cmd *SubmitCutiCo
 			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
 		}
 
-		if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "cuti"); err != nil {
+		if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "cuti", cmd.NamaPemohon, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
 			tx.Rollback()
 			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
 		}

@@ -453,7 +453,14 @@ func RBACMiddleware() fiber.Handler {
 		if strings.Contains(c.Path(), "/recalculate") {
 			return c.Next()
 		}
-		whoamiURL := "http://localhost:3000/whoami"
+		whoamiURL := os.Getenv("WHOAMI_URL")
+		if whoamiURL == "" {
+			host := c.Hostname()
+			if host == "" {
+				host = "localhost:3000"
+			}
+			whoamiURL = c.Protocol() + "://" + host + "/api/account/whoami"
+		}
 
 		token, err := extractBearerToken(c)
 		if err != nil {
@@ -475,6 +482,7 @@ func RBACMiddleware() fiber.Handler {
 		c.Request().PostArgs().Set("prodi", user.Prodi)
 		c.Request().PostArgs().Set("unit", user.Unit)
 		c.Request().PostArgs().Set("source", user.Source)
+		c.Request().PostArgs().Set("nama", user.Name)
 
 		if isAdmin(user) {
 			log.Println("[RBAC] User is admin, access granted")

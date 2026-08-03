@@ -34,6 +34,7 @@ class _HumanLivenessAnimationGuideState
       builder: (context, child) {
         final animValue = widget.animationController.value;
         // Head turn angle back and forth towards left (-0.45 rad = ~-25 degrees)
+        // ignore: unused_local_variable
         final headRotationY = -math.sin(animValue * math.pi) * 0.45;
         final arrowTranslateX = -math.sin(animValue * math.pi) * 16.0;
 
@@ -204,6 +205,7 @@ class _FaceContourPainter extends CustomPainter {
 }
 
 /// Custom Painter for Facial Landmark Mesh Points
+// ignore: unused_element
 class _FaceMeshPainter extends CustomPainter {
   final Color color;
   final double pulse;

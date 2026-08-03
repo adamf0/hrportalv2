@@ -13,8 +13,12 @@ import (
 )
 
 type SppdAnggotaInput struct {
-	Nip  string `json:"nip"`
-	Nidn string `json:"nidn"`
+	Nip      string `json:"nip"`
+	Nidn     string `json:"nidn"`
+	Nama     string `json:"nama"`
+	Unit     string `json:"unit"`
+	Fakultas string `json:"fakultas"`
+	Prodi    string `json:"prodi"`
 }
 
 type SppdFileLaporanInput struct {
@@ -25,6 +29,10 @@ type SppdFileLaporanInput struct {
 type CreateSppdCommand struct {
 	Nidn                     string                 `json:"nidn"`
 	Nip                      string                 `json:"nip"`
+	NamaPemohon              string                 `json:"nama_pemohon"`
+	Unit                     string                 `json:"unit"`
+	Fakultas                 string                 `json:"fakultas"`
+	Prodi                    string                 `json:"prodi"`
 	Tujuan                   string                 `json:"tujuan"`
 	JenisSppdID              uint                   `json:"jenis_sppd_id"`
 	TanggalBerangkat         string                 `json:"tanggal_berangkat"`
@@ -70,9 +78,18 @@ func (h *CreateSppdCommandHandler) Handle(ctx context.Context, cmd *CreateSppdCo
 
 	var dbAnggota []domain.SppdAnggota
 	for _, a := range cmd.Anggota {
+		nama := a.Nama
+		unit := a.Unit
+		fakultas := a.Fakultas
+		prodi := a.Prodi
+
 		dbAnggota = append(dbAnggota, domain.SppdAnggota{
 			Nip:       a.Nip,
 			Nidn:      a.Nidn,
+			Nama:      nama,
+			Unit:      unit,
+			Fakultas:  fakultas,
+			Prodi:     prodi,
 			CreatedAt: &now,
 			UpdatedAt: &now,
 		})
@@ -91,6 +108,10 @@ func (h *CreateSppdCommandHandler) Handle(ctx context.Context, cmd *CreateSppdCo
 	sppd := &domain.Sppd{
 		Nidn:                     cmd.Nidn,
 		Nip:                      cmd.Nip,
+		NamaPemohon:              cmd.NamaPemohon,
+		Unit:                     cmd.Unit,
+		Fakultas:                 cmd.Fakultas,
+		Prodi:                    cmd.Prodi,
 		Tujuan:                   cmd.Tujuan,
 		JenisSppdID:              cmd.JenisSppdID,
 		TanggalBerangkat:         common.FormatDateOnly(cmd.TanggalBerangkat),
@@ -136,7 +157,7 @@ func (h *CreateSppdCommandHandler) Handle(ctx context.Context, cmd *CreateSppdCo
 			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
 		}
 
-		if err := repo.IncrementCounter(ctxTx, nipVal, nidnVal, now, "sppd"); err != nil {
+		if err := repo.IncrementCounter(ctxTx, nipVal, nidnVal, now, "sppd", cmd.NamaPemohon, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
 			tx.Rollback()
 			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
 		}

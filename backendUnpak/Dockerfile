@@ -1,0 +1,34 @@
+# Build Stage
+FROM golang:alpine AS builder
+ENV GOTOOLCHAIN=auto
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates tzdata
+
+# Copy go mod files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source code
+COPY . .
+
+# Build API binary
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/hrportal_api_unpak ./main.go
+
+# Production Stage
+FROM alpine:3.19
+
+WORKDIR /app
+
+RUN apk add --no-cache ca-certificates tzdata
+ENV TZ=Asia/Jakarta
+
+# Copy binary & assets
+COPY --from=builder /app/bin/hrportal_api_unpak /app/hrportal_api_unpak
+COPY --from=builder /app/firebase-service-account.json /app/firebase-service-account.json
+
+EXPOSE 3000
+
+CMD ["/app/hrportal_api_unpak"]

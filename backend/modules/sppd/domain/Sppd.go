@@ -46,6 +46,10 @@ type SppdAnggota struct {
 	SppdID    uint       `gorm:"column:id_sppd" json:"sppd_id"`
 	Nip       string     `gorm:"column:nip;index" json:"nip"`
 	Nidn      string     `gorm:"column:nidn;index" json:"nidn"`
+	Nama      string     `gorm:"column:nama" json:"nama"`
+	Unit      string     `gorm:"column:unit" json:"unit"`
+	Fakultas  string     `gorm:"column:fakultas" json:"fakultas"`
+	Prodi     string     `gorm:"column:prodi" json:"prodi"`
 	CreatedAt *time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt *time.Time `gorm:"column:updated_at" json:"updated_at"`
 }

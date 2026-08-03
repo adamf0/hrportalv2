@@ -3,7 +3,6 @@ package infrastructure
 import (
 	common "hrportal_backend/common/domain"
 	"hrportal_backend/modules/attendance/application/CheckIn"
-	"hrportal_backend/modules/attendance/application/CheckInUpacara"
 	"hrportal_backend/modules/attendance/application/CheckOut"
 	"hrportal_backend/modules/attendance/application/DeleteEmptyAttendance"
 	"hrportal_backend/modules/attendance/application/GetAttendanceHistory"
@@ -33,12 +32,6 @@ func RegisterModuleAttendance(db *gorm.DB) error {
 
 	historyHandler := GetAttendanceHistory.NewGetAttendanceHistoryQueryHandler(repo)
 	err = mediatr.RegisterRequestHandler[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](historyHandler)
-	if err != nil {
-		return err
-	}
-
-	checkInUpacaraHandler := CheckInUpacara.NewCheckInUpacaraCommandHandler(repo)
-	err = mediatr.RegisterRequestHandler[*CheckInUpacara.CheckInUpacaraCommand, common.ResultValue[*domain.AbsenUpacara]](checkInUpacaraHandler)
 	if err != nil {
 		return err
 	}

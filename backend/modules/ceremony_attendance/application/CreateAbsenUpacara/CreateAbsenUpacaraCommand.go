@@ -13,9 +13,13 @@ import (
 )
 
 type CreateAbsenUpacaraCommand struct {
-	Nip     string `json:"nip"`
-	Nidn    string `json:"nidn"`
-	Tanggal string `json:"tanggal"`
+	Nip      string `json:"nip"`
+	Nidn     string `json:"nidn"`
+	Nama     string `json:"nama"`
+	Unit     string `json:"unit"`
+	Fakultas string `json:"fakultas"`
+	Prodi    string `json:"prodi"`
+	Tanggal  string `json:"tanggal"`
 }
 
 func (c CreateAbsenUpacaraCommand) Validate() error {
@@ -41,6 +45,10 @@ func (h *CreateAbsenUpacaraCommandHandler) Handle(ctx context.Context, cmd *Crea
 	upacara := &domain.AbsenUpacara{
 		Nip:       cmd.Nip,
 		Nidn:      cmd.Nidn,
+		Nama:      cmd.Nama,
+		Unit:      cmd.Unit,
+		Fakultas:  cmd.Fakultas,
+		Prodi:     cmd.Prodi,
 		Tanggal:   cmd.Tanggal,
 		CreatedAt: &now,
 		UpdatedAt: &now,
@@ -67,7 +75,7 @@ func (h *CreateAbsenUpacaraCommandHandler) Handle(ctx context.Context, cmd *Crea
 			return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
 		}
 
-		if err := repo.IncrementCounter(ctxTx, nipVal, cmd.Nidn, now, "upacara"); err != nil {
+		if err := repo.IncrementCounter(ctxTx, nipVal, cmd.Nidn, now, "upacara", cmd.Nama, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
 			tx.Rollback()
 			return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
 		}

@@ -31,9 +31,14 @@ func ModuleSppd(app *fiber.App) {
 			if vStr != "" {
 				verifikasi = &vStr
 			}
+
 			command = CreateSppd.CreateSppdCommand{
 				Nidn:             c.FormValue("nidn"),
 				Nip:              c.FormValue("nip"),
+				NamaPemohon:      c.FormValue("nama"),
+				Unit:             c.FormValue("unit"),
+				Fakultas:         c.FormValue("fakultas"),
+				Prodi:            c.FormValue("prodi"),
 				Tujuan:           c.FormValue("tujuan"),
 				JenisSppdID:      uint(jenisSppdID),
 				TanggalBerangkat: c.FormValue("tanggal_berangkat"),
@@ -74,9 +79,14 @@ func ModuleSppd(app *fiber.App) {
 		_ = c.BodyParser(&command)
 		if command.JenisSppdID == 0 && command.TanggalBerangkat == "" {
 			jenisSppdID, _ := strconv.Atoi(c.FormValue("jenis_sppd_id"))
+
 			command = UpdateSppd.UpdateSppdCommand{
 				Nidn:             c.FormValue("nidn"),
 				Nip:              c.FormValue("nip"),
+				NamaPemohon:      c.FormValue("nama"),
+				Unit:             c.FormValue("unit"),
+				Fakultas:         c.FormValue("fakultas"),
+				Prodi:            c.FormValue("prodi"),
 				Tujuan:           c.FormValue("tujuan"),
 				JenisSppdID:      uint(jenisSppdID),
 				TanggalBerangkat: c.FormValue("tanggal_berangkat"),

@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	common "hrportal_backend/common/domain"
+	"hrportal_backend/common/helper"
 	"hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 	"hrportal_backend/modules/ceremony_attendance/application/CreateAbsenUpacara"
@@ -24,9 +25,13 @@ func ModuleCeremonyAttendance(app *fiber.App) {
 		var command CreateAbsenUpacara.CreateAbsenUpacaraCommand
 		if err := c.BodyParser(&command); err != nil {
 			command = CreateAbsenUpacara.CreateAbsenUpacaraCommand{
-				Nip:     c.FormValue("nip"),
-				Nidn:    c.FormValue("nidn"),
-				Tanggal: c.FormValue("tanggal"),
+				Nip:      c.FormValue("nip"),
+				Nidn:     c.FormValue("nidn"),
+				Nama:     c.FormValue("nama"),
+				Unit:     c.FormValue("unit"),
+				Fakultas: c.FormValue("fakultas"),
+				Prodi:    c.FormValue("prodi"),
+				Tanggal:  c.FormValue("tanggal"),
 			}
 		}
 
@@ -37,6 +42,25 @@ func ModuleCeremonyAttendance(app *fiber.App) {
 		if !res.IsSuccess {
 			return infrastructure.HandleError(c, res.Error)
 		}
+
+		// Trigger FCM Notification for Ceremony Attendance Success
+		if res.Value != nil {
+			upacaraData := res.Value
+			targetNip := upacaraData.Nip
+			if targetNip == "" {
+				targetNip = upacaraData.Nidn
+			}
+			if targetNip != "" {
+				helper.GlobalFcmManager.DispatchNotification(
+					[]string{targetNip},
+					"Presensi Upacara Berhasil",
+					"Presensi Upacara Anda pada tanggal "+upacaraData.Tanggal+" telah berhasil dicatat.",
+					"upacara",
+					map[string]string{"type": "check-in-upacara", "id": strconv.Itoa(int(upacaraData.ID))},
+				)
+			}
+		}
+
 		return c.JSON(res.Value)
 	})
 
@@ -48,6 +72,7 @@ func ModuleCeremonyAttendance(app *fiber.App) {
 			command = UpdateAbsenUpacara.UpdateAbsenUpacaraCommand{
 				Nip:     c.FormValue("nip"),
 				Nidn:    c.FormValue("nidn"),
+				Nama:    c.FormValue("nama"),
 				Tanggal: c.FormValue("tanggal"),
 			}
 		}

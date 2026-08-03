@@ -13,11 +13,15 @@ import (
 )
 
 type CheckInCommand struct {
-	Nip       string  `json:"nip"`
-	Nidn      string  `json:"nidn"`
-	Latitude  float64 `json:"latitude"`
-	Longitude float64 `json:"longitude"`
-	Note      string  `json:"note"`
+	Nip         string  `json:"nip"`
+	Nidn        string  `json:"nidn"`
+	NamaPegawai string  `json:"nama_pegawai"`
+	Unit        string  `json:"unit"`
+	Fakultas    string  `json:"fakultas"`
+	Prodi       string  `json:"prodi"`
+	Latitude    float64 `json:"latitude"`
+	Longitude   float64 `json:"longitude"`
+	Note        string  `json:"note"`
 }
 
 func (c CheckInCommand) Validate() error {
@@ -57,6 +61,10 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 			absen := &domain.Absen{
 				Nip:            cmd.Nip,
 				Nidn:           cmd.Nidn,
+				NamaPegawai:    cmd.NamaPegawai,
+				Unit:           cmd.Unit,
+				Fakultas:       cmd.Fakultas,
+				Prodi:          cmd.Prodi,
 				Tanggal:        today,
 				AbsenMasuk:     &now,
 				Note:           cmd.Note,
@@ -68,7 +76,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 				tx.Rollback()
 				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 			}
-			if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk"); err != nil {
+			if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk", cmd.NamaPegawai, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
 				tx.Rollback()
 				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 			}
@@ -85,7 +93,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 			tx.Rollback()
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 		}
-		if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk"); err != nil {
+		if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk", cmd.NamaPegawai, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
 			tx.Rollback()
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 		}

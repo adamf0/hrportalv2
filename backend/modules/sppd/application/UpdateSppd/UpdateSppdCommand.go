@@ -12,8 +12,12 @@ import (
 )
 
 type SppdAnggotaInput struct {
-	Nip  string `json:"nip"`
-	Nidn string `json:"nidn"`
+	Nip      string `json:"nip"`
+	Nidn     string `json:"nidn"`
+	Nama     string `json:"nama"`
+	Unit     string `json:"unit"`
+	Fakultas string `json:"fakultas"`
+	Prodi    string `json:"prodi"`
 }
 
 type SppdFileLaporanInput struct {
@@ -25,6 +29,10 @@ type UpdateSppdCommand struct {
 	ID                       uint                   `json:"id"`
 	Nidn                     string                 `json:"nidn"`
 	Nip                      string                 `json:"nip"`
+	NamaPemohon              string                 `json:"nama_pemohon"`
+	Unit                     string                 `json:"unit"`
+	Fakultas                 string                 `json:"fakultas"`
+	Prodi                    string                 `json:"prodi"`
 	Tujuan                   string                 `json:"tujuan"`
 	JenisSppdID              uint                   `json:"jenis_sppd_id"`
 	TanggalBerangkat         string                 `json:"tanggal_berangkat"`
@@ -76,6 +84,18 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	if cmd.Nip != "" {
 		sppd.Nip = cmd.Nip
 	}
+	if cmd.NamaPemohon != "" {
+		sppd.NamaPemohon = cmd.NamaPemohon
+	}
+	if cmd.Unit != "" {
+		sppd.Unit = cmd.Unit
+	}
+	if cmd.Fakultas != "" {
+		sppd.Fakultas = cmd.Fakultas
+	}
+	if cmd.Prodi != "" {
+		sppd.Prodi = cmd.Prodi
+	}
 	if cmd.Tujuan != "" {
 		sppd.Tujuan = cmd.Tujuan
 	}
@@ -95,7 +115,7 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	if cmd.Keterangan != "" {
 		sppd.Keterangan = cmd.Keterangan
 	}
-	
+
 	if cmd.SaranaTransportasi != nil {
 		sppd.SaranaTransportasi = cmd.SaranaTransportasi
 	}
@@ -134,10 +154,19 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	// Map Anggota
 	var dbAnggota []domain.SppdAnggota
 	for _, a := range cmd.Anggota {
+		nama := a.Nama
+		unit := a.Unit
+		fakultas := a.Fakultas
+		prodi := a.Prodi
+
 		dbAnggota = append(dbAnggota, domain.SppdAnggota{
 			SppdID:    sppd.ID,
 			Nip:       a.Nip,
 			Nidn:      a.Nidn,
+			Nama:      nama,
+			Unit:      unit,
+			Fakultas:  fakultas,
+			Prodi:     prodi,
 			CreatedAt: &now,
 			UpdatedAt: &now,
 		})

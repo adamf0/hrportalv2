@@ -12,6 +12,10 @@ import (
 
 type UpdateIzinCommand struct {
 	ID               uint    `json:"id"`
+	NamaPemohon      string  `json:"nama_pemohon"`
+	Unit             string  `json:"unit"`
+	Fakultas         string  `json:"fakultas"`
+	Prodi            string  `json:"prodi"`
 	JenisIzinID      uint    `json:"id_jenis_izin"`
 	TanggalPengajuan string  `json:"tanggal_pengajuan"`
 	Tujuan           string  `json:"tujuan"`
@@ -44,6 +48,18 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	}
 
 	now := time.Now()
+	if cmd.NamaPemohon != "" {
+		izin.NamaPemohon = cmd.NamaPemohon
+	}
+	if cmd.Unit != "" {
+		izin.Unit = cmd.Unit
+	}
+	if cmd.Fakultas != "" {
+		izin.Fakultas = cmd.Fakultas
+	}
+	if cmd.Prodi != "" {
+		izin.Prodi = cmd.Prodi
+	}
 	if cmd.JenisIzinID > 0 {
 		izin.JenisIzinID = int(cmd.JenisIzinID)
 	}

@@ -12,6 +12,10 @@ import (
 
 type UpdateCutiCommand struct {
 	ID             uint    `json:"id"`
+	NamaPemohon    string  `json:"nama_pemohon"`
+	Unit           string  `json:"unit"`
+	Fakultas       string  `json:"fakultas"`
+	Prodi          string  `json:"prodi"`
 	JenisCutiID    uint    `json:"jenis_cuti_id"`
 	TanggalMulai   string  `json:"tanggal_mulai"`
 	TanggalSelesai string  `json:"tanggal_selesai"`
@@ -47,6 +51,18 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 	}
 
 	now := time.Now()
+	if cmd.NamaPemohon != "" {
+		cuti.NamaPemohon = cmd.NamaPemohon
+	}
+	if cmd.Unit != "" {
+		cuti.Unit = cmd.Unit
+	}
+	if cmd.Fakultas != "" {
+		cuti.Fakultas = cmd.Fakultas
+	}
+	if cmd.Prodi != "" {
+		cuti.Prodi = cmd.Prodi
+	}
 	if cmd.JenisCutiID > 0 {
 		cuti.JenisCutiID = cmd.JenisCutiID
 	}

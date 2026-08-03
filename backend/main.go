@@ -21,8 +21,8 @@ import (
 	commoninfra "hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 
-	accountInfrastructure "hrportal_backend/modules/account/infrastructure"
-	accountPresentation "hrportal_backend/modules/account/presentation"
+	// accountInfrastructure "hrportal_backend/modules/account/infrastructure"
+	// accountPresentation "hrportal_backend/modules/account/presentation"
 
 	attendanceInfrastructure "hrportal_backend/modules/attendance/infrastructure"
 	attendancePresentation "hrportal_backend/modules/attendance/presentation"
@@ -30,8 +30,8 @@ import (
 	leaveInfrastructure "hrportal_backend/modules/leave/infrastructure"
 	leavePresentation "hrportal_backend/modules/leave/presentation"
 
-	masterdataInfrastructure "hrportal_backend/modules/masterdata/infrastructure"
-	masterdataPresentation "hrportal_backend/modules/masterdata/presentation"
+	// masterdataInfrastructure "hrportal_backend/modules/masterdata/infrastructure"
+	// masterdataPresentation "hrportal_backend/modules/masterdata/presentation"
 
 	reportInfrastructure "hrportal_backend/modules/report/infrastructure"
 	reportPresentation "hrportal_backend/modules/report/presentation"
@@ -70,27 +70,25 @@ var (
 	onceMain sync.Once
 )
 
-func NewMySQL() (*gorm.DB, error) {
-	var err error
-	onceMain.Do(func() {
-		dsn := os.Getenv("DB_HRPORTAL")
-		if dsn == "" {
-			dsn = "root:@tcp(127.0.0.1:3306)/unpak_hrportal?charset=utf8mb4&parseTime=True&loc=Local"
-		}
-		dbMain, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-		if err != nil {
-			log.Printf("gagal konek database hrportal: %v", err)
-			return
-		}
-		log.Println("berhasil koneksi database unpak_hrportal")
+func NewMySQLDB(envVar, defaultDSN string) (*gorm.DB, error) {
+	dsn := os.Getenv(envVar)
+	if dsn == "" {
+		dsn = defaultDSN
+	}
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Printf("gagal konek database %s: %v", envVar, err)
+		return nil, err
+	}
+	log.Printf("berhasil koneksi database %s", envVar)
 
-		sqlDB, _ := dbMain.DB()
-		sqlDB.SetMaxOpenConns(100)
-		sqlDB.SetMaxIdleConns(100)
-		sqlDB.SetConnMaxLifetime(10 * time.Minute)
-		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-	})
-	return dbMain, err
+	sqlDB, _ := db.DB()
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetMaxIdleConns(100)
+	sqlDB.SetConnMaxLifetime(10 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+
+	return db, nil
 }
 
 func main() {
@@ -153,38 +151,61 @@ func main() {
 	mediatr.RegisterRequestPipelineBehaviors(NewValidationBehavior())
 
 	var (
-		db       *gorm.DB
-		dbSimak  *gorm.DB
-		dbSimpeg *gorm.DB
+		db *gorm.DB
+		// dbSimak  *gorm.DB
+		// dbSimpeg *gorm.DB
 	)
 	mustStart("Database", func() error {
+		dsn := os.Getenv("DB_HRPORTAL")
+		if dsn == "" {
+			return errors.New("DB_HRPORTAL environment variable is required")
+		}
 		var err error
-		db, err = NewMySQL()
+		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 		if err == nil && db != nil {
 			commonhelper.GlobalFcmManager.SetDB(db)
+			sqlDB, _ := db.DB()
+			sqlDB.SetMaxOpenConns(100)
+			sqlDB.SetMaxIdleConns(100)
+			sqlDB.SetConnMaxLifetime(10 * time.Minute)
+			sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 		}
 		return err
 	})
 
-	mustStart("Database SIMAK", func() error {
-		dsn := os.Getenv("DB_SIMAK")
-		if dsn == "" {
-			dsn = "root:@tcp(127.0.0.1:3306)/unpak_simak?charset=utf8mb4&parseTime=True&loc=Local"
-		}
-		var err error
-		dbSimak, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-		return err
-	})
+	// mustStart("Database SIMAK", func() error {
+	// 	dsn := os.Getenv("DB_SIMAK")
+	// 	if dsn == "" {
+	// 		return errors.New("DB_SIMAK environment variable is required")
+	// 	}
+	// 	var err error
+	// 	dbSimak, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	// 	if err == nil && dbSimak != nil {
+	// 		sqlDB, _ := dbSimak.DB()
+	// 		sqlDB.SetMaxOpenConns(100)
+	// 		sqlDB.SetMaxIdleConns(100)
+	// 		sqlDB.SetConnMaxLifetime(10 * time.Minute)
+	// 		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	// 	}
+	// 	return err
+	// })
 
-	mustStart("Database SIMPEG", func() error {
-		dsn := os.Getenv("DB_SIMPEG")
-		if dsn == "" {
-			dsn = "root:@tcp(127.0.0.1:3306)/unpak_simpeg?charset=utf8mb4&parseTime=True&loc=Local"
-		}
-		var err error
-		dbSimpeg, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-		return err
-	})
+	// mustStart("Database SIMPEG", func() error {
+	// 	dsn := os.Getenv("DB_SIMPEG")
+	// 	if dsn == "" {
+	// 		return errors.New("DB_SIMPEG environment variable is required")
+	// 	}
+	// 	var err error
+	// 	dbSimpeg, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	// 	if err == nil && dbSimpeg != nil {
+	// 		sqlDB, _ := dbSimpeg.DB()
+	// 		sqlDB.SetMaxOpenConns(100)
+	// 		sqlDB.SetMaxIdleConns(100)
+	// 		sqlDB.SetConnMaxLifetime(10 * time.Minute)
+	// 		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	// 	}
+	// 	return err
+	// })
 
 	mustStart("Report Module", func() error {
 		if db == nil {
@@ -193,18 +214,18 @@ func main() {
 		return reportInfrastructure.RegisterModuleReport(db)
 	})
 
-	mustStart("Account Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
-		if dbSimak == nil {
-			dbSimak = db
-		}
-		if dbSimpeg == nil {
-			dbSimpeg = db
-		}
-		return accountInfrastructure.RegisterModuleAccount(db, dbSimak, dbSimpeg)
-	})
+	// mustStart("Account Module", func() error {
+	// 	if db == nil {
+	// 		return errors.New("db nil")
+	// 	}
+	// 	if dbSimak == nil {
+	// 		dbSimak = db
+	// 	}
+	// 	if dbSimpeg == nil {
+	// 		dbSimpeg = db
+	// 	}
+	// 	return accountInfrastructure.RegisterModuleAccount(db, dbSimak, dbSimpeg)
+	// })
 
 	mustStart("Attendance Module", func() error {
 		if db == nil {
@@ -220,12 +241,12 @@ func main() {
 		return leaveInfrastructure.RegisterModuleLeave(db)
 	})
 
-	mustStart("MasterData Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
-		return masterdataInfrastructure.RegisterModuleMasterData(db)
-	})
+	// mustStart("MasterData Module", func() error {
+	// 	if db == nil {
+	// 		return errors.New("db nil")
+	// 	}
+	// 	return masterdataInfrastructure.RegisterModuleMasterData(db)
+	// })
 
 	mustStart("Sppd Module", func() error {
 		if db == nil {
@@ -266,10 +287,10 @@ func main() {
 		log.Printf("Startup warnings/errors encountered: %v", startupErrors)
 	}
 
-	accountPresentation.ModuleAccount(app)
+	// accountPresentation.ModuleAccount(app)
 	attendancePresentation.ModuleAttendance(app)
 	leavePresentation.ModuleLeave(app)
-	masterdataPresentation.ModuleMasterData(app)
+	// masterdataPresentation.ModuleMasterData(app)
 	sppdPresentation.ModuleSppd(app)
 	izinPresentation.ModuleIzin(app)
 	ceremonyAttendancePresentation.ModuleCeremonyAttendance(app)

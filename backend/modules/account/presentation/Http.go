@@ -101,5 +101,4 @@ func WhoAmIHandler(c *fiber.Ctx) error {
 func ModuleAccount(app *fiber.App) {
 	app.Post("/api/account/login", LoginHandlerfunc)
 	app.Get("/api/account/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
-	app.Get("/api/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
 }

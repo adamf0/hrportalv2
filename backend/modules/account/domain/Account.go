@@ -30,6 +30,9 @@ type Pegawai struct {
 	Nama      string  `gorm:"column:nama" json:"nama"`
 	Email     *string `gorm:"column:email" json:"email"`
 	UnitKerja *string `gorm:"column:unit_kerja" json:"unit_kerja"`
+	Unit      *string `gorm:"column:unit" json:"unit"`
+	Fakultas  *string `gorm:"column:fakultas" json:"fakultas"`
+	Prodi     *string `gorm:"column:prodi" json:"prodi"`
 	Jabatan   *string `gorm:"column:jabatan" json:"jabatan"`
 }
 
