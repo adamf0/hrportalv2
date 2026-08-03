@@ -56,7 +56,7 @@ func processAutoVerifyRequests(db *gorm.DB) {
 		UpdatedAt time.Time
 	}
 
-	errLeave := db.Table("leave").
+	errLeave := db.Table("cuti").
 		Select("id, nip, nip_atasan, status, created_at, updated_at").
 		Where("status = ? AND (updated_at <= ? OR created_at <= ?)", "terima atasan", thresholdTime, thresholdTime).
 		Find(&pendingLeaves).Error
@@ -75,10 +75,10 @@ func processAutoVerifyRequests(db *gorm.DB) {
 			title := "Verifikasi Otomatis SDM (1x24 Jam)"
 			body := "Pengajuan Cuti NIP " + leave.Nip + " telah diverifikasi dan disetujui otomatis oleh Sistem SDM setelah 1x24 jam."
 			payload := map[string]string{
-				"type":        "cuti",
-				"id":          strconvUint(leave.ID),
-				"status":      "terima sdm",
-				"autoverify":  "true",
+				"type":       "cuti",
+				"id":         strconvUint(leave.ID),
+				"status":     "terima sdm",
+				"autoverify": "true",
 			}
 			GlobalFcmManager.DispatchNotification(targets, title, body, "cuti", payload)
 		}

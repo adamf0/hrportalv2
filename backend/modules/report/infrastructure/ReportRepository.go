@@ -214,108 +214,166 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	}
 
 	var (
-		wg       sync.WaitGroup
-		pegawais []accountDomain.Pegawai
-		absens   []attendanceDomain.Absen
-		izins    []permissionDomain.Izin
-		cutis    []leaveDomain.Cuti
-		sppds    []sppdDomain.Sppd
-		upacaras []attendanceDomain.AbsenUpacara
+		wg           sync.WaitGroup
+		pegawais     []accountDomain.Pegawai
+		absens       []attendanceDomain.Absen
+		izins        []permissionDomain.Izin
+		cutis        []leaveDomain.Cuti
+		sppds        []sppdDomain.Sppd
+		sppdAnggotas []sppdDomain.SppdAnggota
+		upacaras     []attendanceDomain.AbsenUpacara
 	)
 
-	wg.Add(5)
+	wg.Add(6)
 
-	// Query 1: Pegawai
-	go func() {
-		defer wg.Done()
-		q := r.db.WithContext(ctx).Table("connect_payroll_m_pegawai cpmp").
-			Select("cpmp.id_pegawai as id, cpmp.nip as nip, coalesce(cep.nidn, '') as nidn, cpmp.nama as nama, null as email, null as unit_kerja, coalesce(cpmp.fungsional, '') as jabatan").
-			Joins("left join connect_e_pribadi cep on cpmp.nip = cep.nip")
-		if nip != "" {
-			q = q.Where("cpmp.nip = ?", nip)
-		}
-		if nidn != "" {
-			q = q.Where("cep.nidn = ?", nidn)
-		}
-		q.Find(&pegawais)
-	}()
-
-	// Query 2: Absen Masuk
+	// Query 1: Absen Masuk
 	go func() {
 		defer wg.Done()
 		q := r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}).
 			Where("tanggal >= ? AND tanggal <= ? AND absen_masuk IS NOT NULL", tanggalMulai, tanggalAkhir)
 		if nip != "" {
-			q = q.Where("nip = ? OR nidn = ?", nip, nidn)
+			q = q.Where("nip = ?", nip)
 		}
 		if nidn != "" {
-			q = q.Where("nidn = ? OR nip = ?", nidn, nidn)
+			q = q.Where("nidn = ?", nidn)
 		}
 		q.Find(&absens)
 	}()
 
-	// Query 3: Izin
+	// Query 2: Izin
 	go func() {
 		defer wg.Done()
 		q := r.db.WithContext(ctx).Model(&permissionDomain.Izin{}).
 			Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalMulai, tanggalAkhir)
 		if nip != "" {
-			q = q.Where("nip = ? OR nidn = ?", nip, nidn)
+			q = q.Where("nip = ?", nip)
 		}
 		if nidn != "" {
-			q = q.Where("nidn = ? OR nip = ?", nidn, nidn)
+			q = q.Where("nidn = ?", nidn)
 		}
 		q.Find(&izins)
 	}()
 
-	// Query 4: Cuti
+	// Query 3: Cuti
 	go func() {
 		defer wg.Done()
 		q := r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}).
 			Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
 		if nip != "" {
-			q = q.Where("nip = ? OR nidn = ?", nip, nidn)
+			q = q.Where("nip = ?", nip)
 		}
 		if nidn != "" {
-			q = q.Where("nidn = ? OR nip = ?", nidn, nidn)
+			q = q.Where("nidn = ?", nidn)
 		}
 		q.Find(&cutis)
 	}()
 
-	// Query 5: SPPD & Upacara
+	// Query 4: SPPD
 	go func() {
 		defer wg.Done()
 		q := r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}).
 			Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
 		if nip != "" {
-			q = q.Where("nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
+			q = q.Where("nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
 		}
 		if nidn != "" {
-			q = q.Where("nidn = ? OR nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ? OR nip = ?)", nidn, nidn, nidn, nidn)
+			q = q.Where("nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
 		}
 		q.Find(&sppds)
+	}()
 
+	// Query 5: SPPD Anggota
+	go func() {
+		defer wg.Done()
+		qSa := r.db.WithContext(ctx).Model(&sppdDomain.SppdAnggota{}).
+			Joins("JOIN sppd ON sppd.id = sppd_anggota.id_sppd").
+			Where("sppd.tanggal_berangkat <= ? AND sppd.tanggal_kembali >= ? AND (sppd.status IS NULL OR sppd.status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
+		if nip != "" {
+			qSa = qSa.Where("sppd_anggota.nip = ?", nip)
+		}
+		if nidn != "" {
+			qSa = qSa.Where("sppd_anggota.nidn = ?", nidn)
+		}
+		qSa.Find(&sppdAnggotas)
+	}()
+
+	// Query 6: Absen Upacara
+	go func() {
+		defer wg.Done()
 		qu := r.db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{}).
 			Where("tanggal >= ? AND tanggal <= ?", tanggalMulai, tanggalAkhir)
 		if nip != "" {
-			qu = qu.Where("nip = ? OR nidn = ?", nip, nidn)
+			qu = qu.Where("nip = ?", nip)
 		}
 		if nidn != "" {
-			qu = qu.Where("nidn = ? OR nip = ?", nidn, nidn)
+			qu = qu.Where("nidn = ?", nidn)
 		}
 		qu.Find(&upacaras)
 	}()
 
 	wg.Wait()
 
-	var sppdIds []uint
-	for _, sp := range sppds {
-		sppdIds = append(sppdIds, sp.ID)
+	// Extract unique Pegawai list in-memory directly from fetched activity slices
+	empMap := make(map[string]accountDomain.Pegawai)
+	addPegawai := func(nipVal, nidnVal, namaVal, fakVal, prodiVal, unitVal string) {
+		nipClean := strings.TrimSpace(nipVal)
+		nidnClean := strings.TrimSpace(nidnVal)
+		if nipClean == "" && nidnClean == "" {
+			return
+		}
+		key := nipClean
+		if key == "" {
+			key = nidnClean
+		}
+		if _, exists := empMap[key]; !exists {
+			uStr := unitVal
+			fStr := fakVal
+			pStr := prodiVal
+			empMap[key] = accountDomain.Pegawai{
+				Nip:       nipClean,
+				Nidn:      nidnClean,
+				Nama:      namaVal,
+				UnitKerja: &uStr,
+				Unit:      &uStr,
+				Fakultas:  &fStr,
+				Prodi:     &pStr,
+			}
+		}
 	}
 
-	var sppdAnggotas []sppdDomain.SppdAnggota
-	if len(sppdIds) > 0 {
-		r.db.WithContext(ctx).Model(&sppdDomain.SppdAnggota{}).Where("id_sppd IN ?", sppdIds).Find(&sppdAnggotas)
+	for _, a := range absens {
+		addPegawai(a.Nip, a.Nidn, a.NamaPegawai, a.Fakultas, a.Prodi, a.Unit)
+	}
+	for _, iz := range izins {
+		addPegawai(iz.Nip, iz.Nidn, iz.NamaPemohon, iz.Fakultas, iz.Prodi, iz.Unit)
+	}
+	for _, c := range cutis {
+		addPegawai(c.Nip, c.Nidn, c.NamaPemohon, c.Fakultas, c.Prodi, c.Unit)
+	}
+	for _, sp := range sppds {
+		addPegawai(sp.Nip, sp.Nidn, sp.NamaPemohon, sp.Fakultas, sp.Prodi, sp.Unit)
+	}
+	for _, sa := range sppdAnggotas {
+		addPegawai(sa.Nip, sa.Nidn, sa.Nama, sa.Fakultas, sa.Prodi, sa.Unit)
+	}
+	for _, u := range upacaras {
+		addPegawai(u.Nip, u.Nidn, u.Nama, u.Fakultas, u.Prodi, u.Unit)
+	}
+
+	if len(empMap) == 0 && (nip != "" || nidn != "") {
+		key := nip
+		if key == "" {
+			key = nidn
+		}
+		empMap[key] = accountDomain.Pegawai{
+			Nip:  nip,
+			Nidn: nidn,
+			Nama: nip,
+		}
+	}
+
+	for _, p := range empMap {
+		pegawais = append(pegawais, p)
 	}
 
 	// Map to look up members by SppdID quickly
