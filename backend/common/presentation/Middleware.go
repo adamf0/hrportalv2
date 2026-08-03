@@ -459,7 +459,7 @@ func RBACMiddleware() fiber.Handler {
 			if host == "" {
 				host = "localhost:3000"
 			}
-			whoamiURL = c.Protocol() + "://" + host + "/api/account/whoami"
+			whoamiURL = c.Protocol() + "://" + host + "/api/v2/account/whoami"
 		}
 
 		token, err := extractBearerToken(c)
@@ -520,6 +520,8 @@ func fetchWhoAmI(token, whoamiURL string, c *fiber.Ctx) (*Account, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
