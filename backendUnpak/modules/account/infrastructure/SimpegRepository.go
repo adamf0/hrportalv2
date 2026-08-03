@@ -22,13 +22,31 @@ func NewSimpegRepository(dbSimpeg *gorm.DB) *SimpegRepository {
 }
 
 func (r *SimpegRepository) Authenticate(ctx context.Context, username, password string) (*domain.AuthResult, error) {
-	if r.dbSimpeg == nil {
+	if r == nil || r.dbSimpeg == nil {
 		return nil, errors.New("database SIMPEG connection not available")
 	}
 
 	rawUsername := strings.TrimSpace(username)
+	rawPassword := strings.TrimSpace(password)
 
-	// Query e_pribadi (Dosen)
+	// 1. Cek login di tabel pengguna: username, password, level harus dosen/pegawai, status = AKTIF
+	var pengguna struct {
+		ID       int    `gorm:"column:id"`
+		Username string `gorm:"column:username"`
+		Level    string `gorm:"column:level"`
+		Status   string `gorm:"column:status"`
+	}
+
+	errUser := r.dbSimpeg.WithContext(ctx).Table("pengguna").Debug().
+		Where("username = ? AND password = SHA1(?) AND LOWER(level) IN ('dosen', 'pegawai') AND LOWER(status) = 'aktif'",
+			rawUsername, rawPassword).
+		First(&pengguna).Error
+
+	if errUser != nil || pengguna.ID == 0 {
+		return nil, errors.New("invalid credentials, level, or status in SIMPEG")
+	}
+
+	// 2. Jika valid, baru cari data e_pribadi (Dosen) dan n_pribadi (Pegawai/Tendik) menggunakan username
 	var ePribadi struct {
 		Nip         *string `gorm:"column:nip"`
 		Nidn        *string `gorm:"column:nidn"`
@@ -37,7 +55,6 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 	}
 	_ = r.dbSimpeg.WithContext(ctx).Table("e_pribadi").Where("nidn = ? OR nip = ?", rawUsername, rawUsername).First(&ePribadi)
 
-	// Query n_pribadi (Pegawai/Tendik)
 	var nPribadi struct {
 		Nip         *string `gorm:"column:nip"`
 		Nama        *string `gorm:"column:nama"`
@@ -45,13 +62,6 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 		NamaPegawai *string `gorm:"column:nama_pegawai"`
 	}
 	_ = r.dbSimpeg.WithContext(ctx).Table("n_pribadi").Where("nip = ?", rawUsername).First(&nPribadi)
-
-	// Query pengguna table
-	var pengguna struct {
-		Nama *string `gorm:"column:nama"`
-		Name *string `gorm:"column:name"`
-	}
-	_ = r.dbSimpeg.WithContext(ctx).Table("pengguna").Select("nama, name").Where("username = ?", rawUsername).Scan(&pengguna)
 
 	realNip := rawUsername
 	if helper.StringValue(ePribadi.Nip) != "" {
@@ -77,10 +87,6 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 		realName = helper.StringValue(nPribadi.NamaLengkap)
 	} else if helper.StringValue(nPribadi.NamaPegawai) != "" && helper.StringValue(nPribadi.NamaPegawai) != rawUsername && helper.StringValue(nPribadi.NamaPegawai) != cleanNip {
 		realName = helper.StringValue(nPribadi.NamaPegawai)
-	} else if helper.StringValue(pengguna.Nama) != "" && helper.StringValue(pengguna.Nama) != rawUsername && helper.StringValue(pengguna.Nama) != cleanNip {
-		realName = helper.StringValue(pengguna.Nama)
-	} else if helper.StringValue(pengguna.Name) != "" && helper.StringValue(pengguna.Name) != rawUsername && helper.StringValue(pengguna.Name) != cleanNip {
-		realName = helper.StringValue(pengguna.Name)
 	}
 
 	if realName == "" {
@@ -97,6 +103,9 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 }
 
 func (r *SimpegRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
+	if r.dbSimpeg == nil {
+		return nil, errors.New("database SIMPEG connection not available")
+	}
 	cleanSid := strings.TrimSpace(sid)
 
 	// Query e_pribadi (Dosen)
@@ -120,12 +129,12 @@ func (r *SimpegRepository) GetInfo(ctx context.Context, sid string) (*domain.Use
 	}
 	_ = r.dbSimpeg.WithContext(ctx).Table("n_pribadi").Where("nip = ?", cleanSid).First(&nPribadi)
 
-	// Query pengguna table as additional fallback
+	// Query pengguna table (level, status)
 	var pengguna struct {
-		Nama *string `gorm:"column:nama"`
-		Name *string `gorm:"column:name"`
+		Level  *string `gorm:"column:level"`
+		Status *string `gorm:"column:status"`
 	}
-	_ = r.dbSimpeg.WithContext(ctx).Table("pengguna").Select("nama, name").Where("username = ?", cleanSid).Scan(&pengguna)
+	_ = r.dbSimpeg.WithContext(ctx).Table("pengguna").Select("level, status").Where("username = ?", cleanSid).Scan(&pengguna)
 
 	realNip := cleanSid
 	if helper.StringValue(ePribadi.Nip) != "" {
@@ -145,10 +154,6 @@ func (r *SimpegRepository) GetInfo(ctx context.Context, sid string) (*domain.Use
 		realName = helper.StringValue(ePribadi.Nama)
 	} else if helper.StringValue(nPribadi.Nama) != "" && helper.StringValue(nPribadi.Nama) != cleanSid && helper.StringValue(nPribadi.Nama) != cleanNip {
 		realName = helper.StringValue(nPribadi.Nama)
-	} else if helper.StringValue(pengguna.Nama) != "" && helper.StringValue(pengguna.Nama) != cleanSid && helper.StringValue(pengguna.Nama) != cleanNip {
-		realName = helper.StringValue(pengguna.Nama)
-	} else if helper.StringValue(pengguna.Name) != "" && helper.StringValue(pengguna.Name) != cleanSid && helper.StringValue(pengguna.Name) != cleanNip {
-		realName = helper.StringValue(pengguna.Name)
 	}
 
 	if realName == "" {

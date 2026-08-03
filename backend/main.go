@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/joho/godotenv"
 	"github.com/mehdihadeli/go-mediatr"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -91,7 +92,44 @@ func NewMySQLDB(envVar, defaultDSN string) (*gorm.DB, error) {
 	return db, nil
 }
 
+func tryConnectDB(envVar string, dbName string) (*gorm.DB, error) {
+	candidates := []string{}
+	if envDSN := os.Getenv(envVar); envDSN != "" {
+		candidates = append(candidates, envDSN)
+	}
+	candidates = append(candidates,
+		fmt.Sprintf("root:@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+		fmt.Sprintf("root:password@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+		fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+	)
+
+	var lastErr error
+	for _, dsn := range candidates {
+		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		if err == nil && db != nil {
+			sqlDB, errSql := db.DB()
+			if errSql == nil {
+				sqlDB.SetMaxOpenConns(100)
+				sqlDB.SetMaxIdleConns(100)
+				sqlDB.SetConnMaxLifetime(10 * time.Minute)
+				sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+				if errPing := sqlDB.Ping(); errPing == nil {
+					log.Printf("Successfully connected %s using DSN: %s", envVar, dsn)
+					return db, nil
+				} else {
+					lastErr = errPing
+				}
+			}
+		} else if err != nil {
+			lastErr = err
+		}
+	}
+	return nil, lastErr
+}
+
 func main() {
+	_ = godotenv.Load()
+
 	cfg := commonpresentation.DefaultHeaderSecurityConfig()
 	cfg.ResolveAndCheck = false
 
@@ -152,23 +190,12 @@ func main() {
 
 	var (
 		db *gorm.DB
-		// dbSimak  *gorm.DB
-		// dbSimpeg *gorm.DB
 	)
 	mustStart("Database", func() error {
-		dsn := os.Getenv("DB_HRPORTAL")
-		if dsn == "" {
-			return errors.New("DB_HRPORTAL environment variable is required")
-		}
 		var err error
-		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		db, err = tryConnectDB("DB_HRPORTAL", "unpak_hrportal")
 		if err == nil && db != nil {
 			commonhelper.GlobalFcmManager.SetDB(db)
-			sqlDB, _ := db.DB()
-			sqlDB.SetMaxOpenConns(100)
-			sqlDB.SetMaxIdleConns(100)
-			sqlDB.SetConnMaxLifetime(10 * time.Minute)
-			sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 		}
 		return err
 	})
@@ -208,78 +235,34 @@ func main() {
 	// })
 
 	mustStart("Report Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return reportInfrastructure.RegisterModuleReport(db)
 	})
 
-	// mustStart("Account Module", func() error {
-	// 	if db == nil {
-	// 		return errors.New("db nil")
-	// 	}
-	// 	if dbSimak == nil {
-	// 		dbSimak = db
-	// 	}
-	// 	if dbSimpeg == nil {
-	// 		dbSimpeg = db
-	// 	}
-	// 	return accountInfrastructure.RegisterModuleAccount(db, dbSimak, dbSimpeg)
-	// })
-
 	mustStart("Attendance Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return attendanceInfrastructure.RegisterModuleAttendance(db)
 	})
 
 	mustStart("Leave Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return leaveInfrastructure.RegisterModuleLeave(db)
 	})
 
-	// mustStart("MasterData Module", func() error {
-	// 	if db == nil {
-	// 		return errors.New("db nil")
-	// 	}
-	// 	return masterdataInfrastructure.RegisterModuleMasterData(db)
-	// })
-
 	mustStart("Sppd Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return sppdInfrastructure.RegisterModuleSppd(db)
 	})
 
 	mustStart("Izin Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return izinInfrastructure.RegisterModuleIzin(db)
 	})
 
 	mustStart("CeremonyAttendance Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return ceremonyAttendanceInfrastructure.RegisterModuleCeremonyAttendance(db)
 	})
 
 	mustStart("Calendar Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return calendarInfrastructure.RegisterModuleCalendar(db)
 	})
 
 	mustStart("Holiday Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return holidayInfrastructure.RegisterModuleHoliday(db)
 	})
 

@@ -10,22 +10,44 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterModuleAccount(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB) error {
-	repoLocal := NewLocalRepository(db)
-	repoSimak := NewSimakRepository(dbSimak, dbSimpeg)
-	repoSimpeg := NewSimpegRepository(dbSimpeg)
+var (
+	GlobalRepoLocal  domain.ILocalRepository
+	GlobalRepoSimak  domain.ISimakRepository
+	GlobalRepoSimpeg domain.ISimpegRepository
+)
 
-	mediatr.RegisterRequestHandler[
+func init() {
+	GlobalRepoLocal = NewLocalRepository(nil)
+	GlobalRepoSimak = NewSimakRepository(nil, nil)
+	GlobalRepoSimpeg = NewSimpegRepository(nil)
+
+	_ = mediatr.RegisterRequestHandler[
 		*who.WhoamiQuery,
 		commondomain.ResultValue[*domain.UserInfo],
-	](who.NewWhoamiQueryHandler(repoLocal, repoSimak, repoSimpeg))
+	](who.NewWhoamiQueryHandler(GlobalRepoLocal, GlobalRepoSimak, GlobalRepoSimpeg))
 
-	mediatr.RegisterRequestHandler[
+	_ = mediatr.RegisterRequestHandler[
 		*login.LoginCommand,
 		commondomain.ResultValue[login.LoginResult],
-	](login.NewLoginCommandHandler(repoLocal, repoSimak, repoSimpeg))
+	](login.NewLoginCommandHandler(GlobalRepoLocal, GlobalRepoSimak, GlobalRepoSimpeg))
+}
 
-	// commoninfra.RegisterValidation(login.LoginCommandValidation, "Account.Login.Validation")
+func RegisterModuleAccount(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB) error {
+	GlobalRepoLocal = NewLocalRepository(db)
+	GlobalRepoSimak = NewSimakRepository(dbSimak, dbSimpeg)
+	GlobalRepoSimpeg = NewSimpegRepository(dbSimpeg)
+
+	mediatr.ClearRequestRegistrations()
+
+	_ = mediatr.RegisterRequestHandler[
+		*who.WhoamiQuery,
+		commondomain.ResultValue[*domain.UserInfo],
+	](who.NewWhoamiQueryHandler(GlobalRepoLocal, GlobalRepoSimak, GlobalRepoSimpeg))
+
+	_ = mediatr.RegisterRequestHandler[
+		*login.LoginCommand,
+		commondomain.ResultValue[login.LoginResult],
+	](login.NewLoginCommandHandler(GlobalRepoLocal, GlobalRepoSimak, GlobalRepoSimpeg))
 
 	return nil
 }

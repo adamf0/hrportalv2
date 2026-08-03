@@ -2,6 +2,8 @@ package presentation
 
 import (
 	"context"
+	"log"
+	"runtime/debug"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,6 +15,7 @@ import (
 	login "hrportal_backend_unpak/modules/account/application/Login"
 	who "hrportal_backend_unpak/modules/account/application/Whoami"
 	domainaccount "hrportal_backend_unpak/modules/account/domain"
+	accountInfrastructure "hrportal_backend_unpak/modules/account/infrastructure"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -45,17 +48,39 @@ func generateJWT(sid string, source string, duration time.Duration) (string, err
 }
 
 func LoginHandlerfunc(c *fiber.Ctx) error {
-	username := c.FormValue("username")
-	password := c.FormValue("password")
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[LOGIN PANIC RECOVERED] %v\n%s", r, debug.Stack())
+		}
+	}()
 
-	cmd := login.LoginCommand{
-		Username: username,
-		Password: password,
+	var cmd login.LoginCommand
+	_ = c.BodyParser(&cmd)
+
+	if cmd.Username == "" {
+		cmd.Username = c.FormValue("username")
+	}
+	if cmd.Password == "" {
+		cmd.Password = c.FormValue("password")
 	}
 
-	result, err := mediatr.Send[*login.LoginCommand, commondomain.ResultValue[login.LoginResult]](context.Background(), &cmd)
+	ctx := c.UserContext()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	result, err := mediatr.Send[*login.LoginCommand, commondomain.ResultValue[login.LoginResult]](ctx, &cmd)
 	if err != nil {
-		return commoninfra.HandleError(c, err)
+		handler := login.NewLoginCommandHandler(
+			accountInfrastructure.GlobalRepoLocal,
+			accountInfrastructure.GlobalRepoSimak,
+			accountInfrastructure.GlobalRepoSimpeg,
+		)
+		var errDirect error
+		result, errDirect = handler.Handle(ctx, &cmd)
+		if errDirect != nil {
+			return commoninfra.HandleError(c, errDirect)
+		}
 	}
 
 	if !result.IsSuccess {
@@ -90,9 +115,23 @@ func WhoAmIHandler(c *fiber.Ctx) error {
 		Source: source,
 	}
 
-	result, err := mediatr.Send[*who.WhoamiQuery, commondomain.ResultValue[*domainaccount.UserInfo]](context.Background(), &query)
+	ctx := c.UserContext()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	result, err := mediatr.Send[*who.WhoamiQuery, commondomain.ResultValue[*domainaccount.UserInfo]](ctx, &query)
 	if err != nil {
-		return commoninfra.HandleError(c, err)
+		handler := who.NewWhoamiQueryHandler(
+			accountInfrastructure.GlobalRepoLocal,
+			accountInfrastructure.GlobalRepoSimak,
+			accountInfrastructure.GlobalRepoSimpeg,
+		)
+		var errDirect error
+		result, errDirect = handler.Handle(ctx, &query)
+		if errDirect != nil {
+			return commoninfra.HandleError(c, errDirect)
+		}
 	}
 
 	return c.JSON(result.Value)

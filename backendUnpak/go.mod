@@ -6,6 +6,7 @@ require (
 	github.com/bytedance/sonic v1.15.2
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/gofiber/fiber/v2 v2.52.4
+	github.com/joho/godotenv v1.5.1
 	github.com/mehdihadeli/go-mediatr v1.3.0
 	gorm.io/driver/mysql v1.5.6
 	gorm.io/gorm v1.25.10

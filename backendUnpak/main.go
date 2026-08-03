@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -12,11 +12,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/joho/godotenv"
 	"github.com/mehdihadeli/go-mediatr"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
-	commonhelper "hrportal_backend_unpak/common/helper"
 	commoninfra "hrportal_backend_unpak/common/infrastructure"
 	commonpresentation "hrportal_backend_unpak/common/presentation"
 
@@ -38,7 +38,45 @@ func mustStart(name string, fn func() error) {
 	}
 }
 
+func tryConnectDB(envVar string, dbName string) (*gorm.DB, error) {
+	candidates := []string{}
+	if envDSN := os.Getenv(envVar); envDSN != "" {
+		candidates = append(candidates, envDSN)
+	}
+	// Candidate fallbacks: empty password, 'password', 'root'
+	candidates = append(candidates,
+		fmt.Sprintf("root:@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+		fmt.Sprintf("root:password@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+		fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+	)
+
+	var lastErr error
+	for _, dsn := range candidates {
+		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		if err == nil && db != nil {
+			sqlDB, errSql := db.DB()
+			if errSql == nil {
+				sqlDB.SetMaxOpenConns(100)
+				sqlDB.SetMaxIdleConns(100)
+				sqlDB.SetConnMaxLifetime(10 * time.Minute)
+				sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+				if errPing := sqlDB.Ping(); errPing == nil {
+					log.Printf("Successfully connected %s using DSN: %s", envVar, dsn)
+					return db, nil
+				} else {
+					lastErr = errPing
+				}
+			}
+		} else if err != nil {
+			lastErr = err
+		}
+	}
+	return nil, lastErr
+}
+
 func main() {
+	_ = godotenv.Load()
+
 	cfg := commonpresentation.DefaultHeaderSecurityConfig()
 	cfg.ResolveAndCheck = false
 
@@ -103,61 +141,27 @@ func main() {
 		dbSimpeg *gorm.DB
 	)
 	mustStart("Database", func() error {
-		dsn := os.Getenv("DB_HRPORTAL")
-		if dsn == "" {
-			return errors.New("DB_HRPORTAL environment variable is required")
-		}
 		var err error
-		db, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-		if err == nil && db != nil {
-			commonhelper.GlobalFcmManager.SetDB(db)
-			sqlDB, _ := db.DB()
-			sqlDB.SetMaxOpenConns(100)
-			sqlDB.SetMaxIdleConns(100)
-			sqlDB.SetConnMaxLifetime(10 * time.Minute)
-			sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-		}
+		db, err = tryConnectDB("DB_HRPORTAL", "unpak_hrportal")
+		// if err == nil && db != nil {
+		// 	commonhelper.GlobalFcmManager.SetDB(db)
+		// }
 		return err
 	})
 
 	mustStart("Database SIMAK", func() error {
-		dsn := os.Getenv("DB_SIMAK")
-		if dsn == "" {
-			return errors.New("DB_SIMAK environment variable is required")
-		}
 		var err error
-		dbSimak, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-		if err == nil && dbSimak != nil {
-			sqlDB, _ := dbSimak.DB()
-			sqlDB.SetMaxOpenConns(100)
-			sqlDB.SetMaxIdleConns(100)
-			sqlDB.SetConnMaxLifetime(10 * time.Minute)
-			sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-		}
+		dbSimak, err = tryConnectDB("DB_SIMAK", "unpak_simak")
 		return err
 	})
 
 	mustStart("Database SIMPEG", func() error {
-		dsn := os.Getenv("DB_SIMPEG")
-		if dsn == "" {
-			return errors.New("DB_SIMPEG environment variable is required")
-		}
 		var err error
-		dbSimpeg, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-		if err == nil && dbSimpeg != nil {
-			sqlDB, _ := dbSimpeg.DB()
-			sqlDB.SetMaxOpenConns(100)
-			sqlDB.SetMaxIdleConns(100)
-			sqlDB.SetConnMaxLifetime(10 * time.Minute)
-			sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-		}
+		dbSimpeg, err = tryConnectDB("DB_SIMPEG", "unpak_simpeg")
 		return err
 	})
 
 	mustStart("Account Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		if dbSimak == nil {
 			dbSimak = db
 		}
@@ -168,9 +172,6 @@ func main() {
 	})
 
 	mustStart("MasterData Module", func() error {
-		if db == nil {
-			return errors.New("db nil")
-		}
 		return masterdataInfrastructure.RegisterModuleMasterData(db)
 	})
 

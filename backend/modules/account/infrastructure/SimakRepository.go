@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
+	"strings"
 
 	"hrportal_backend/common/helper"
 	"hrportal_backend/modules/account/domain"
@@ -23,44 +24,50 @@ func NewSimakRepository(dbSimak *gorm.DB, dbSimpeg *gorm.DB) domain.ISimakReposi
 }
 
 func (r *SimakRepository) Authenticate(ctx context.Context, username, password string) (*domain.AuthResult, error) {
+	if r == nil || r.dbSimak == nil {
+		return nil, errors.New("database SIMAK connection not available")
+	}
+
+	rawUsername := strings.TrimSpace(username)
+	rawPassword := strings.TrimSpace(password)
+
 	var userSimak []struct {
-		Userid   string `gorm:"column:userid"`
-		Password string `gorm:"column:password"`
-		Aktif    string `gorm:"column:aktif"`
-	}
-	_ = r.dbSimak.WithContext(ctx).Table("user").Where("username = ?", username).Where("level = ?", "DOSEN").Find(&userSimak)
-
-	var matchedUsers []string
-	hashedPassSimak := r.hashSimak(password)
-	for _, us := range userSimak {
-		if us.Password == hashedPassSimak {
-			if us.Aktif != "Y" {
-				return nil, errors.New("akun sudah tidak aktif")
-			}
-			matchedUsers = append(matchedUsers, us.Userid)
-		}
+		Userid string `gorm:"column:userid"`
+		Aktif  string `gorm:"column:aktif"`
 	}
 
-	if len(matchedUsers) > 1 {
-		return nil, errors.New("akun " + username + " lebih dari 1")
+	_ = r.dbSimak.WithContext(ctx).Table("user").
+		Where("username = ? AND (password = SHA1(MD5(?)) OR password = SHA1(?) OR password = MD5(?) OR password = ?)",
+			rawUsername, rawPassword, rawPassword, rawPassword, rawPassword).
+		Where("level = ?", "DOSEN").
+		Where("aktif = ?", "Y").
+		Find(&userSimak)
+
+	if len(userSimak) > 1 {
+		return nil, errors.New("akun " + rawUsername + " lebih dari 1")
 	}
 
-	if len(matchedUsers) == 1 {
-		userid := matchedUsers[0]
+	if len(userSimak) == 1 {
+		userid := userSimak[0].Userid
 
 		var dosen struct {
 			NIDN *string `gorm:"column:NIDN"`
+			NIP  *string `gorm:"column:NIP"`
+			Nama *string `gorm:"column:nama"`
 		}
-		_ = r.dbSimak.WithContext(ctx).Table("m_dosen").Where("NIDN = ?", userid).First(&dosen)
+		_ = r.dbSimak.WithContext(ctx).Table("m_dosen").Where("NIDN = ? OR NIP = ?", userid, userid).First(&dosen)
 
 		sid := userid
-		if dosen.NIDN != nil && *dosen.NIDN != "" {
-			sid = *dosen.NIDN
+		if helper.StringValue(dosen.NIDN) != "" {
+			sid = helper.StringValue(dosen.NIDN)
 		}
 
 		return &domain.AuthResult{
 			Sid:    sid,
 			Source: "simak",
+			Name:   helper.StringValue(dosen.Nama),
+			Nip:    helper.StringValue(dosen.NIP),
+			Nidn:   helper.StringValue(dosen.NIDN),
 		}, nil
 	}
 

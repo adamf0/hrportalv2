@@ -5,14 +5,12 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/mehdihadeli/go-mediatr"
 
-	commondomain "hrportal_backend/common/domain"
 	commoninfra "hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 	login "hrportal_backend/modules/account/application/Login"
 	who "hrportal_backend/modules/account/application/Whoami"
-	domainaccount "hrportal_backend/modules/account/domain"
+	accountInfrastructure "hrportal_backend/modules/account/infrastructure"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -45,15 +43,27 @@ func generateJWT(sid string, source string, duration time.Duration) (string, err
 }
 
 func LoginHandlerfunc(c *fiber.Ctx) error {
-	username := c.FormValue("username")
-	password := c.FormValue("password")
+	var cmd login.LoginCommand
+	_ = c.BodyParser(&cmd)
 
-	cmd := login.LoginCommand{
-		Username: username,
-		Password: password,
+	if cmd.Username == "" {
+		cmd.Username = c.FormValue("username")
+	}
+	if cmd.Password == "" {
+		cmd.Password = c.FormValue("password")
 	}
 
-	result, err := mediatr.Send[*login.LoginCommand, commondomain.ResultValue[login.LoginResult]](context.Background(), &cmd)
+	ctx := c.UserContext()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	handler := login.NewLoginCommandHandler(
+		accountInfrastructure.GlobalRepoLocal,
+		accountInfrastructure.GlobalRepoSimak,
+		accountInfrastructure.GlobalRepoSimpeg,
+	)
+	result, err := handler.Handle(ctx, &cmd)
 	if err != nil {
 		return commoninfra.HandleError(c, err)
 	}
@@ -90,7 +100,17 @@ func WhoAmIHandler(c *fiber.Ctx) error {
 		Source: source,
 	}
 
-	result, err := mediatr.Send[*who.WhoamiQuery, commondomain.ResultValue[*domainaccount.UserInfo]](context.Background(), &query)
+	ctx := c.UserContext()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	handler := who.NewWhoamiQueryHandler(
+		accountInfrastructure.GlobalRepoLocal,
+		accountInfrastructure.GlobalRepoSimak,
+		accountInfrastructure.GlobalRepoSimpeg,
+	)
+	result, err := handler.Handle(ctx, &query)
 	if err != nil {
 		return commoninfra.HandleError(c, err)
 	}
