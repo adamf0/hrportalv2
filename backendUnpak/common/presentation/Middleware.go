@@ -58,7 +58,7 @@ func DefaultBlacklistedHeaderNames() map[string]bool {
 }
 
 func DefaultHeaderSecurityConfig() *HeaderSecurityConfig {
-	domains := []string{"hrportal.unpak.ac.id", "localhost", "localhost:3000", "thunderclient.com", "10.0.2.2:3000", "10.0.2.2", "127.0.0.1", "127.0.0.1:3000"}
+	domains := []string{"hrportal.unpak.ac.id", "localhost", "localhost:3000", "thunderclient.com", "10.0.2.2:3000", "10.0.2.2", "127.0.0.1", "127.0.0.1:3000", "217.216.75.192", "217.216.75.192:3000"}
 	if envDomains := os.Getenv("ALLOW_DOMAINS"); envDomains != "" {
 		parts := strings.Split(envDomains, ",")
 		var parsed []string
