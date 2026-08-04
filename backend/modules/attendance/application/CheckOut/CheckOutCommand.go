@@ -37,8 +37,10 @@ func (h *CheckOutCommandHandler) Handle(ctx context.Context, cmd *CheckOutComman
 	}
 
 	now := time.Now()
+	isFirstCheckOut := existing.AbsenKeluar == nil
 	existing.AbsenKeluar = &now
 	existing.UpdatedAt = &now
+	existing.IsCreated = isFirstCheckOut
 
 	if err := h.attendanceRepo.UpdateAbsen(ctx, existing); err != nil {
 		return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err

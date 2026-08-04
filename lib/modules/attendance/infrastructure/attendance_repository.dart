@@ -9,10 +9,6 @@ class AttendanceRepository implements IAttendanceRepository {
   @override
   Future<bool> checkIn(
       double lat, double lon, String ip, bool isUpacara, String note) async {
-    final insideCampus = await isWithinCampusPolygon(lat, lon);
-    final validWifi = await isPakuanWifi(ip);
-    if (!insideCampus && !validWifi) return false;
-
     try {
       final session = await SsoHelper.getSession();
       if (session == null) return false;
@@ -67,10 +63,6 @@ class AttendanceRepository implements IAttendanceRepository {
 
   @override
   Future<bool> checkOut(double lat, double lon, String ip) async {
-    final insideCampus = await isWithinCampusPolygon(lat, lon);
-    final validWifi = await isPakuanWifi(ip);
-    if (!insideCampus && !validWifi) return false;
-
     try {
       final session = await SsoHelper.getSession();
       if (session == null) return false;

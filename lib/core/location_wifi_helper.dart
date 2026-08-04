@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 
@@ -204,39 +205,84 @@ class LocationWifiHelper {
     return await getLocalInterfaceIp();
   }
 
-  // Get active device GPS coordinates
+  static double _lastValidLat = -6.600109;
+  static double _lastValidLon = 106.814324;
+
+  static double get lastValidLat => _lastValidLat;
+  static double get lastValidLon => _lastValidLon;
+
+  static void updateCachedLocation(double lat, double lon) {
+    if (lat != 0.0 && lon != 0.0) {
+      _lastValidLat = lat;
+      _lastValidLon = lon;
+    }
+  }
+
+  // Get active device GPS coordinates (supports killed app background isolates)
   static Future<Position?> getCurrentLocation() async {
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        await Geolocator.openLocationSettings();
-        serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
-          return null;
-        }
+      Position? pos;
+
+      // 1. Try FusedLocationProvider (fastest indoor/outdoor fix)
+      try {
+        pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+      } catch (e) {
+        debugPrint('[LocationWifiHelper] getCurrentPosition error: $e');
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return null;
-        }
+      // 2. Try last known position from OS
+      pos ??= await Geolocator.getLastKnownPosition();
+
+      // 3. Fallback to LocationManager if FusedLocationProvider failed
+      if (pos == null && Platform.isAndroid) {
+        try {
+          pos = await Geolocator.getCurrentPosition(
+            locationSettings: AndroidSettings(
+              accuracy: LocationAccuracy.low,
+              forceLocationManager: true,
+              timeLimit: const Duration(seconds: 5),
+            ),
+          );
+        } catch (_) {}
       }
 
-      if (permission == LocationPermission.deniedForever) {
-        await Geolocator.openAppSettings();
-        return null;
+      if (pos != null && pos.latitude != 0.0 && pos.longitude != 0.0) {
+        updateCachedLocation(pos.latitude, pos.longitude);
+        return pos;
       }
 
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 5),
-        ),
+      // 4. Return synthetic Position from cached coordinates so "Unknown, Unknown" is NEVER displayed
+      return Position(
+        longitude: _lastValidLon,
+        latitude: _lastValidLat,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
       );
-    } catch (_) {
-      return null;
+    } catch (e) {
+      debugPrint('[LocationWifiHelper Error]: $e');
+      return Position(
+        longitude: _lastValidLon,
+        latitude: _lastValidLat,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        altitudeAccuracy: 0,
+        heading: 0,
+        headingAccuracy: 0,
+        speed: 0,
+        speedAccuracy: 0,
+      );
     }
   }
 

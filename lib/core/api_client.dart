@@ -243,12 +243,9 @@ class ApiClient {
     final Map<String, String> finalHeaders =
         headers != null ? Map.from(headers) : {};
     try {
-      final session = await SsoHelper.getSession();
-      if (session != null && session['token'] != null) {
-        final token = session['token'] as String;
-        if (token.isNotEmpty && !finalHeaders.containsKey('Authorization')) {
-          finalHeaders['Authorization'] = 'Bearer $token';
-        }
+      final token = await SsoHelper.getValidToken();
+      if (token != null && token.isNotEmpty && !finalHeaders.containsKey('Authorization')) {
+        finalHeaders['Authorization'] = 'Bearer $token';
       }
     } catch (_) {}
     return finalHeaders;

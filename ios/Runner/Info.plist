@@ -4,6 +4,10 @@
 	<dict>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Aplikasi ini membutuhkan akses lokasi Anda untuk memverifikasi absensi masuk di area kampus Universitas Pakuan.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Aplikasi ini membutuhkan akses lokasi latar belakang untuk melakukan presensi otomatis saat berada di area kampus Universitas Pakuan.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>Aplikasi ini memerlukan izin lokasi terus-menerus untuk mendeteksi posisi kampus saat presensi otomatis.</string>
 		<key>NSCameraUsageDescription</key>
 		<string>Aplikasi ini memerlukan akses kamera depan untuk melakukan verifikasi liveness wajah.</string>
 		<key>NSMicrophoneUsageDescription</key>
@@ -53,7 +57,15 @@
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>fetch</string>
+			<string>processing</string>
+			<string>location</string>
 			<string>remote-notification</string>
+		</array>
+		<key>BGTaskSchedulerPermittedIdentifiers</key>
+		<array>
+			<string>auto_attendance_killed_task</string>
+			<string>autoAttendanceTask</string>
+			<string>dev.flutter.background.refresh</string>
 		</array>
 	</dict>
 </plist>

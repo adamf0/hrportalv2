@@ -48,7 +48,7 @@ class AttendanceBloc extends ChangeNotifier {
             _checkInTime =
                 "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
             _isCheckedIn = true;
-            AutoAttendanceService.instance.markAlreadyCheckedInInitial();
+            // AutoAttendanceService.instance.markAlreadyCheckedInInitial();
           }
         } else {
           _checkInTime = '--:--';
@@ -76,8 +76,8 @@ class AttendanceBloc extends ChangeNotifier {
             _checkInTime =
                 "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
             _isCheckedIn = true;
-            AutoAttendanceService.instance
-                .triggerSuccessNotificationIfInitialNull();
+            // AutoAttendanceService.instance
+            //     .triggerSuccessNotificationIfInitialNull();
             notifyListeners();
           }
         }

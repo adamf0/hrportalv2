@@ -71,6 +71,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 				OtomatisKeluar: false,
 				CreatedAt:      &now,
 				UpdatedAt:      &now,
+				IsCreated:      true,
 			}
 			if err := h.attendanceRepo.CreateAbsen(ctxTx, absen); err != nil {
 				tx.Rollback()
@@ -89,6 +90,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 		existing.AbsenMasuk = &now
 		existing.Note = cmd.Note
 		existing.UpdatedAt = &now
+		existing.IsCreated = false
 		if err := h.attendanceRepo.UpdateAbsen(ctxTx, existing); err != nil {
 			tx.Rollback()
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
@@ -114,6 +116,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 			OtomatisKeluar: false,
 			CreatedAt:      &now,
 			UpdatedAt:      &now,
+			IsCreated:      true,
 		}
 		if err := h.attendanceRepo.CreateAbsen(ctx, absen); err != nil {
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
@@ -123,6 +126,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 
 	existing.AbsenMasuk = &now
 	existing.UpdatedAt = &now
+	existing.IsCreated = false
 	if err := h.attendanceRepo.UpdateAbsen(ctx, existing); err != nil {
 		return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 	}

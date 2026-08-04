@@ -75,7 +75,9 @@ class _AttendancePageState extends State<AttendancePage>
         frontCamera,
         ResolutionPreset.medium,
         enableAudio: false,
-        imageFormatGroup: Platform.isIOS ? ImageFormatGroup.bgra8888 : ImageFormatGroup.yuv420,
+        imageFormatGroup: Platform.isIOS
+            ? ImageFormatGroup.bgra8888
+            : ImageFormatGroup.yuv420,
       );
 
       await _cameraController!.initialize();
@@ -101,7 +103,9 @@ class _AttendancePageState extends State<AttendancePage>
   }
 
   void _startImageStreaming(CameraDescription camera) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
 
     int frameSkipCounter = 0;
 
@@ -129,14 +133,16 @@ class _AttendancePageState extends State<AttendancePage>
             final face = faces.first;
             final yaw = face.headEulerAngleY;
 
-            debugPrint("Liveness Face Yaw: $yaw | BoundingBox: ${face.boundingBox}");
+            debugPrint(
+                "Liveness Face Yaw: $yaw | BoundingBox: ${face.boundingBox}");
 
             if (yaw != null) {
               setState(() {
                 final absYaw = yaw.abs();
-                
+
                 if (absYaw > 15.0) {
-                  double targetProgress = ((absYaw - 10.0) / 20.0).clamp(0.0, 1.0);
+                  double targetProgress =
+                      ((absYaw - 10.0) / 20.0).clamp(0.0, 1.0);
                   if (targetProgress > _progress) {
                     _progress = targetProgress;
                   }
@@ -146,12 +152,14 @@ class _AttendancePageState extends State<AttendancePage>
                     _detectionStatus = 'Selesai!';
                     _onVerificationSuccess();
                   } else {
-                    _detectionStatus = 'Bagus! Putar lebih ke kiri... (${(absYaw).toStringAsFixed(0)}°)';
+                    _detectionStatus =
+                        'Bagus! Putar lebih ke kiri... (${(absYaw).toStringAsFixed(0)}°)';
                   }
                 } else if (absYaw > 8.0) {
                   _detectionStatus = 'Sedikit lagi, putar lebih ke kiri...';
                 } else {
-                  _detectionStatus = 'Wajah terdeteksi. Silakan tengok ke kiri!';
+                  _detectionStatus =
+                      'Wajah terdeteksi. Silakan tengok ke kiri!';
                   if (_progress > 0) {
                     _progress = (_progress - 0.01).clamp(0.0, 1.0);
                   }
@@ -174,19 +182,23 @@ class _AttendancePageState extends State<AttendancePage>
     });
   }
 
-  InputImage? _inputImageFromCameraImage(CameraImage image, CameraDescription camera) {
+  InputImage? _inputImageFromCameraImage(
+      CameraImage image, CameraDescription camera) {
     try {
       final sensorOrientation = camera.sensorOrientation;
       final isFrontCamera = camera.lensDirection == CameraLensDirection.front;
 
       InputImageRotation rotation;
       if (Platform.isAndroid) {
-        rotation = _rotationFromSensor(sensorOrientation) ?? InputImageRotation.rotation0deg;
+        rotation = _rotationFromSensor(sensorOrientation) ??
+            InputImageRotation.rotation0deg;
       } else {
-        rotation = _rotationFromSensor(sensorOrientation) ?? InputImageRotation.rotation0deg;
+        rotation = _rotationFromSensor(sensorOrientation) ??
+            InputImageRotation.rotation0deg;
       }
 
-      debugPrint("Camera: sensor=$sensorOrientation, isFront=$isFrontCamera, mlkitRotation=$rotation, imgSize=${image.width}x${image.height}, planes=${image.planes.length}");
+      debugPrint(
+          "Camera: sensor=$sensorOrientation, isFront=$isFrontCamera, mlkitRotation=$rotation, imgSize=${image.width}x${image.height}, planes=${image.planes.length}");
 
       Uint8List bytes;
       InputImageFormat format;
@@ -220,18 +232,18 @@ class _AttendancePageState extends State<AttendancePage>
   Uint8List _yuv420ToNv21(CameraImage image) {
     final width = image.width;
     final height = image.height;
-    
+
     final yPlane = image.planes[0];
     final uPlane = image.planes[1];
     final vPlane = image.planes[2];
-    
+
     final yBuffer = yPlane.bytes;
     final uBuffer = uPlane.bytes;
     final vBuffer = vPlane.bytes;
-    
+
     final numPixels = width * height;
     final nv21 = Uint8List(numPixels + (numPixels ~/ 2));
-    
+
     final yRowStride = yPlane.bytesPerRow;
     for (int row = 0; row < height; row++) {
       int srcOffset = row * yRowStride;
@@ -242,19 +254,21 @@ class _AttendancePageState extends State<AttendancePage>
         }
       }
     }
-    
+
     int uvIndex = numPixels;
     final uRowStride = uPlane.bytesPerRow;
     final vRowStride = vPlane.bytesPerRow;
     final uPixelStride = uPlane.bytesPerPixel ?? 1;
     final vPixelStride = vPlane.bytesPerPixel ?? 1;
-    
+
     for (int row = 0; row < height ~/ 2; row++) {
       for (int col = 0; col < width ~/ 2; col++) {
         final vIndex = row * vRowStride + col * vPixelStride;
         final uIndex = row * uRowStride + col * uPixelStride;
-        
-        if (vIndex < vBuffer.length && uIndex < uBuffer.length && uvIndex < nv21.length - 1) {
+
+        if (vIndex < vBuffer.length &&
+            uIndex < uBuffer.length &&
+            uvIndex < nv21.length - 1) {
           nv21[uvIndex++] = vBuffer[vIndex];
           nv21[uvIndex++] = uBuffer[uIndex];
         }
@@ -290,7 +304,7 @@ class _AttendancePageState extends State<AttendancePage>
         _faceDetector?.close();
         _faceDetector = null;
         controller?.dispose();
-        
+
         setState(() {
           _progress = 0.0;
           _detectionStatus = 'Mencari wajah...';
@@ -322,8 +336,9 @@ class _AttendancePageState extends State<AttendancePage>
 
     final appState = Provider.of<AttendanceBloc>(context, listen: false);
     final now = DateTime.now();
-    final timeStr = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-    
+    final timeStr =
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
     if (appState.isUpacaraCheckInIntent) {
       await appState.doUpacaraCheckIn(timeStr);
       appState.isUpacaraCheckInIntent = false;
@@ -348,7 +363,8 @@ class _AttendancePageState extends State<AttendancePage>
                 color: AppTheme.successContainer,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle, color: AppTheme.success, size: 48),
+              child: const Icon(Icons.check_circle,
+                  color: AppTheme.success, size: 48),
             ),
             const SizedBox(height: 16),
             Text(
@@ -378,7 +394,8 @@ class _AttendancePageState extends State<AttendancePage>
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
                 minimumSize: const Size(double.infinity, 44),
                 elevation: 0,
               ),
@@ -406,7 +423,9 @@ class _AttendancePageState extends State<AttendancePage>
     if (showSuccess) {
       return AttendanceSuccessCard(
         isUpacara: appState.isUpacaraCheckInIntent,
-        time: appState.isUpacaraCheckInIntent ? appState.upacaraTime : appState.checkInTime,
+        time: appState.isUpacaraCheckInIntent
+            ? appState.upacaraTime
+            : appState.checkInTime,
         onBackTap: () => appState.setTabIndex(0),
       );
     }

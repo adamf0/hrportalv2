@@ -1,11 +1,96 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:workmanager/workmanager.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import '../modules/attendance/infrastructure/attendance_repository.dart';
 import 'location_wifi_helper.dart';
 import 'sso_helper.dart';
 import 'api_client.dart';
 import 'fcm_service.dart';
+
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((task, inputData) async {
+    debugPrint(
+        '[WorkManager Background Task] Executing background attendance check for killed app: $task');
+    try {
+      WidgetsFlutterBinding.ensureInitialized();
+      await AutoAttendanceService.instance
+          .runAutoAttendanceCheck(isExplicit: true, isWorkmanager: true);
+      return Future.value(true);
+    } catch (e) {
+      debugPrint('[WorkManager Background Task Error]: $e');
+      return Future.value(false);
+    }
+  });
+}
+
+@pragma('vm:entry-point')
+void onStart(ServiceInstance service) async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FcmService.initLocalNotifications();
+
+  if (service is AndroidServiceInstance) {
+    service.on('setAsForeground').listen((event) {
+      service.setAsForegroundService();
+    });
+
+    service.on('setAsBackground').listen((event) {
+      service.setAsBackgroundService();
+    });
+  }
+
+  service.on('stopService').listen((event) {
+    service.stopSelf();
+  });
+
+  // Periodic Foreground Service Timer (Runs continuously even across app kills)
+  Timer.periodic(const Duration(seconds: 10), (timer) async {
+    try {
+      final ip = await LocationWifiHelper.getActiveDeviceIp();
+      final pos = await LocationWifiHelper.getCurrentLocation();
+      final matchesWifi = LocationWifiHelper.isPakuanIp(ip);
+      bool matchesLocation = false;
+
+      if (pos != null) {
+        final insidePoly1 = LocationWifiHelper.isPointInPolygon(
+            pos.latitude, pos.longitude, LocationWifiHelper.polygon1);
+        final insidePoly2 = LocationWifiHelper.isPointInPolygon(
+            pos.latitude, pos.longitude, LocationWifiHelper.polygon2);
+        // final insidePoly3 = LocationWifiHelper.isPointInPolygon(
+        //     pos.latitude, pos.longitude, LocationWifiHelper.polygon3);
+        // final withinRadius = RadiusValidationStrategy()
+        // .isWithinCampus(pos.latitude, pos.longitude);
+        matchesLocation = insidePoly1 || insidePoly2;
+      }
+
+      final wifiStatus = matchesWifi ? 'WiFi Pakuan (Kampus)' : 'Jaringan Luar';
+      final campusStatus =
+          matchesLocation ? 'Dalam Area Kampus' : 'Luar Area Kampus';
+      final latStr = pos != null ? pos.latitude.toStringAsFixed(5) : 'Unknown';
+      final lonStr = pos != null ? pos.longitude.toStringAsFixed(5) : 'Unknown';
+
+      final tokenInfo = SsoHelper.lastTokenRefreshTime;
+
+      if (service is AndroidServiceInstance) {
+        if (await service.isForegroundService()) {
+          service.setForegroundNotificationInfo(
+            title: "HR Portal • Presensi Active",
+            content:
+                "IP: $ip ($wifiStatus)\nGPS: $latStr, $lonStr ($campusStatus)\nToken Status: Aktif (Update: $tokenInfo)",
+          );
+        }
+      }
+
+      // Perform background auto attendance check
+      await AutoAttendanceService.instance
+          .runAutoAttendanceCheck(isExplicit: true);
+    } catch (e) {
+      debugPrint('[ForegroundService Timer Error]: $e');
+    }
+  });
+}
 
 class AutoAttendanceService with WidgetsBindingObserver {
   static final AutoAttendanceService instance =
@@ -43,17 +128,95 @@ class AutoAttendanceService with WidgetsBindingObserver {
   Future<void> triggerSuccessNotificationIfInitialNull() async {
     if (!_hasNotifiedSuccessToday) {
       _hasNotifiedSuccessToday = true;
-      await FcmService.showCustomNotification(
-        title: 'Presensi Otomatis Berhasil',
-        body: 'Sistem sudah melakukan absensi otomatis',
-      );
     }
   }
 
-  /// Initializes the Auto-Attendance Service & WidgetsBindingObserver for background app execution
+  /// Initializes the Auto-Attendance Service, Native Foreground Service, and WorkManager
   void initialize() {
     WidgetsBinding.instance.addObserver(this);
     startBackgroundWorker();
+    initWorkmanager();
+    initForegroundService();
+  }
+
+  /// Configures & starts native Android/iOS Foreground Service (Sticky ongoing notification across kills)
+  Future<void> initForegroundService() async {
+    try {
+      await FcmService.initLocalNotifications();
+      final service = FlutterBackgroundService();
+      final isRunning = await service.isRunning();
+      if (!isRunning) {
+        await service.configure(
+          androidConfiguration: AndroidConfiguration(
+            onStart: onStart,
+            autoStart: false,
+            isForegroundMode: true,
+            notificationChannelId: 'hrportal_ongoing_channel',
+            initialNotificationTitle: 'HR Portal • Presensi Active',
+            initialNotificationContent: 'Memuat status IP & GPS...',
+            foregroundServiceNotificationId: 9999,
+          ),
+          iosConfiguration: IosConfiguration(
+            autoStart: false,
+            onForeground: onStart,
+            onBackground: onIosBackground,
+          ),
+        );
+        await service.startService();
+      }
+      debugPrint('[AutoAttendanceService] Native Foreground Service started.');
+    } catch (e) {
+      debugPrint('[AutoAttendanceService Foreground Service Error]: $e');
+    }
+  }
+
+  @pragma('vm:entry-point')
+  static bool onIosBackground(ServiceInstance service) {
+    WidgetsFlutterBinding.ensureInitialized();
+    return true;
+  }
+
+  /// Registers native Android/iOS WorkManager periodic & one-off tasks
+  void initWorkmanager() {
+    try {
+      Workmanager().initialize(
+        callbackDispatcher,
+        isInDebugMode: false,
+      );
+      Workmanager().registerPeriodicTask(
+        "auto_attendance_killed_task",
+        "autoAttendanceKilledTask",
+        frequency: const Duration(minutes: 15),
+        existingWorkPolicy: ExistingWorkPolicy.replace,
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+      );
+      scheduleImmediateKilledTask();
+      debugPrint(
+          '[AutoAttendanceService] Native WorkManager registered for killed app execution (15m interval + immediate oneoff).');
+    } catch (e) {
+      debugPrint('[AutoAttendanceService Workmanager Registration Error]: $e');
+    }
+  }
+
+  /// Schedules an immediate 5-second one-off WorkManager background task when app is detached/killed
+  void scheduleImmediateKilledTask() {
+    try {
+      Workmanager().registerOneOffTask(
+        "auto_attendance_oneoff_${DateTime.now().millisecondsSinceEpoch}",
+        "autoAttendanceTask",
+        initialDelay: const Duration(seconds: 5),
+        existingWorkPolicy: ExistingWorkPolicy.replace,
+        constraints: Constraints(
+          networkType: NetworkType.connected,
+        ),
+      );
+      debugPrint(
+          '[AutoAttendanceService] Immediate OneOff WorkManager task scheduled for killed app state.');
+    } catch (e) {
+      debugPrint('[AutoAttendanceService Schedule OneOff Error]: $e');
+    }
   }
 
   /// Sets active user session for background auto-attendance
@@ -66,7 +229,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
     }
   }
 
-  /// Starts the periodic background worker timer (runs even when app is hidden/paused)
+  /// Starts the periodic active timer (15s interval)
   void startBackgroundWorker() {
     _bgTimer?.cancel();
     _bgTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
@@ -82,14 +245,16 @@ class AutoAttendanceService with WidgetsBindingObserver {
     debugPrint('[AutoAttendanceService] App lifecycle state changed: $state');
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached ||
         state == AppLifecycleState.resumed) {
       runAutoAttendanceCheck();
+    } else if (state == AppLifecycleState.detached) {
+      scheduleImmediateKilledTask();
     }
   }
 
   /// Executes auto-attendance and auto-ceremony-attendance evaluation
-  Future<void> runAutoAttendanceCheck({bool isExplicit = false}) async {
+  Future<void> runAutoAttendanceCheck(
+      {bool isExplicit = false, bool isWorkmanager = false}) async {
     final now = DateTime.now();
     final todayStr = "${now.year}-${now.month}-${now.day}";
     if (_lastNotifiedDate != todayStr) {
@@ -142,11 +307,10 @@ class AutoAttendanceService with WidgetsBindingObserver {
 
         final successCheckIn =
             await _performAutoCheckIn(_cachedNip!, _cachedNidn!);
-        if (successCheckIn) {
+        if (successCheckIn || isWorkmanager) {
           debugPrint(
               '[AutoAttendanceService] Auto-attendance check-in SUCCESS.');
           onAttendanceUpdated?.call();
-          await triggerSuccessNotificationIfInitialNull();
         }
 
         final successUpacara =
@@ -158,7 +322,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
       } else {
         debugPrint(
             '[AutoAttendanceService] User is OUTSIDE campus radius or disconnected.');
-        if (!_hasNotifiedFailToday) {
+        if (isWorkmanager || !_hasNotifiedFailToday) {
           _hasNotifiedFailToday = true;
           await _notifyAutoAttendanceFailed(_cachedNip!);
         }
@@ -185,11 +349,23 @@ class AutoAttendanceService with WidgetsBindingObserver {
             pos.latitude, pos.longitude, LocationWifiHelper.polygon1);
         final insidePoly2 = LocationWifiHelper.isPointInPolygon(
             pos.latitude, pos.longitude, LocationWifiHelper.polygon2);
+        // final insidePoly3 = LocationWifiHelper.isPointInPolygon(
+        //     pos.latitude, pos.longitude, LocationWifiHelper.polygon3);
+        // final withinRadius = RadiusValidationStrategy()
+        // .isWithinCampus(pos.latitude, pos.longitude);
         matchesLocation = insidePoly1 || insidePoly2;
       }
 
       debugPrint(
           '[AutoAttendanceService] Evaluation -> IP: $ip (WifiMatch: $matchesWifi), GPS: ${pos?.latitude}, ${pos?.longitude} (LocationMatch: $matchesLocation)');
+
+      await FcmService.showOngoingStatusNotification(
+        ip: ip,
+        lat: pos?.latitude ?? 0.0,
+        lon: pos?.longitude ?? 0.0,
+        isInsideCampus: matchesLocation,
+        isPakuanWifi: matchesWifi,
+      );
 
       return matchesWifi || matchesLocation;
     } catch (e) {
@@ -260,6 +436,25 @@ class AutoAttendanceService with WidgetsBindingObserver {
       ).timeout(const Duration(seconds: 5));
     } catch (e) {
       debugPrint('[AutoAttendanceService] Notify fail API failed: $e');
+    }
+  }
+
+  /// Stops background timer, Foreground Service, and cancels WorkManager background tasks upon user logout
+  Future<void> stopServiceAndCancelWorkmanager() async {
+    _bgTimer?.cancel();
+    _cachedNip = null;
+    _cachedNidn = null;
+    await FcmService.cancelOngoingNotification();
+    try {
+      final service = FlutterBackgroundService();
+      service.invoke('stopService');
+    } catch (_) {}
+    try {
+      await Workmanager().cancelAll();
+      debugPrint(
+          '[AutoAttendanceService] All WorkManager tasks and Foreground Service stopped upon logout.');
+    } catch (e) {
+      debugPrint('[AutoAttendanceService Logout Error]: $e');
     }
   }
 

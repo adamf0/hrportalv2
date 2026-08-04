@@ -24,6 +24,7 @@ type Absen struct {
 	OtomatisKeluar bool       `gorm:"column:otomatis_keluar" json:"otomatis_keluar"`
 	CreatedAt      *time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt      *time.Time `gorm:"column:updated_at" json:"updated_at"`
+	IsCreated      bool       `gorm:"-" json:"is_created,omitempty"`
 }
 
 func (Absen) TableName() string {

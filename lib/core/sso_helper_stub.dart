@@ -9,12 +9,22 @@ import 'sqlite_auth_storage.dart';
 import 'fcm_service.dart';
 import 'api_client.dart';
 
+import 'auto_attendance_service.dart';
+
 class SsoHelper {
   static const String _clientId = "unpak_link_gate";
   static const String _logoutUrl =
       "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout";
 
   static const _appAuth = FlutterAppAuth();
+
+  static String lastTokenRefreshTime = "Aktif";
+
+  static void updateTokenRefreshTime() {
+    final now = DateTime.now();
+    lastTokenRefreshTime =
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}";
+  }
 
   static Future<String?> getLoggedInName() async {
     final session = await SqliteAuthStorage.instance.getSession();
@@ -116,6 +126,7 @@ class SsoHelper {
   }
 
   static Future<void> logout() async {
+    await AutoAttendanceService.instance.stopServiceAndCancelWorkmanager();
     final refreshToken = await LocalStorageMobile.read('refresh');
     await SqliteAuthStorage.instance.clearAll();
     await LocalStorageMobile.clear();
@@ -158,12 +169,55 @@ class SsoHelper {
     if (_isTokenExpired(token)) {
       final username = session['username'] as String?;
       final password = session['password'] as String?;
+      final refreshToken = await LocalStorageMobile.read('refresh');
 
+      // 1. Try SSO OAuth2 Refresh Token Exchange
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        print("JWT Token expired. Attempting background SSO token refresh via OAuth2...");
+        try {
+          final tokenResult = await _appAuth.token(
+            TokenRequest(
+              _clientId,
+              "com.unpak.hrportal:/oauth2redirect",
+              issuer: "https://gerbang.unpak.ac.id/realms/gateway",
+              refreshToken: refreshToken,
+            ),
+          );
+
+          if (tokenResult.accessToken != null) {
+            final newToken = tokenResult.accessToken!;
+            await saveSession(
+              username: username ?? '',
+              password: password ?? '',
+              token: newToken,
+              name: session['name'] ?? '',
+              nip: session['nip'] ?? '',
+              email: session['email'] ?? '',
+              role: session['role'] ?? 'Dosen',
+              groups: List<String>.from(session['groups'] ?? []),
+            );
+            if (tokenResult.refreshToken != null) {
+              await LocalStorageMobile.write('refresh', tokenResult.refreshToken!);
+            }
+            await FcmService.showCustomNotification(
+              title: 'Sesi Keamanan Diperbarui',
+              body: 'Token SSO Anda berhasil diperbarui secara otomatis di latar belakang.',
+            );
+            updateTokenRefreshTime();
+            print("Background SSO token refresh SUCCESS.");
+            return newToken;
+          }
+        } catch (e) {
+          print("Background SSO token refresh failed: $e");
+        }
+      }
+
+      // 2. Try Manual Login Credentials Re-authentication
       if (username != null &&
           username.isNotEmpty &&
           password != null &&
           password.isNotEmpty) {
-        print("JWT Token expired. Attempting background re-login via SQLite credentials...");
+        print("JWT Token expired. Attempting background re-login via credentials...");
         try {
           final responseData = await ApiClient.post(
             Uri.parse("${ApiClient.baseUrlUnpak}/account/login"),
@@ -171,6 +225,7 @@ class SsoHelper {
               "username": username,
               "password": password,
             },
+            scope: 'global',
           );
 
           if (responseData is Map<String, dynamic> &&
@@ -180,6 +235,7 @@ class SsoHelper {
             final whoamiData = await ApiClient.get(
               Uri.parse("${ApiClient.baseUrlUnpak}/account/whoami"),
               headers: {"Authorization": "Bearer $newToken"},
+              scope: 'global',
             );
 
             if (whoamiData is Map<String, dynamic>) {
@@ -205,24 +261,28 @@ class SsoHelper {
                 body: 'Token JWT Anda berhasil diperbarui secara otomatis di latar belakang.',
               );
 
-              print("Background token refresh SUCCESS.");
+              updateTokenRefreshTime();
+              print("Background manual token refresh SUCCESS.");
               return newToken;
             }
           }
         } catch (e) {
-          print("Background token refresh failed: $e");
+          print("Background manual token refresh failed: $e");
         }
       }
 
-      // Re-login failed or no stored password
+      // Re-login failed or no stored credentials
       await clearSession();
       await FcmService.showCustomNotification(
         title: 'Sesi Berakhir',
-        body: 'Token JWT telah kadaluarsa. Silakan login kembali ke HR Portal.',
+        body: 'Sesi login telah kadaluarsa. Silakan login kembali ke HR Portal.',
       );
       return null;
     }
 
+    if (lastTokenRefreshTime == "Aktif") {
+      updateTokenRefreshTime();
+    }
     return token;
   }
 

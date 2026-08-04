@@ -115,8 +115,8 @@ func ModuleAttendance(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		// Trigger FCM Notification & WebSocket Broadcast for Check-In Success
-		if res.Value != nil {
+		// Trigger FCM Notification & WebSocket Broadcast for Check-In Success (Only when CREATED, not updated)
+		if res.Value != nil && res.Value.IsCreated {
 			absenData := res.Value
 			helper.GlobalFcmManager.DispatchNotification(
 				[]string{absenData.Nip},
@@ -157,7 +157,8 @@ func ModuleAttendance(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		if res.Value != nil {
+		// Trigger FCM Notification & WebSocket Broadcast for Check-Out Success (Only when CREATED, not updated)
+		if res.Value != nil && res.Value.IsCreated {
 			absenData := res.Value
 			helper.GlobalFcmManager.DispatchNotification(
 				[]string{absenData.Nip},
