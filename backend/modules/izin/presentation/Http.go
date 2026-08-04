@@ -30,6 +30,18 @@ func ModuleIzin(app *fiber.App) {
 			verifikasi = &vStr
 		}
 
+		var fileLampiran *string
+		fStr := c.FormValue("file_lampiran")
+		if fStr == "" {
+			fStr = c.FormValue("file")
+		}
+		if fStr == "" {
+			fStr = c.FormValue("dokumen")
+		}
+		if fStr != "" {
+			fileLampiran = &fStr
+		}
+
 		cmd := create.CreateIzinCommand{
 			Nip:              c.FormValue("nip"),
 			Nidn:             c.FormValue("nidn"),
@@ -40,6 +52,7 @@ func ModuleIzin(app *fiber.App) {
 			JenisIzinID:      uint(jenisIzinID),
 			TanggalPengajuan: c.FormValue("tanggal_pengajuan"),
 			Tujuan:           c.FormValue("tujuan"),
+			FileLampiran:     fileLampiran,
 			Verifikasi:       verifikasi,
 		}
 
@@ -77,6 +90,18 @@ func ModuleIzin(app *fiber.App) {
 			catatan = &cStr
 		}
 
+		var fileLampiran *string
+		fStr := c.FormValue("file_lampiran")
+		if fStr == "" {
+			fStr = c.FormValue("file")
+		}
+		if fStr == "" {
+			fStr = c.FormValue("dokumen")
+		}
+		if fStr != "" {
+			fileLampiran = &fStr
+		}
+
 		cmd := update.UpdateIzinCommand{
 			ID:               uint(id),
 			NamaPemohon:      c.FormValue("nama"),
@@ -86,8 +111,10 @@ func ModuleIzin(app *fiber.App) {
 			JenisIzinID:      uint(jenisIzinID),
 			TanggalPengajuan: c.FormValue("tanggal_pengajuan"),
 			Tujuan:           c.FormValue("tujuan"),
+			FileLampiran:     fileLampiran,
 			Status:           c.FormValue("status"),
 			Catatan:          catatan,
+			IsSdm:            c.FormValue("role") == "sdm",
 		}
 
 		res, err := mediatr.Send[*update.UpdateIzinCommand, commondomain.ResultValue[*domain.Izin]](c.UserContext(), &cmd)

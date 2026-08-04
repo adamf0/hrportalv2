@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+/// LeaveRepository Infrastructure Implementation
 import 'package:flutter/foundation.dart';
 import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/core/sso_helper.dart';
@@ -55,7 +58,10 @@ class LeaveRepository implements ILeaveRepository {
           if (jenisCutiId == 3) type = "Cuti Melahirkan";
           if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
 
-          final svId = json['verifikasi']?.toString() ?? json['nip_atasan']?.toString();
+          final svId =
+              json['verifikasi']?.toString() ?? json['nip_atasan']?.toString();
+          final attPath =
+              _parseAttachmentPath(json, ['dokumen', 'file_lampiran', 'file']);
           allRequests.add(LeaveRequest(
             id: "cuti_${json['id']}",
             type: type,
@@ -70,6 +76,7 @@ class LeaveRepository implements ILeaveRepository {
             applicantNip: sessionNip,
             applicantNidn: sessionNidn,
             supervisorId: svId,
+            attachmentPath: attPath,
           ));
         }
       }
@@ -85,7 +92,10 @@ class LeaveRepository implements ILeaveRepository {
           if (jenisIzinId == 3) type = "Izin Melahirkan";
           if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
 
-          final svId = json['verifikasi']?.toString() ?? json['id_verifikasi']?.toString();
+          final svId = json['verifikasi']?.toString() ??
+              json['id_verifikasi']?.toString();
+          final attPath =
+              _parseAttachmentPath(json, ['file_lampiran', 'dokumen', 'file']);
           allRequests.add(LeaveRequest(
             id: "izin_${json['id']}",
             type: type,
@@ -99,6 +109,7 @@ class LeaveRepository implements ILeaveRepository {
             applicantNip: sessionNip,
             applicantNidn: sessionNidn,
             supervisorId: svId,
+            attachmentPath: attPath,
           ));
         }
       }
@@ -129,6 +140,8 @@ class LeaveRepository implements ILeaveRepository {
           }
         }
 
+        final attPath = _parseAttachmentPath(
+            json, ['file_sppd_laporan', 'file', 'dokumen']);
         allRequests.add(LeaveRequest(
           id: "sppd_${json['id']}",
           type: type,
@@ -143,6 +156,7 @@ class LeaveRepository implements ILeaveRepository {
           applicantNip: sessionNip,
           applicantNidn: sessionNidn,
           supervisorId: svId,
+          attachmentPath: attPath,
         ));
       }
 
@@ -292,7 +306,8 @@ class LeaveRepository implements ILeaveRepository {
 
   @override
   Future<bool> submitLeave(
-      LeaveRequest request, String supervisorId, String? attachmentPath) async {
+      LeaveRequest request, String supervisorId, String? attachmentPath,
+      [List<Supervisor>? members]) async {
     if (request.endDate.isBefore(request.startDate)) {
       throw const InvalidLeavePeriodError();
     }
@@ -312,40 +327,91 @@ class LeaveRepository implements ILeaveRepository {
         if (typeLower.contains("melahirkan")) jenisIzinId = 3;
         if (typeLower.contains("mendesak")) jenisIzinId = 4;
 
+        final name = session['name'] ?? session['nama'] ?? '';
+        final unit = session['unit'] ?? '';
+        final fakultas = session['fakultas'] ?? '';
+        final prodi = session['prodi'] ?? '';
+
         debugPrint(
-            '{nip: $nip, nidn: $nidn, id_jenis_izin: $jenisIzinId, verifikasi: $supervisorId}');
+            '{nip: $nip, nidn: $nidn, id_jenis_izin: $jenisIzinId, verifikasi: $supervisorId, file_lampiran: $attachmentPath}');
+
+        final Map<String, String> bodyData = {
+          "nip": nip,
+          "nidn": nidn,
+          "nama": name,
+          "unit": unit,
+          "fakultas": fakultas,
+          "prodi": prodi,
+          "id_jenis_izin": jenisIzinId.toString(),
+          "tanggal_pengajuan":
+              "${request.startDate.year}-${_twoDigits(request.startDate.month)}-${_twoDigits(request.startDate.day)}",
+          "tujuan": request.details,
+          "verifikasi": supervisorId,
+        };
+        if (attachmentPath != null && attachmentPath.isNotEmpty) {
+          bodyData["file_lampiran"] = attachmentPath;
+          bodyData["file"] = attachmentPath;
+          bodyData["dokumen"] = attachmentPath;
+        }
 
         final responseData = await ApiClient.post(
           Uri.parse("${ApiClient.baseUrl}/api/izin/"),
-          body: {
-            "nip": nip,
-            "nidn": nidn,
-            "id_jenis_izin": jenisIzinId.toString(),
-            "tanggal_pengajuan":
-                "${request.startDate.year}-${_twoDigits(request.startDate.month)}-${_twoDigits(request.startDate.day)}",
-            "tujuan": request.details,
-            "verifikasi": supervisorId,
-          },
+          body: bodyData,
         );
         return responseData != null;
       } else if (typeLower.startsWith("sppd")) {
         int jenisSppdId = 1;
         if (typeLower.contains("dalam kota")) jenisSppdId = 2;
 
+        final name = session['name'] ?? session['nama'] ?? '';
+        final unit = session['unit'] ?? '';
+        final fakultas = session['fakultas'] ?? '';
+        final prodi = session['prodi'] ?? '';
+
+        final Map<String, String> bodyData = {
+          "nip": nip,
+          "nidn": nidn,
+          "nama": name,
+          "unit": unit,
+          "fakultas": fakultas,
+          "prodi": prodi,
+          "jenis_sppd_id": jenisSppdId.toString(),
+          "tanggal_berangkat":
+              "${request.startDate.year}-${_twoDigits(request.startDate.month)}-${_twoDigits(request.startDate.day)}",
+          "tanggal_kembali":
+              "${request.endDate.year}-${_twoDigits(request.endDate.month)}-${_twoDigits(request.endDate.day)}",
+          "tujuan": request.details,
+          "keterangan": "Atasan: $supervisorId",
+          "verifikasi": supervisorId,
+        };
+
+        if (members != null && members.isNotEmpty) {
+          final List<Map<String, String>> anggotaList = members
+              .map((m) => {
+                    "nip": m.id,
+                    "nidn": "",
+                    "nama": m.name,
+                    "unit": "",
+                    "fakultas": "",
+                    "prodi": "",
+                  })
+              .toList();
+          bodyData["anggota"] = jsonEncode(anggotaList);
+        }
+
+        if (attachmentPath != null && attachmentPath.isNotEmpty) {
+          final List<Map<String, String>> filesList = [
+            {
+              "file": attachmentPath,
+              "type": "lampiran",
+            }
+          ];
+          bodyData["files"] = jsonEncode(filesList);
+        }
+
         final responseData = await ApiClient.post(
           Uri.parse("${ApiClient.baseUrl}/api/sppd/create"),
-          body: {
-            "nip": nip,
-            "nidn": nidn,
-            "jenis_sppd_id": jenisSppdId.toString(),
-            "tanggal_berangkat":
-                "${request.startDate.year}-${_twoDigits(request.startDate.month)}-${_twoDigits(request.startDate.day)}",
-            "tanggal_kembali":
-                "${request.endDate.year}-${_twoDigits(request.endDate.month)}-${_twoDigits(request.endDate.day)}",
-            "tujuan": request.details,
-            "keterangan": "Atasan: $supervisorId",
-            "verifikasi": supervisorId,
-          },
+          body: bodyData,
         );
         return responseData != null;
       } else {
@@ -354,25 +420,28 @@ class LeaveRepository implements ILeaveRepository {
         if (typeLower.contains("melahirkan")) jenisCutiId = 3;
         if (typeLower.contains("dinas luar")) jenisCutiId = 4;
 
-        final responseData = await ApiClient.postMultipart(
+        final Map<String, String> bodyData = {
+          "nip": nip,
+          "nidn": nidn,
+          "jenis_cuti_id": jenisCutiId.toString(),
+          "tanggal_mulai":
+              "${request.startDate.year}-${_twoDigits(request.startDate.month)}-${_twoDigits(request.startDate.day)}",
+          "tanggal_selesai":
+              "${request.endDate.year}-${_twoDigits(request.endDate.month)}-${_twoDigits(request.endDate.day)}",
+          "jumlah_hari":
+              (request.endDate.difference(request.startDate).inDays + 1)
+                  .toString(),
+          "alasan": request.details,
+          "nip_atasan": supervisorId,
+          "verifikasi": supervisorId,
+        };
+        if (attachmentPath != null && attachmentPath.isNotEmpty) {
+          bodyData["file_lampiran"] = attachmentPath;
+        }
+
+        final responseData = await ApiClient.post(
           Uri.parse("${ApiClient.baseUrl}/api/leave/submit"),
-          fields: {
-            "nip": nip,
-            "nidn": nidn,
-            "jenis_cuti_id": jenisCutiId.toString(),
-            "tanggal_mulai":
-                "${request.startDate.year}-${_twoDigits(request.startDate.month)}-${_twoDigits(request.startDate.day)}",
-            "tanggal_selesai":
-                "${request.endDate.year}-${_twoDigits(request.endDate.month)}-${_twoDigits(request.endDate.day)}",
-            "jumlah_hari":
-                (request.endDate.difference(request.startDate).inDays + 1)
-                    .toString(),
-            "alasan": request.details,
-            "nip_atasan": supervisorId,
-            "verifikasi": supervisorId,
-          },
-          fileFieldName: "file_lampiran",
-          filePath: attachmentPath,
+          body: bodyData,
         );
         return responseData != null;
       }
@@ -409,11 +478,17 @@ class LeaveRepository implements ILeaveRepository {
         );
         return res != null;
       } else if (prefix == 'sppd') {
+        final session = await SsoHelper.getSession();
+        final role = session?['role'] as String? ?? '';
+        final isSdm = role.toLowerCase() == 'sdm';
+
         final res = await ApiClient.put(
           Uri.parse("${ApiClient.baseUrl}/api/sppd/$realId"),
           body: {
             "status": status,
             "catatan": note ?? '',
+            "role": role,
+            "is_sdm": isSdm.toString(),
           },
         );
         return res != null;
@@ -458,7 +533,7 @@ class LeaveRepository implements ILeaveRepository {
   Future<List<Supervisor>> getSupervisors() async {
     try {
       final responseData = await ApiClient.get(
-        Uri.parse("${ApiClient.baseUrlUnpak}/masterdata/verifikator?type=cuti"),
+        Uri.parse("${ApiClient.baseUrlUnpak}/masterdata/verifikator"),
       );
       if (responseData is List && responseData.isNotEmpty) {
         final List<Supervisor> list = [];
@@ -478,6 +553,36 @@ class LeaveRepository implements ILeaveRepository {
       }
     } catch (e) {
       debugPrint('[LeaveRepository getSupervisors API error]: $e');
+    }
+    return [];
+  }
+
+  @override
+  Future<List<Supervisor>> getPeople() async {
+    try {
+      var responseData = await ApiClient.get(
+        Uri.parse("${ApiClient.baseUrl}/api/masterdata/people"),
+      );
+
+      if (responseData is List && responseData.isNotEmpty) {
+        final List<Supervisor> list = [];
+        for (var item in responseData) {
+          final nip = item['nip']?.toString() ?? item['nidn']?.toString() ?? '';
+          final nama = item['nama']?.toString() ?? '';
+          final struktural =
+              item['struktural']?.toString() ?? item['unit']?.toString() ?? '';
+          if (nip.isNotEmpty && nama.isNotEmpty) {
+            list.add(Supervisor(
+              id: nip,
+              name: nama,
+              role: struktural,
+            ));
+          }
+        }
+        if (list.isNotEmpty) return list;
+      }
+    } catch (e) {
+      debugPrint('[LeaveRepository getPeople API error]: $e');
     }
     return [];
   }
@@ -502,4 +607,17 @@ class LeaveRepository implements ILeaveRepository {
   }
 
   String _twoDigits(int n) => n >= 10 ? "$n" : "0$n";
+
+  String? _parseAttachmentPath(Map<String, dynamic> json, List<String> keys) {
+    for (final key in keys) {
+      final val = json[key]?.toString().trim();
+      if (val != null &&
+          val.isNotEmpty &&
+          val.toLowerCase() != 'null' &&
+          val.toLowerCase() != 'undefined') {
+        return val;
+      }
+    }
+    return null;
+  }
 }

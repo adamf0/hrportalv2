@@ -13,6 +13,7 @@ class SubmitLeaveCommandHandler extends ICommandHandler<SubmitLeaveCommand, bool
       command.request,
       command.supervisorId,
       command.attachmentPath,
+      command.members,
     );
   }
 }

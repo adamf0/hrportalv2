@@ -1,60 +1,75 @@
 package presentation
 
 import (
+	"encoding/json"
 	"strconv"
-
-	common "hrportal_backend/common/domain"
-	"hrportal_backend/common/helper"
-	"hrportal_backend/common/infrastructure"
-	commonpresentation "hrportal_backend/common/presentation"
-	"hrportal_backend/modules/sppd/application/CreateSppd"
-	"hrportal_backend/modules/sppd/application/DeleteSppd"
-	"hrportal_backend/modules/sppd/application/GetSppd"
-	"hrportal_backend/modules/sppd/application/GetSppdHistory"
-	"hrportal_backend/modules/sppd/application/UpdateSppd"
-	"hrportal_backend/modules/sppd/domain"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mehdihadeli/go-mediatr"
+
+	commondomain "hrportal_backend/common/domain"
+	"hrportal_backend/common/helper"
+	commoninfra "hrportal_backend/common/infrastructure"
+	commonpresentation "hrportal_backend/common/presentation"
+	create "hrportal_backend/modules/sppd/application/CreateSppd"
+	delete "hrportal_backend/modules/sppd/application/DeleteSppd"
+	get "hrportal_backend/modules/sppd/application/GetSppd"
+	getHistory "hrportal_backend/modules/sppd/application/GetSppdHistory"
+	update "hrportal_backend/modules/sppd/application/UpdateSppd"
+	"hrportal_backend/modules/sppd/domain"
 )
 
 func ModuleSppd(app *fiber.App) {
 	group := app.Group("/api/sppd", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
 
 	group.Post("/create", func(c *fiber.Ctx) error {
-		var command CreateSppd.CreateSppdCommand
-		_ = c.BodyParser(&command)
-		if command.JenisSppdID == 0 && command.TanggalBerangkat == "" {
-			jenisSppdID, _ := strconv.Atoi(c.FormValue("jenis_sppd_id"))
-			var verifikasi *string
-			vStr := c.FormValue("verifikasi")
-			if vStr != "" {
-				verifikasi = &vStr
-			}
+		jenisSppdID, _ := strconv.Atoi(c.FormValue("jenis_sppd_id"))
+		if jenisSppdID == 0 {
+			jenisSppdID, _ = strconv.Atoi(c.FormValue("jenis_sppd"))
+		}
 
-			command = CreateSppd.CreateSppdCommand{
-				Nidn:             c.FormValue("nidn"),
-				Nip:              c.FormValue("nip"),
-				NamaPemohon:      c.FormValue("nama"),
-				Unit:             c.FormValue("unit"),
-				Fakultas:         c.FormValue("fakultas"),
-				Prodi:            c.FormValue("prodi"),
-				Tujuan:           c.FormValue("tujuan"),
-				JenisSppdID:      uint(jenisSppdID),
-				TanggalBerangkat: c.FormValue("tanggal_berangkat"),
-				TanggalKembali:   c.FormValue("tanggal_kembali"),
-				Keterangan:       c.FormValue("keterangan"),
-				Verifikasi:       verifikasi,
+		var verifikasi *string
+		vStr := c.FormValue("verifikasi")
+		if vStr != "" {
+			verifikasi = &vStr
+		}
+
+		cmd := create.CreateSppdCommand{
+			Nip:              c.FormValue("nip"),
+			Nidn:             c.FormValue("nidn"),
+			NamaPemohon:      c.FormValue("nama"),
+			Unit:             c.FormValue("unit"),
+			Fakultas:         c.FormValue("fakultas"),
+			Prodi:            c.FormValue("prodi"),
+			Tujuan:           c.FormValue("tujuan"),
+			JenisSppdID:      uint(jenisSppdID),
+			TanggalBerangkat: c.FormValue("tanggal_berangkat"),
+			TanggalKembali:   c.FormValue("tanggal_kembali"),
+			Keterangan:       c.FormValue("keterangan"),
+			Verifikasi:       verifikasi,
+		}
+
+		if len(cmd.Anggota) == 0 {
+			anggotaJson := c.FormValue("anggota")
+			if anggotaJson != "" {
+				_ = json.Unmarshal([]byte(anggotaJson), &cmd.Anggota)
 			}
 		}
 
-		res, err := mediatr.Send[*CreateSppd.CreateSppdCommand, common.ResultValue[*domain.Sppd]](c.UserContext(), &command)
+		if len(cmd.Files) == 0 {
+			filesJson := c.FormValue("files")
+			if filesJson != "" {
+				_ = json.Unmarshal([]byte(filesJson), &cmd.Files)
+			}
+		}
+
+		res, err := mediatr.Send[*create.CreateSppdCommand, commondomain.ResultValue[*domain.Sppd]](c.UserContext(), &cmd)
 		if err != nil {
-			return infrastructure.HandleError(c, err)
+			return commoninfra.HandleError(c, err)
 		}
 
 		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
+			return commoninfra.HandleError(c, res.Error)
 		}
 
 		// Trigger FCM Notification for Create SPPD
@@ -74,36 +89,63 @@ func ModuleSppd(app *fiber.App) {
 
 	group.Put("/:id", func(c *fiber.Ctx) error {
 		id, _ := strconv.Atoi(c.Params("id"))
+		jenisSppdID, _ := strconv.Atoi(c.FormValue("jenis_sppd_id"))
+		if jenisSppdID == 0 {
+			jenisSppdID, _ = strconv.Atoi(c.FormValue("jenis_sppd"))
+		}
 
-		var command UpdateSppd.UpdateSppdCommand
-		_ = c.BodyParser(&command)
-		if command.JenisSppdID == 0 && command.TanggalBerangkat == "" {
-			jenisSppdID, _ := strconv.Atoi(c.FormValue("jenis_sppd_id"))
+		var verifikasi *string
+		vStr := c.FormValue("verifikasi")
+		if vStr != "" {
+			verifikasi = &vStr
+		}
 
-			command = UpdateSppd.UpdateSppdCommand{
-				Nidn:             c.FormValue("nidn"),
-				Nip:              c.FormValue("nip"),
-				NamaPemohon:      c.FormValue("nama"),
-				Unit:             c.FormValue("unit"),
-				Fakultas:         c.FormValue("fakultas"),
-				Prodi:            c.FormValue("prodi"),
-				Tujuan:           c.FormValue("tujuan"),
-				JenisSppdID:      uint(jenisSppdID),
-				TanggalBerangkat: c.FormValue("tanggal_berangkat"),
-				TanggalKembali:   c.FormValue("tanggal_kembali"),
-				Keterangan:       c.FormValue("keterangan"),
-				Status:           c.FormValue("status"),
+		var catatan *string
+		cStr := c.FormValue("catatan")
+		if cStr != "" {
+			catatan = &cStr
+		}
+
+		cmd := update.UpdateSppdCommand{
+			ID:               uint(id),
+			Nip:              c.FormValue("nip"),
+			Nidn:             c.FormValue("nidn"),
+			NamaPemohon:      c.FormValue("nama"),
+			Unit:             c.FormValue("unit"),
+			Fakultas:         c.FormValue("fakultas"),
+			Prodi:            c.FormValue("prodi"),
+			Tujuan:           c.FormValue("tujuan"),
+			JenisSppdID:      uint(jenisSppdID),
+			TanggalBerangkat: c.FormValue("tanggal_berangkat"),
+			TanggalKembali:   c.FormValue("tanggal_kembali"),
+			Keterangan:       c.FormValue("keterangan"),
+			Verifikasi:       verifikasi,
+			Status:           c.FormValue("status"),
+			Catatan:          catatan,
+			IsSdm:            c.FormValue("role") == "sdm",
+		}
+
+		if len(cmd.Anggota) == 0 {
+			anggotaJson := c.FormValue("anggota")
+			if anggotaJson != "" {
+				_ = json.Unmarshal([]byte(anggotaJson), &cmd.Anggota)
 			}
 		}
-		command.ID = uint(id)
 
-		res, err := mediatr.Send[*UpdateSppd.UpdateSppdCommand, common.ResultValue[*domain.Sppd]](c.UserContext(), &command)
+		if len(cmd.Files) == 0 {
+			filesJson := c.FormValue("files")
+			if filesJson != "" {
+				_ = json.Unmarshal([]byte(filesJson), &cmd.Files)
+			}
+		}
+
+		res, err := mediatr.Send[*update.UpdateSppdCommand, commondomain.ResultValue[*domain.Sppd]](c.UserContext(), &cmd)
 		if err != nil {
-			return infrastructure.HandleError(c, err)
+			return commoninfra.HandleError(c, err)
 		}
 
 		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
+			return commoninfra.HandleError(c, res.Error)
 		}
 
 		// Trigger FCM Notification for Update/Verify SPPD
@@ -143,17 +185,17 @@ func ModuleSppd(app *fiber.App) {
 	group.Delete("/:id", func(c *fiber.Ctx) error {
 		id, _ := strconv.Atoi(c.Params("id"))
 
-		command := DeleteSppd.DeleteSppdCommand{
+		cmd := delete.DeleteSppdCommand{
 			ID: uint(id),
 		}
 
-		res, err := mediatr.Send[*DeleteSppd.DeleteSppdCommand, common.ResultValue[bool]](c.UserContext(), &command)
+		res, err := mediatr.Send[*delete.DeleteSppdCommand, commondomain.ResultValue[bool]](c.UserContext(), &cmd)
 		if err != nil {
-			return infrastructure.HandleError(c, err)
+			return commoninfra.HandleError(c, err)
 		}
 
 		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
+			return commoninfra.HandleError(c, res.Error)
 		}
 
 		return c.JSON(fiber.Map{"success": res.Value})
@@ -164,7 +206,7 @@ func ModuleSppd(app *fiber.App) {
 		nidn := c.FormValue("nidn")
 		isSdm := c.FormValue("role") == "sdm"
 
-		query := &GetSppdHistory.GetSppdHistoryQuery{
+		query := &getHistory.GetSppdHistoryQuery{
 			Nip:          nip,
 			Nidn:         nidn,
 			Verifikasi:   c.Query("verifikasi") == "haxor",
@@ -173,16 +215,16 @@ func ModuleSppd(app *fiber.App) {
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
 		}
 
-		res, err := mediatr.Send[*GetSppdHistory.GetSppdHistoryQuery, common.ResultValue[[]domain.Sppd]](c.UserContext(), query)
+		res, err := mediatr.Send[*getHistory.GetSppdHistoryQuery, commondomain.ResultValue[[]domain.Sppd]](c.UserContext(), query)
 		if err != nil {
-			return infrastructure.HandleError(c, err)
+			return commoninfra.HandleError(c, err)
 		}
 
 		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
+			return commoninfra.HandleError(c, res.Error)
 		}
 
-		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		pagedData := commondomain.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
 		sseAdapter := &commonpresentation.SSEAdapter[domain.Sppd]{}
 
 		return sseAdapter.Send(c, pagedData)
@@ -191,17 +233,17 @@ func ModuleSppd(app *fiber.App) {
 	group.Get("/:id", func(c *fiber.Ctx) error {
 		id, _ := strconv.Atoi(c.Params("id"))
 
-		query := GetSppd.GetSppdQuery{
+		query := get.GetSppdQuery{
 			ID: uint(id),
 		}
 
-		res, err := mediatr.Send[*GetSppd.GetSppdQuery, common.ResultValue[*domain.Sppd]](c.UserContext(), &query)
+		res, err := mediatr.Send[*get.GetSppdQuery, commondomain.ResultValue[*domain.Sppd]](c.UserContext(), &query)
 		if err != nil {
-			return infrastructure.HandleError(c, err)
+			return commoninfra.HandleError(c, err)
 		}
 
 		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
+			return commoninfra.HandleError(c, res.Error)
 		}
 
 		return c.JSON(res.Value)

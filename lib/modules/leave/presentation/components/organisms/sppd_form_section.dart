@@ -18,6 +18,7 @@ class SppdFormSection extends StatelessWidget {
   final TextEditingController sppdDurationController;
   final TextEditingController sppdPurposeController;
   final Widget attachmentWidget;
+  final Widget? memberSelectorWidget;
   final Widget supervisorSelectorWidget;
   final bool isLoading;
   final bool isEditing;
@@ -39,6 +40,7 @@ class SppdFormSection extends StatelessWidget {
     required this.sppdDurationController,
     required this.sppdPurposeController,
     required this.attachmentWidget,
+    this.memberSelectorWidget,
     required this.supervisorSelectorWidget,
     this.isLoading = false,
     this.isEditing = false,
@@ -269,6 +271,13 @@ class SppdFormSection extends StatelessWidget {
           const SizedBox(height: 8),
           attachmentWidget,
           const SizedBox(height: 20),
+
+          if (memberSelectorWidget != null) ...[
+            const FormSectionHeader(title: 'ANGGOTA / PENGIKUT DINAS (OPSIONAL)'),
+            const SizedBox(height: 8),
+            memberSelectorWidget!,
+            const SizedBox(height: 20),
+          ],
 
           const FormSectionHeader(title: 'VERIFIKASI ATASAN'),
           const SizedBox(height: 8),

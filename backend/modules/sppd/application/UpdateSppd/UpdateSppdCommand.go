@@ -6,6 +6,8 @@ import (
 
 	common "hrportal_backend/common/domain"
 	"hrportal_backend/common/infrastructure"
+	commoninfra "hrportal_backend/common/infrastructure"
+	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -51,6 +53,7 @@ type UpdateSppdCommand struct {
 	IdUser                   *uint64                `json:"id_user"`
 	Anggota                  []SppdAnggotaInput     `json:"anggota"`
 	Files                    []SppdFileLaporanInput `json:"files"`
+	IsSdm                    bool                   `json:"isSdm"`
 }
 
 func (c UpdateSppdCommand) Validate() error {
@@ -186,8 +189,27 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	}
 	sppd.Files = dbFiles
 
-	if err := h.sppdRepo.UpdateSppd(ctx, sppd); err != nil {
-		return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed", err.Error())), nil
+	repo := reportInfra.GetReportRepository()
+	if repo != nil {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		if err := h.sppdRepo.UpdateSppd(ctxTx, sppd); err != nil {
+			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed", err.Error())), nil
+		}
+
+		if cmd.Status == "terima sdm" {
+			if err := repo.IncrementCounter(ctxTx, sppd.Nip, sppd.Nidn, now, "sppd", sppd.NamaPemohon, sppd.Unit, sppd.Fakultas, sppd.Prodi); err != nil {
+				tx.Rollback()
+				return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed2", err.Error())), err
+			}
+		}
 	}
 
 	return common.SuccessValue(sppd), nil

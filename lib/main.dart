@@ -47,6 +47,8 @@ import 'modules/leave/application/get_leaves/get_leaves_query.dart';
 import 'modules/leave/application/get_leaves/get_leaves_query_handler.dart';
 import 'modules/leave/application/get_supervisors/get_supervisors_query.dart';
 import 'modules/leave/application/get_supervisors/get_supervisors_query_handler.dart';
+import 'modules/leave/application/get_people/get_people_query.dart';
+import 'modules/leave/application/get_people/get_people_query_handler.dart';
 import 'modules/leave/application/get_verification_leaves/get_verification_leaves_query.dart';
 import 'modules/leave/application/update_leave_status/update_leave_status_command.dart';
 import 'modules/leave/infrastructure/leave_repository.dart';
@@ -100,6 +102,8 @@ void setupMediator() {
       GetLeavesQueryHandler(leaveRepo));
   mediator.registerHandler<GetSupervisorsQuery, List<Supervisor>>(
       GetSupervisorsQueryHandler(leaveRepo));
+  mediator.registerHandler<GetPeopleQuery, List<Supervisor>>(
+      GetPeopleQueryHandler(leaveRepo));
   mediator.registerHandler<GetVerificationLeavesQuery, List<LeaveRequest>>(
       GetVerificationLeavesQueryHandler(leaveRepo));
   mediator.registerHandler<UpdateLeaveStatusCommand, bool>(

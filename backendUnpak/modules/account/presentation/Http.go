@@ -54,14 +54,9 @@ func LoginHandlerfunc(c *fiber.Ctx) error {
 		}
 	}()
 
-	var cmd login.LoginCommand
-	_ = c.BodyParser(&cmd)
-
-	if cmd.Username == "" {
-		cmd.Username = c.FormValue("username")
-	}
-	if cmd.Password == "" {
-		cmd.Password = c.FormValue("password")
+	cmd := login.LoginCommand{
+		Username: c.FormValue("username"),
+		Password: c.FormValue("password"),
 	}
 
 	ctx := c.UserContext()

@@ -20,6 +20,7 @@ type CreateIzinCommand struct {
 	JenisIzinID      uint    `json:"id_jenis_izin"`
 	TanggalPengajuan string  `json:"tanggal_pengajuan"`
 	Tujuan           string  `json:"tujuan"`
+	FileLampiran     *string `json:"file_lampiran"`
 	Verifikasi       *string `json:"verifikasi"`
 }
 
@@ -55,6 +56,7 @@ func (h *CreateIzinCommandHandler) Handle(ctx context.Context, cmd *CreateIzinCo
 		JenisIzinID:      int(cmd.JenisIzinID),
 		TanggalPengajuan: cmd.TanggalPengajuan,
 		Tujuan:           cmd.Tujuan,
+		FileLampiran:     cmd.FileLampiran,
 		Verifikasi:       cmd.Verifikasi,
 		Status:           "menunggu",
 		CreatedAt:        &now,

@@ -18,6 +18,7 @@ type Izin struct {
 	JenisIzinID      int        `gorm:"column:id_jenis_izin;type:int" json:"id_jenis_izin"`
 	TanggalPengajuan string     `gorm:"column:tanggal_pengajuan;index" json:"tanggal_pengajuan"`
 	Tujuan           string     `gorm:"column:tujuan" json:"tujuan"`
+	FileLampiran     *string    `gorm:"column:dokumen" json:"file_lampiran"`
 	Verifikasi       *string    `gorm:"column:verifikasi" json:"verifikasi"`
 	Status           string     `gorm:"column:status" json:"status"`
 	Catatan          *string    `gorm:"column:catatan" json:"catatan"`

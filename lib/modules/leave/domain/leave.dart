@@ -1,5 +1,7 @@
 import 'leave_errors.dart';
 
+/// LeaveRequest Domain Entity
+
 class LeaveRequest {
   final String id;
   final String type;
@@ -14,6 +16,7 @@ class LeaveRequest {
   final String? applicantNip;
   final String? applicantNidn;
   final String? supervisorId;
+  final String? attachmentPath;
 
   LeaveRequest({
     required this.id,
@@ -28,6 +31,7 @@ class LeaveRequest {
     this.applicantNip,
     this.applicantNidn,
     this.supervisorId,
+    this.attachmentPath,
   });
 
   /// Domain Invariant Rule Validation (Domain Business Rules)

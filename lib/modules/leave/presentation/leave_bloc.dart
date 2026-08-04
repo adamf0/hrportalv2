@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/mediator/mediator.dart';
 import '../application/get_leaves/get_leaves_query.dart';
 import '../application/get_supervisors/get_supervisors_query.dart';
+import '../application/get_people/get_people_query.dart';
 import '../application/get_verification_leaves/get_verification_leaves_query.dart';
 import '../application/submit_leave/submit_leave_command.dart';
 import '../application/update_leave_status/update_leave_status_command.dart';
@@ -227,6 +228,10 @@ class LeaveBloc extends ChangeNotifier {
   bool _isSupervisorsError = false;
   bool get isSupervisorsError => _isSupervisorsError;
 
+  List<Supervisor> _peopleList = [];
+  List<Supervisor> get peopleList =>
+      _peopleList.isNotEmpty ? _peopleList : _supervisors;
+
   Future<void> fetchSupervisors() async {
     _isSupervisorsLoading = true;
     _isSupervisorsError = false;
@@ -245,6 +250,18 @@ class LeaveBloc extends ChangeNotifier {
     }
   }
 
+  Future<void> fetchPeopleList() async {
+    try {
+      final res = await _mediator.send(GetPeopleQuery());
+      if (res.isNotEmpty) {
+        _peopleList = List.from(res);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('[LeaveBloc fetchPeopleList error]: $e');
+    }
+  }
+
   Future<bool> submitLeaveForm({
     required String type,
     required DateTime startDate,
@@ -253,6 +270,7 @@ class LeaveBloc extends ChangeNotifier {
     required String supervisorId,
     required String supervisorName,
     String? attachmentPath,
+    List<Supervisor>? members,
   }) async {
     _isLoading = true;
     _errorMessage = '';
@@ -279,6 +297,7 @@ class LeaveBloc extends ChangeNotifier {
           request: newReq,
           supervisorId: supervisorId,
           attachmentPath: attachmentPath,
+          members: members,
         ),
       );
 

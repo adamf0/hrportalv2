@@ -5,6 +5,7 @@ import (
 	common "hrportal_backend/common/domain"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/leave/domain"
+	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -24,6 +25,7 @@ type UpdateCutiCommand struct {
 	FileLampiran   *string `json:"file_lampiran"`
 	Status         string  `json:"status"`
 	CatatanAtasan  *string `json:"catatan_atasan"`
+	IsSdm          bool    `json:"isSdm"`
 }
 
 func (c UpdateCutiCommand) Validate() error {
@@ -93,8 +95,28 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 	}
 	cuti.UpdatedAt = &now
 
-	if err := h.leaveRepo.UpdateCuti(ctx, cuti); err != nil {
-		return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed", err.Error())), nil
+	repo := reportInfra.GetReportRepository()
+	if repo != nil {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		if err := h.leaveRepo.UpdateCuti(ctxTx, cuti); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed", err.Error())), nil
+		}
+
+		if cmd.Status == "terima sdm" {
+			if err := repo.IncrementCounter(ctxTx, cuti.Nip, cuti.Nidn, now, "cuti", cuti.NamaPemohon, cuti.Unit, cuti.Fakultas, cuti.Prodi); err != nil {
+				tx.Rollback()
+				return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed2", err.Error())), err
+			}
+		}
 	}
 
 	return common.SuccessValue(cuti), nil

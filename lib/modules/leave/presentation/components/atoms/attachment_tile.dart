@@ -82,7 +82,9 @@ class AttachmentTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${fileSizeMb.toStringAsFixed(2)} MB',
+                  fileSizeMb > 0
+                      ? '${fileSizeMb.toStringAsFixed(2)} MB'
+                      : 'Dokumen terlampir',
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     color: Theme.of(context).colorScheme.secondary,

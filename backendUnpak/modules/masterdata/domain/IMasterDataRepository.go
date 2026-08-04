@@ -10,5 +10,6 @@ type IMasterDataRepository interface {
 	GetAllJenisCuti(ctx context.Context) ([]JenisCuti, error)
 	GetAllJenisIzin(ctx context.Context) ([]JenisIzin, error)
 	GetAllJenisSppd(ctx context.Context) ([]JenisSppd, error)
-	GetVerifikators(ctx context.Context, verifikatorType string) ([]Verifikator, error)
+	GetVerifikators(ctx context.Context) ([]Verifikator, error)
+	GetPepoples(ctx context.Context) ([]Verifikator, error)
 }

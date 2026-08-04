@@ -5,6 +5,7 @@ import (
 	common "hrportal_backend/common/domain"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/izin/domain"
+	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -19,8 +20,10 @@ type UpdateIzinCommand struct {
 	JenisIzinID      uint    `json:"id_jenis_izin"`
 	TanggalPengajuan string  `json:"tanggal_pengajuan"`
 	Tujuan           string  `json:"tujuan"`
+	FileLampiran     *string `json:"file_lampiran"`
 	Status           string  `json:"status"`
 	Catatan          *string `json:"catatan"`
+	IsSdm            bool    `json:"isSdm"`
 }
 
 func (c UpdateIzinCommand) Validate() error {
@@ -69,6 +72,9 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	if cmd.Tujuan != "" {
 		izin.Tujuan = cmd.Tujuan
 	}
+	if cmd.FileLampiran != nil {
+		izin.FileLampiran = cmd.FileLampiran
+	}
 	if cmd.Status != "" {
 		izin.Status = cmd.Status
 	}
@@ -77,8 +83,36 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	}
 	izin.UpdatedAt = &now
 
-	if err := h.Repo.Update(ctx, izin); err != nil {
-		return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed", err.Error())), nil
+	repo := reportInfra.GetReportRepository()
+	if repo != nil {
+		db := repo.GetDB()
+		tx := db.Begin()
+		defer func() {
+			if r := recover(); r != nil {
+				tx.Rollback()
+			}
+		}()
+		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+
+		if err := h.Repo.Update(ctxTx, izin); err != nil {
+			tx.Rollback()
+			return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed", err.Error())), nil
+		}
+
+		if cmd.Status == "terima sdm" {
+			if err := repo.IncrementCounter(ctxTx, izin.Nip, izin.Nidn, now, "izin", izin.NamaPemohon, izin.Unit, izin.Fakultas, izin.Prodi); err != nil {
+				tx.Rollback()
+				return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed2", err.Error())), err
+			}
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.Izin](common.FailureError("Izin.CommitFailed", err.Error())), nil
+		}
+	} else {
+		if err := h.Repo.Update(ctx, izin); err != nil {
+			return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed", err.Error())), nil
+		}
 	}
 
 	return common.SuccessValue(izin), nil

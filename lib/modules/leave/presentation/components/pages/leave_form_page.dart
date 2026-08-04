@@ -7,6 +7,7 @@ import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart'
 import 'package:hrportalv2/core/responsive_helper.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/atoms/attachment_tile.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/atoms/supervisor_selector_tile.dart';
+import 'package:hrportalv2/modules/leave/presentation/components/atoms/member_selector_tile.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/molecules/leave_form_tab_bar.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/strategies/attachment_strategy.dart';
 
@@ -19,7 +20,10 @@ import 'package:hrportalv2/modules/leave/presentation/components/organisms/sppd_
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/cuti_type_selector_sheet.dart';
 import 'package:hrportalv2/modules/leave/domain/leave.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/supervisor_selector_sheet.dart';
+import 'package:hrportalv2/modules/leave/presentation/components/organisms/member_selector_sheet.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/leave_form_success_dialog.dart';
+
+// Leave Form Page Component
 
 class LeaveFormPage extends StatefulWidget {
   final int initialTab;
@@ -56,6 +60,10 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
         _selectedIzinType = req.type;
         _izinDate = req.startDate;
         _izinPurposeController.text = req.details;
+        if (req.attachmentPath != null && req.attachmentPath!.isNotEmpty) {
+          _izinHasAttachment = true;
+          _izinFileName = req.attachmentPath!;
+        }
       } else if (typeLower.startsWith('sppd')) {
         _activeType = LeaveFormType.sppd;
         _selectedSppdType = req.type;
@@ -75,6 +83,10 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           _sppdPurposeController.text = req.details;
         }
         _calculateSppdDuration();
+        if (req.attachmentPath != null && req.attachmentPath!.isNotEmpty) {
+          _sppdHasAttachment = true;
+          _sppdFileName = req.attachmentPath!;
+        }
       } else {
         _activeType = LeaveFormType.cuti;
         _selectedCutiType = req.type;
@@ -82,6 +94,10 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
         _cutiEndDate = req.endDate;
         _cutiPurposeController.text = req.details;
         _calculateCutiDuration();
+        if (req.attachmentPath != null && req.attachmentPath!.isNotEmpty) {
+          _cutiHasAttachment = true;
+          _cutiFileName = req.attachmentPath!;
+        }
       }
     } else {
       _activeType = widget.initialTab == 1
@@ -162,6 +178,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
   String _sppdFileName = '';
   double _sppdFileSizeMb = 0.0;
   String? _selectedSppdSupervisorId;
+  final List<Supervisor> _selectedSppdMembers = [];
 
   @override
   void dispose() {
@@ -184,7 +201,8 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     _sppdDurationController.text = difference.toString();
   }
 
-  Future<void> _selectSingleDate(BuildContext context, bool isStart, LeaveFormType formType) async {
+  Future<void> _selectSingleDate(
+      BuildContext context, bool isStart, LeaveFormType formType) async {
     final picked = await LeaveDatePickerHelper.pickDate(
       context: context,
       isStart: isStart,
@@ -235,19 +253,22 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
         case LeaveFormType.cuti:
           _cutiHasAttachment = true;
           String typeLabel = _selectedCutiType ?? 'dokumen';
-          _cutiFileName = 'bukti_cuti_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
+          _cutiFileName =
+              'bukti_cuti_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
           _cutiFileSizeMb = 2.4;
           break;
         case LeaveFormType.izin:
           _izinHasAttachment = true;
           String typeLabel = _selectedIzinType ?? 'dokumen';
-          _izinFileName = 'bukti_izin_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
+          _izinFileName =
+              'bukti_izin_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
           _izinFileSizeMb = 1.8;
           break;
         case LeaveFormType.sppd:
           _sppdHasAttachment = true;
           String typeLabel = _selectedSppdType ?? 'dokumen';
-          _sppdFileName = 'bukti_sppd_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
+          _sppdFileName =
+              'bukti_sppd_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
           _sppdFileSizeMb = 3.2;
           break;
       }
@@ -290,6 +311,30 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
                   _selectedSppdSupervisorId = sv.id;
                   break;
               }
+            });
+          },
+        );
+      },
+    );
+  }
+
+  void _showMemberSelector(BuildContext context) {
+    final leaveBloc = context.read<LeaveBloc>();
+    if (leaveBloc.peopleList.isEmpty) {
+      leaveBloc.fetchPeopleList();
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return MemberSelectorSheet(
+          people: leaveBloc.peopleList,
+          initialSelectedMembers: _selectedSppdMembers,
+          onMembersSelected: (members) {
+            setState(() {
+              _selectedSppdMembers.clear();
+              _selectedSppdMembers.addAll(members);
             });
           },
         );
@@ -442,6 +487,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
             supervisorId: supervisor.id,
             supervisorName: supervisor.name,
             attachmentPath: _sppdHasAttachment ? _sppdFileName : null,
+            members: _selectedSppdMembers,
           );
 
           if (ok) {
@@ -535,8 +581,10 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       onCutiTypeTap: () => _showCutiTypeSelector(context),
       cutiStartDate: _cutiStartDate,
       cutiEndDate: _cutiEndDate,
-      onSelectStartDate: () => _selectSingleDate(context, true, LeaveFormType.cuti),
-      onSelectEndDate: () => _selectSingleDate(context, false, LeaveFormType.cuti),
+      onSelectStartDate: () =>
+          _selectSingleDate(context, true, LeaveFormType.cuti),
+      onSelectEndDate: () =>
+          _selectSingleDate(context, false, LeaveFormType.cuti),
       cutiDurationController: _cutiDurationController,
       cutiPurposeController: _cutiPurposeController,
       attachmentWidget: _buildAttachmentSection(LeaveFormType.cuti),
@@ -544,9 +592,12 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
         builder: (context) {
           final isSvLoading = leaveBloc.isSupervisorsLoading ||
               (leaveBloc.isLoading && leaveBloc.supervisors.isEmpty) ||
-              (widget.initialRequest != null && _selectedCutiSupervisorId == null && !leaveBloc.isSupervisorsError);
+              (widget.initialRequest != null &&
+                  _selectedCutiSupervisorId == null &&
+                  !leaveBloc.isSupervisorsError);
           Supervisor? sv;
-          if (_selectedCutiSupervisorId != null && leaveBloc.supervisors.isNotEmpty) {
+          if (_selectedCutiSupervisorId != null &&
+              leaveBloc.supervisors.isNotEmpty) {
             try {
               sv = leaveBloc.supervisors.firstWhere(
                   (element) => element.id == _selectedCutiSupervisorId);
@@ -589,9 +640,12 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
         builder: (context) {
           final isSvLoading = leaveBloc.isSupervisorsLoading ||
               (leaveBloc.isLoading && leaveBloc.supervisors.isEmpty) ||
-              (widget.initialRequest != null && _selectedIzinSupervisorId == null && !leaveBloc.isSupervisorsError);
+              (widget.initialRequest != null &&
+                  _selectedIzinSupervisorId == null &&
+                  !leaveBloc.isSupervisorsError);
           Supervisor? sv;
-          if (_selectedIzinSupervisorId != null && leaveBloc.supervisors.isNotEmpty) {
+          if (_selectedIzinSupervisorId != null &&
+              leaveBloc.supervisors.isNotEmpty) {
             try {
               sv = leaveBloc.supervisors.firstWhere(
                   (element) => element.id == _selectedIzinSupervisorId);
@@ -629,18 +683,32 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       sppdCityController: _sppdCityController,
       sppdStartDate: _sppdStartDate,
       sppdEndDate: _sppdEndDate,
-      onSelectStartDate: () => _selectSingleDate(context, true, LeaveFormType.sppd),
-      onSelectEndDate: () => _selectSingleDate(context, false, LeaveFormType.sppd),
+      onSelectStartDate: () =>
+          _selectSingleDate(context, true, LeaveFormType.sppd),
+      onSelectEndDate: () =>
+          _selectSingleDate(context, false, LeaveFormType.sppd),
       sppdDurationController: _sppdDurationController,
       sppdPurposeController: _sppdPurposeController,
       attachmentWidget: _buildAttachmentSection(LeaveFormType.sppd),
+      memberSelectorWidget: MemberSelectorTile(
+        selectedMembers: _selectedSppdMembers,
+        onTap: () => _showMemberSelector(context),
+        onRemoveMember: (member) {
+          setState(() {
+            _selectedSppdMembers.removeWhere((m) => m.id == member.id);
+          });
+        },
+      ),
       supervisorSelectorWidget: Builder(
         builder: (context) {
           final isSvLoading = leaveBloc.isSupervisorsLoading ||
               (leaveBloc.isLoading && leaveBloc.supervisors.isEmpty) ||
-              (widget.initialRequest != null && _selectedSppdSupervisorId == null && !leaveBloc.isSupervisorsError);
+              (widget.initialRequest != null &&
+                  _selectedSppdSupervisorId == null &&
+                  !leaveBloc.isSupervisorsError);
           Supervisor? sv;
-          if (_selectedSppdSupervisorId != null && leaveBloc.supervisors.isNotEmpty) {
+          if (_selectedSppdSupervisorId != null &&
+              leaveBloc.supervisors.isNotEmpty) {
             try {
               sv = leaveBloc.supervisors.firstWhere(
                   (element) => element.id == _selectedSppdSupervisorId);

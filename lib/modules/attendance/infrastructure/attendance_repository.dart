@@ -34,9 +34,18 @@ class AttendanceRepository implements IAttendanceRepository {
 
       final safeNote = note.length > 10 ? note.substring(0, 10) : note;
 
+      final name = session['name'] ?? session['nama'] ?? '';
+      final unit = session['unit'] ?? '';
+      final fakultas = session['fakultas'] ?? '';
+      final prodi = session['prodi'] ?? '';
+
       final Map<String, String> bodyData = {
         "nip": nip,
         "nidn": nidn,
+        "nama": name,
+        "unit": unit,
+        "fakultas": fakultas,
+        "prodi": prodi,
         "latitude": lat.toString(),
         "longitude": lon.toString(),
         "note": safeNote,

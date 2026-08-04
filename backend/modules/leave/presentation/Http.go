@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"os"
 	"strconv"
 
 	common "hrportal_backend/common/domain"
@@ -33,17 +32,12 @@ func ModuleLeave(app *fiber.App) {
 		}
 
 		var fileLampiran *string
-		file, err := c.FormFile("file_lampiran")
-		if err == nil && file != nil {
-			_ = os.MkdirAll("./uploads", os.ModePerm)
-			savePath := "./uploads/" + file.Filename
-			_ = c.SaveFile(file, savePath)
-			fileLampiran = &savePath
-		} else {
-			fileVal := c.FormValue("file_lampiran")
-			if fileVal != "" {
-				fileLampiran = &fileVal
-			}
+		fStr := c.FormValue("file_lampiran")
+		if fStr == "" {
+			fStr = c.FormValue("file")
+		}
+		if fStr != "" {
+			fileLampiran = &fStr
 		}
 
 		command := SubmitCuti.SubmitCutiCommand{
@@ -95,17 +89,12 @@ func ModuleLeave(app *fiber.App) {
 		jumlahHari, _ := strconv.Atoi(c.FormValue("jumlah_hari"))
 
 		var fileLampiran *string
-		file, err := c.FormFile("file_lampiran")
-		if err == nil && file != nil {
-			_ = os.MkdirAll("./uploads", os.ModePerm)
-			savePath := "./uploads/" + file.Filename
-			_ = c.SaveFile(file, savePath)
-			fileLampiran = &savePath
-		} else {
-			fileVal := c.FormValue("file_lampiran")
-			if fileVal != "" {
-				fileLampiran = &fileVal
-			}
+		fStr := c.FormValue("file_lampiran")
+		if fStr == "" {
+			fStr = c.FormValue("file")
+		}
+		if fStr != "" {
+			fileLampiran = &fStr
 		}
 
 		var catatanAtasan *string
@@ -128,6 +117,7 @@ func ModuleLeave(app *fiber.App) {
 			FileLampiran:   fileLampiran,
 			Status:         c.FormValue("status"),
 			CatatanAtasan:  catatanAtasan,
+			IsSdm:          c.FormValue("role") == "sdm",
 		}
 
 		res, err := mediatr.Send[*UpdateCuti.UpdateCutiCommand, common.ResultValue[*domain.Cuti]](c.UserContext(), &command)

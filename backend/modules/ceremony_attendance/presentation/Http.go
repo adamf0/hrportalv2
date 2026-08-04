@@ -22,17 +22,14 @@ func ModuleCeremonyAttendance(app *fiber.App) {
 	group := app.Group("/api/ceremony-attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
 
 	group.Post("/", func(c *fiber.Ctx) error {
-		var command CreateAbsenUpacara.CreateAbsenUpacaraCommand
-		if err := c.BodyParser(&command); err != nil {
-			command = CreateAbsenUpacara.CreateAbsenUpacaraCommand{
-				Nip:      c.FormValue("nip"),
-				Nidn:     c.FormValue("nidn"),
-				Nama:     c.FormValue("nama"),
-				Unit:     c.FormValue("unit"),
-				Fakultas: c.FormValue("fakultas"),
-				Prodi:    c.FormValue("prodi"),
-				Tanggal:  c.FormValue("tanggal"),
-			}
+		command := CreateAbsenUpacara.CreateAbsenUpacaraCommand{
+			Nip:      c.FormValue("nip"),
+			Nidn:     c.FormValue("nidn"),
+			Nama:     c.FormValue("nama"),
+			Unit:     c.FormValue("unit"),
+			Fakultas: c.FormValue("fakultas"),
+			Prodi:    c.FormValue("prodi"),
+			Tanggal:  c.FormValue("tanggal"),
 		}
 
 		res, err := mediatr.Send[*CreateAbsenUpacara.CreateAbsenUpacaraCommand, common.ResultValue[*domain.AbsenUpacara]](c.UserContext(), &command)
@@ -67,16 +64,13 @@ func ModuleCeremonyAttendance(app *fiber.App) {
 	group.Put("/:id", func(c *fiber.Ctx) error {
 		id, _ := strconv.Atoi(c.Params("id"))
 
-		var command UpdateAbsenUpacara.UpdateAbsenUpacaraCommand
-		if err := c.BodyParser(&command); err != nil {
-			command = UpdateAbsenUpacara.UpdateAbsenUpacaraCommand{
-				Nip:     c.FormValue("nip"),
-				Nidn:    c.FormValue("nidn"),
-				Nama:    c.FormValue("nama"),
-				Tanggal: c.FormValue("tanggal"),
-			}
+		command := UpdateAbsenUpacara.UpdateAbsenUpacaraCommand{
+			ID:      uint(id),
+			Nip:     c.FormValue("nip"),
+			Nidn:    c.FormValue("nidn"),
+			Nama:    c.FormValue("nama"),
+			Tanggal: c.FormValue("tanggal"),
 		}
-		command.ID = uint(id)
 
 		res, err := mediatr.Send[*UpdateAbsenUpacara.UpdateAbsenUpacaraCommand, common.ResultValue[*domain.AbsenUpacara]](c.UserContext(), &command)
 		if err != nil {

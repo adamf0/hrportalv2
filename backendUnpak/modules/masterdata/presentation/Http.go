@@ -75,10 +75,20 @@ func ModuleMasterData(app *fiber.App) {
 	})
 
 	group.Get("/verifikator", func(c *fiber.Ctx) error {
-		q := &query.GetAllVerifikatorQuery{
-			Type: c.Query("type"),
-		}
+		q := &query.GetAllVerifikatorQuery{}
 		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
+
+	group.Get("/people", func(c *fiber.Ctx) error {
+		q := &query.GetAllPeopleQuery{}
+		res, err := mediatr.Send[*query.GetAllPeopleQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
 		if err != nil {
 			return infrastructure.HandleError(c, err)
 		}

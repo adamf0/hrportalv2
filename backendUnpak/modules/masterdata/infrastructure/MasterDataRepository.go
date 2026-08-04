@@ -3,7 +3,6 @@ package infrastructure
 import (
 	"context"
 	"hrportal_backend_unpak/modules/masterdata/domain"
-	"strings"
 
 	"gorm.io/gorm"
 )
@@ -46,7 +45,7 @@ func (r *MasterDataRepository) GetAllJenisSppd(ctx context.Context) ([]domain.Je
 	return list, err
 }
 
-func (r *MasterDataRepository) GetVerifikators(ctx context.Context, verifikatorType string) ([]domain.Verifikator, error) {
+func (r *MasterDataRepository) GetVerifikators(ctx context.Context) ([]domain.Verifikator, error) {
 	var list []domain.Verifikator
 	query := r.db.WithContext(ctx).Table("connect_payroll_m_pegawai").
 		Where("CHAR_LENGTH(nip) >= 3").
@@ -57,17 +56,17 @@ func (r *MasterDataRepository) GetVerifikators(ctx context.Context, verifikatorT
 		return nil, err
 	}
 
-	if verifikatorType == "sppd" || verifikatorType == "verifikator" {
-		var filtered []domain.Verifikator
-		for _, v := range list {
-			strukturalLower := strings.ToLower(v.Struktural)
-			if strings.Contains(strukturalLower, "wakil rektor bid sdm dan keuangan") ||
-				strings.Contains(strukturalLower, "wakil dekan 2") ||
-				strings.Contains(strukturalLower, "wakil dekan ii") {
-				filtered = append(filtered, v)
-			}
-		}
-		return filtered, nil
+	return list, nil
+}
+
+func (r *MasterDataRepository) GetPepoples(ctx context.Context) ([]domain.Verifikator, error) {
+	var list []domain.Verifikator
+	query := r.db.WithContext(ctx).Table("connect_payroll_m_pegawai").
+		Where("CHAR_LENGTH(nip) >= 3")
+
+	err := query.Find(&list).Error
+	if err != nil {
+		return nil, err
 	}
 
 	return list, nil

@@ -401,21 +401,30 @@ class AutoAttendanceService with WidgetsBindingObserver {
   /// Performs Auto Ceremony Check-In API call
   Future<bool> _performAutoUpacaraCheckIn(String nip, String nidn) async {
     try {
+      final session = await SsoHelper.getSession();
+      final name = session?['name'] ?? session?['nama'] ?? '';
+      final unit = session?['unit'] ?? '';
+      final fakultas = session?['fakultas'] ?? '';
+      final prodi = session?['prodi'] ?? '';
+
       final now = DateTime.now();
       final todayStr =
           "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final url = Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance');
-      final response = await http.post(
-        url,
+      final responseData = await ApiClient.post(
+        Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance'),
         body: {
           'nip': nip,
           'nidn': nidn,
+          'nama': name,
+          'unit': unit,
+          'fakultas': fakultas,
+          'prodi': prodi,
           'tanggal': todayStr,
-          'note': 'Auto Ceremony Attendance (Background Job)',
+          'note': 'Auto Ceremony Attendance',
         },
-      ).timeout(const Duration(seconds: 5));
+      );
 
-      return response.statusCode == 200;
+      return responseData != null;
     } catch (e) {
       debugPrint('[AutoAttendanceService] Upacara API failed: $e');
     }
