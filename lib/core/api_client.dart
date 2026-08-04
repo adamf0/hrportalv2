@@ -625,4 +625,95 @@ class ApiClient {
       throw ApiException(msg);
     }
   }
+
+  /// Perform DELETE request
+  static Future<dynamic> delete(
+    Uri url, {
+    Map<String, String>? headers,
+    Object? body,
+    Duration timeout = const Duration(seconds: 10),
+    String? scope,
+  }) async {
+    final reqScopeId = _currentScopeId;
+    final reqScope = scope ?? _activeScope;
+    final isExempt = isExemptedUrl(url, scope);
+
+    if (!isExempt &&
+        (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+      debugPrint(
+          '[ApiClient Pre-Check Blocked]: DELETE $url (Scope mismatch: $reqScope != $_activeScope)');
+      throw ApiCancelledException(reqScope, url.toString());
+    }
+
+    final injectedHeaders = await _injectAuthHeaders(headers);
+    debugPrint(
+        '[API Loading State Log] Request: DELETE $url | State: START (Scope: $reqScope)');
+    try {
+      final response = await http
+          .delete(
+            url,
+            headers: injectedHeaders,
+            body: body,
+          )
+          .timeout(timeout);
+
+      if (!isExempt &&
+          (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        debugPrint(
+            '[ApiClient Post-Check Cancelled]: DELETE $url (Page switched during request)');
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+
+      debugPrint('[API Loading State Log] Request: DELETE $url | State: END');
+      return processResponse(response);
+    } on ApiCancelledException {
+      rethrow;
+    } on SocketException catch (e, stackTrace) {
+      if (!isExempt &&
+          (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint(
+          '[API Loading State Log] Request: DELETE $url | State: END (SocketException)');
+      const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
+      debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on TimeoutException catch (e, stackTrace) {
+      if (!isExempt &&
+          (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint(
+          '[API Loading State Log] Request: DELETE $url | State: END (TimeoutException)');
+      const msg =
+          'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
+      debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } on FormatException catch (e, stackTrace) {
+      if (!isExempt &&
+          (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint(
+          '[API Loading State Log] Request: DELETE $url | State: END (FormatException)');
+      const msg = 'Format data dari server mengalami kesalahan.';
+      debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    } catch (e, stackTrace) {
+      if (!isExempt &&
+          (_activeScope != reqScope || _currentScopeId != reqScopeId)) {
+        throw ApiCancelledException(reqScope, url.toString());
+      }
+      debugPrint(
+          '[API Loading State Log] Request: DELETE $url | State: END (Exception)');
+      if (e is ApiException) rethrow;
+      final msg = 'Terjadi kesalahan tidak terduga: $e';
+      debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');
+      showToast(msg);
+      throw ApiException(msg);
+    }
+  }
 }

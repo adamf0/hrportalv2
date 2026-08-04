@@ -231,6 +231,61 @@ class _LeaveListPageState extends State<LeaveListPage> {
     );
   }
 
+  void _handleEdit(BuildContext context, LeaveBloc bloc, LeaveRequest req) {
+    int initialTab = 0;
+    if (req.type.toLowerCase().startsWith('izin')) initialTab = 1;
+    if (req.type.toLowerCase().startsWith('sppd')) initialTab = 2;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LeaveFormPage(
+          initialTab: initialTab,
+          initialType: req.type,
+          initialRequest: req,
+        ),
+      ),
+    ).then((_) {
+      bloc.fetchLeaves(isRefresh: true);
+    });
+  }
+
+  void _handleDelete(BuildContext context, LeaveBloc bloc, LeaveRequest req) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Hapus Pengajuan',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus pengajuan "${req.type}" ini?',
+          style: GoogleFonts.inter(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[600],
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await bloc.deleteLeave(req.id);
+              if (ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Pengajuan berhasil dihapus!')),
+                );
+              }
+            },
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final leaveBloc = Provider.of<LeaveBloc>(context);
@@ -675,6 +730,18 @@ class _LeaveListPageState extends State<LeaveListPage> {
                                             ),
                                             ...items.map((req) => RequestCard(
                                                   req: req,
+                                                  onEdit: _activeTab == 0
+                                                      ? () => _handleEdit(
+                                                          context,
+                                                          leaveBloc,
+                                                          req)
+                                                      : null,
+                                                  onDelete: _activeTab == 0
+                                                      ? () => _handleDelete(
+                                                          context,
+                                                          leaveBloc,
+                                                          req)
+                                                      : null,
                                                   onApprove: _activeTab == 1
                                                       ? () => _handleApprove(
                                                           context,
@@ -696,6 +763,18 @@ class _LeaveListPageState extends State<LeaveListPage> {
                                     : filteredRequests
                                         .map((req) => RequestCard(
                                               req: req,
+                                              onEdit: _activeTab == 0
+                                                  ? () => _handleEdit(
+                                                      context,
+                                                      leaveBloc,
+                                                      req)
+                                                  : null,
+                                              onDelete: _activeTab == 0
+                                                  ? () => _handleDelete(
+                                                      context,
+                                                      leaveBloc,
+                                                      req)
+                                                  : null,
                                               onApprove: _activeTab == 1
                                                   ? () => _handleApprove(
                                                       context,
@@ -720,8 +799,8 @@ class _LeaveListPageState extends State<LeaveListPage> {
             if (_activeTab == 0)
               Positioned(
                 bottom: 20,
-                right: 20,
-                child: FloatingActionButton.extended(
+                left: 20,
+                child: FloatingActionButton(
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -734,12 +813,7 @@ class _LeaveListPageState extends State<LeaveListPage> {
                   backgroundColor: primaryColor,
                   foregroundColor: Colors.white,
                   elevation: 4,
-                  icon: const Icon(Icons.add, size: 20),
-                  label: Text(
-                    'Buat Pengajuan',
-                    style: GoogleFonts.inter(
-                        fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                  child: const Icon(Icons.add, size: 24),
                 ),
               ),
           ],

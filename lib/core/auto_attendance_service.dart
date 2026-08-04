@@ -34,6 +34,22 @@ class AutoAttendanceService with WidgetsBindingObserver {
     }
   }
 
+  void markAlreadyCheckedInInitial() {
+    _hasNotifiedSuccessToday = true;
+    debugPrint(
+        '[AutoAttendanceService] Initial state already checked in today. Success notification suppressed.');
+  }
+
+  Future<void> triggerSuccessNotificationIfInitialNull() async {
+    if (!_hasNotifiedSuccessToday) {
+      _hasNotifiedSuccessToday = true;
+      await FcmService.showCustomNotification(
+        title: 'Presensi Otomatis Berhasil',
+        body: 'Sistem sudah melakukan absensi otomatis',
+      );
+    }
+  }
+
   /// Initializes the Auto-Attendance Service & WidgetsBindingObserver for background app execution
   void initialize() {
     WidgetsBinding.instance.addObserver(this);
@@ -56,7 +72,8 @@ class AutoAttendanceService with WidgetsBindingObserver {
     _bgTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       runAutoAttendanceCheck();
     });
-    debugPrint('[AutoAttendanceService] Background worker timer started (15s interval).');
+    debugPrint(
+        '[AutoAttendanceService] Background worker timer started (15s interval).');
   }
 
   @override
@@ -109,6 +126,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
       if (await _isAlreadyCheckedInToday()) {
         debugPrint(
             '[AutoAttendanceService] User has ALREADY checked in today. Skipping auto check-in request.');
+        _hasNotifiedSuccessToday = true;
         onAttendanceUpdated?.call();
         return;
       }
@@ -128,13 +146,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
           debugPrint(
               '[AutoAttendanceService] Auto-attendance check-in SUCCESS.');
           onAttendanceUpdated?.call();
-          if (!_hasNotifiedSuccessToday) {
-            _hasNotifiedSuccessToday = true;
-            await FcmService.showCustomNotification(
-              title: 'Presensi Otomatis Berhasil',
-              body: 'Sistem sudah melakukan absensi otomatis',
-            );
-          }
+          await triggerSuccessNotificationIfInitialNull();
         }
 
         final successUpacara =
@@ -216,8 +228,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
       final now = DateTime.now();
       final todayStr =
           "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final url =
-          Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance');
+      final url = Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance');
       final response = await http.post(
         url,
         body: {

@@ -42,12 +42,13 @@ class AttendanceBloc extends ChangeNotifier {
 
       if (type == 'initial_state') {
         final masukStr = payload['absen_masuk'] as String?;
-        if (masukStr != null) {
+        if (masukStr != null && masukStr.isNotEmpty) {
           final dt = DateTime.tryParse(masukStr);
           if (dt != null) {
             _checkInTime =
                 "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
             _isCheckedIn = true;
+            AutoAttendanceService.instance.markAlreadyCheckedInInitial();
           }
         } else {
           _checkInTime = '--:--';
@@ -55,7 +56,7 @@ class AttendanceBloc extends ChangeNotifier {
         }
 
         final keluarStr = payload['absen_keluar'] as String?;
-        if (keluarStr != null) {
+        if (keluarStr != null && keluarStr.isNotEmpty) {
           final dt = DateTime.tryParse(keluarStr);
           if (dt != null) {
             _checkOutTime =
@@ -75,6 +76,8 @@ class AttendanceBloc extends ChangeNotifier {
             _checkInTime =
                 "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
             _isCheckedIn = true;
+            AutoAttendanceService.instance
+                .triggerSuccessNotificationIfInitialNull();
             notifyListeners();
           }
         }
@@ -206,6 +209,19 @@ class AttendanceBloc extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshAttendanceState() async {
+    final session = await SsoHelper.getSession();
+    if (session != null) {
+      final nip = session['nip'] as String? ?? '';
+      final role = session['role'] as String? ?? '';
+      final nidn = role == 'Dosen' ? nip : '';
+      if (nip.isNotEmpty || nidn.isNotEmpty) {
+        AttendanceRealtimeService().forceReconnect(nip, nidn);
+      }
+    }
+    await fetchAttendanceHistory();
+  }
+
   Future<void> fetchAttendanceHistory() async {
     try {
       final session = await SsoHelper.getSession();
@@ -241,6 +257,12 @@ class AttendanceBloc extends ChangeNotifier {
       if (history.todayCheckOutTime != null) {
         _checkOutTime = history.todayCheckOutTime!;
         _isCheckedOut = true;
+      } else if (_isCheckedOut) {
+        if (_checkOutTime == '--:--') {
+          final now = DateTime.now();
+          _checkOutTime =
+              "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+        }
       } else {
         _checkOutTime = '--:--';
         _isCheckedOut = false;

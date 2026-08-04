@@ -334,7 +334,7 @@ class _DashboardPageState extends State<DashboardPage> {
         child: RefreshIndicator(
           onRefresh: () async {
             await Future.wait([
-              attendanceBloc.fetchAttendanceHistory(),
+              attendanceBloc.refreshAttendanceState(),
               leaveBloc.fetchLeaves(),
               _fetchCalendarEvents(),
             ]);

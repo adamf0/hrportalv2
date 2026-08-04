@@ -17,13 +17,20 @@ import 'package:hrportalv2/modules/leave/presentation/components/organisms/cuti_
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/izin_form_section.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/sppd_form_section.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/cuti_type_selector_sheet.dart';
+import 'package:hrportalv2/modules/leave/domain/leave.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/supervisor_selector_sheet.dart';
 import 'package:hrportalv2/modules/leave/presentation/components/organisms/leave_form_success_dialog.dart';
 
 class LeaveFormPage extends StatefulWidget {
   final int initialTab;
   final String? initialType;
-  const LeaveFormPage({super.key, this.initialTab = 0, this.initialType});
+  final LeaveRequest? initialRequest;
+  const LeaveFormPage({
+    super.key,
+    this.initialTab = 0,
+    this.initialType,
+    this.initialRequest,
+  });
 
   @override
   State<LeaveFormPage> createState() => _LeaveFormPageState();
@@ -36,27 +43,91 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
 
   late LeaveFormType _activeType;
 
+  bool _isMasterDataLoading = true;
+
   @override
   void initState() {
     super.initState();
-    _activeType = widget.initialTab == 1
-        ? LeaveFormType.izin
-        : (widget.initialTab == 2 ? LeaveFormType.sppd : LeaveFormType.cuti);
+    final req = widget.initialRequest;
+    if (req != null) {
+      final typeLower = req.type.toLowerCase();
+      if (typeLower.startsWith('izin')) {
+        _activeType = LeaveFormType.izin;
+        _selectedIzinType = req.type;
+        _izinDate = req.startDate;
+        _izinPurposeController.text = req.details;
+      } else if (typeLower.startsWith('sppd')) {
+        _activeType = LeaveFormType.sppd;
+        _selectedSppdType = req.type;
+        _sppdStartDate = req.startDate;
+        _sppdEndDate = req.endDate;
+        if (req.details.contains('|')) {
+          final parts = req.details.split('|');
+          for (var part in parts) {
+            if (part.contains('Tujuan:')) {
+              _sppdPurposeController.text =
+                  part.replaceAll('Tujuan:', '').trim();
+            } else if (part.contains('Kota:')) {
+              _sppdCityController.text = part.replaceAll('Kota:', '').trim();
+            }
+          }
+        } else {
+          _sppdPurposeController.text = req.details;
+        }
+        _calculateSppdDuration();
+      } else {
+        _activeType = LeaveFormType.cuti;
+        _selectedCutiType = req.type;
+        _cutiStartDate = req.startDate;
+        _cutiEndDate = req.endDate;
+        _cutiPurposeController.text = req.details;
+        _calculateCutiDuration();
+      }
+    } else {
+      _activeType = widget.initialTab == 1
+          ? LeaveFormType.izin
+          : (widget.initialTab == 2 ? LeaveFormType.sppd : LeaveFormType.cuti);
 
-    switch (_activeType) {
-      case LeaveFormType.cuti:
-        _selectedCutiType = widget.initialType;
-        break;
-      case LeaveFormType.izin:
-        _selectedIzinType = widget.initialType;
-        break;
-      case LeaveFormType.sppd:
-        _selectedSppdType = widget.initialType;
-        break;
+      switch (_activeType) {
+        case LeaveFormType.cuti:
+          _selectedCutiType = widget.initialType;
+          break;
+        case LeaveFormType.izin:
+          _selectedIzinType = widget.initialType;
+          break;
+        case LeaveFormType.sppd:
+          _selectedSppdType = widget.initialType;
+          break;
+      }
     }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LeaveBloc>().fetchSupervisors();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final bloc = context.read<LeaveBloc>();
+      await Future.wait([
+        LeaveFormData.loadMasterData(),
+        bloc.fetchSupervisors(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _isMasterDataLoading = false;
+      });
+      if (req != null && bloc.supervisors.isNotEmpty) {
+        String? targetSvId = req.supervisorId;
+        if (targetSvId != null && targetSvId.isNotEmpty) {
+          final matched =
+              bloc.supervisors.any((element) => element.id == targetSvId);
+          if (!matched) {
+            targetSvId = null;
+          }
+        }
+        if (targetSvId != null) {
+          setState(() {
+            _selectedCutiSupervisorId = targetSvId;
+            _selectedIzinSupervisorId = targetSvId;
+            _selectedSppdSupervisorId = targetSvId;
+          });
+        }
+      }
     });
   }
 
@@ -248,21 +319,27 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
   void _handleSubmit() async {
     final leaveBloc = context.read<LeaveBloc>();
     final attendanceBloc = context.read<AttendanceBloc>();
+    final messenger = ScaffoldMessenger.of(context);
 
     switch (_activeType) {
       case LeaveFormType.cuti:
         if (_cutiFormKey.currentState!.validate()) {
           if (_selectedCutiType == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(content: Text('Silakan pilih jenis cuti.')),
             );
             return;
           }
           if (_selectedCutiSupervisorId == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Silakan pilih atasan untuk verifikasi.')),
+            messenger.showSnackBar(
+              const SnackBar(
+                  content: Text('Silakan pilih atasan untuk verifikasi.')),
             );
             return;
+          }
+
+          if (widget.initialRequest != null) {
+            await leaveBloc.deleteLeave(widget.initialRequest!.id);
           }
 
           final supervisor = leaveBloc.supervisors
@@ -292,16 +369,21 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       case LeaveFormType.izin:
         if (_izinFormKey.currentState!.validate()) {
           if (_selectedIzinType == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(content: Text('Silakan pilih jenis izin.')),
             );
             return;
           }
           if (_selectedIzinSupervisorId == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Silakan pilih atasan untuk verifikasi.')),
+            messenger.showSnackBar(
+              const SnackBar(
+                  content: Text('Silakan pilih atasan untuk verifikasi.')),
             );
             return;
+          }
+
+          if (widget.initialRequest != null) {
+            await leaveBloc.deleteLeave(widget.initialRequest!.id);
           }
 
           final supervisor = leaveBloc.supervisors
@@ -331,16 +413,21 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       case LeaveFormType.sppd:
         if (_sppdFormKey.currentState!.validate()) {
           if (_selectedSppdType == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(content: Text('Silakan pilih jenis dinas/SPPD.')),
             );
             return;
           }
           if (_selectedSppdSupervisorId == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Silakan pilih atasan untuk verifikasi.')),
+            messenger.showSnackBar(
+              const SnackBar(
+                  content: Text('Silakan pilih atasan untuk verifikasi.')),
             );
             return;
+          }
+
+          if (widget.initialRequest != null) {
+            await leaveBloc.deleteLeave(widget.initialRequest!.id);
           }
 
           final supervisor = leaveBloc.supervisors
@@ -350,7 +437,8 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
             type: 'SPPD - $_selectedSppdType',
             startDate: _sppdStartDate,
             endDate: _sppdEndDate,
-            reason: 'Tujuan: ${_sppdPurposeController.text.trim()} | Kota: ${_sppdCityController.text.trim()}',
+            reason:
+                'Tujuan: ${_sppdPurposeController.text.trim()} | Kota: ${_sppdCityController.text.trim()}',
             supervisorId: supervisor.id,
             supervisorName: supervisor.name,
             attachmentPath: _sppdHasAttachment ? _sppdFileName : null,
@@ -395,7 +483,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Form Pengajuan',
+          widget.initialRequest != null ? 'Edit Pengajuan' : 'Form Pengajuan',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
             color: primaryColor,
@@ -409,7 +497,9 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           children: [
             LeaveFormTabBar(
               activeType: _activeType,
+              isEditing: widget.initialRequest != null,
               onTypeChanged: (type) {
+                if (widget.initialRequest != null) return;
                 setState(() {
                   _activeType = type;
                 });
@@ -452,17 +542,31 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       attachmentWidget: _buildAttachmentSection(LeaveFormType.cuti),
       supervisorSelectorWidget: Builder(
         builder: (context) {
-          final sv = _selectedCutiSupervisorId == null
-              ? null
-              : leaveBloc.supervisors.firstWhere(
+          final isSvLoading = leaveBloc.isSupervisorsLoading ||
+              (leaveBloc.isLoading && leaveBloc.supervisors.isEmpty) ||
+              (widget.initialRequest != null && _selectedCutiSupervisorId == null && !leaveBloc.isSupervisorsError);
+          Supervisor? sv;
+          if (_selectedCutiSupervisorId != null && leaveBloc.supervisors.isNotEmpty) {
+            try {
+              sv = leaveBloc.supervisors.firstWhere(
                   (element) => element.id == _selectedCutiSupervisorId);
+            } catch (_) {
+              sv = null;
+            }
+          }
           return SupervisorSelectorTile(
             selectedSupervisor: sv,
+            isLoading: isSvLoading,
+            isError: leaveBloc.isSupervisorsError,
+            onRetry: () => leaveBloc.fetchSupervisors(),
             onTap: () => _showSupervisorSelector(context, LeaveFormType.cuti),
           );
         },
       ),
       isLoading: leaveBloc.isLoading,
+      isEditing: widget.initialRequest != null,
+      isSupervisorError: leaveBloc.isSupervisorsError,
+      isMasterDataLoading: _isMasterDataLoading || LeaveFormData.isLoading,
       onSubmit: _handleSubmit,
     );
   }
@@ -483,17 +587,31 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       attachmentWidget: _buildAttachmentSection(LeaveFormType.izin),
       supervisorSelectorWidget: Builder(
         builder: (context) {
-          final sv = _selectedIzinSupervisorId == null
-              ? null
-              : leaveBloc.supervisors.firstWhere(
+          final isSvLoading = leaveBloc.isSupervisorsLoading ||
+              (leaveBloc.isLoading && leaveBloc.supervisors.isEmpty) ||
+              (widget.initialRequest != null && _selectedIzinSupervisorId == null && !leaveBloc.isSupervisorsError);
+          Supervisor? sv;
+          if (_selectedIzinSupervisorId != null && leaveBloc.supervisors.isNotEmpty) {
+            try {
+              sv = leaveBloc.supervisors.firstWhere(
                   (element) => element.id == _selectedIzinSupervisorId);
+            } catch (_) {
+              sv = null;
+            }
+          }
           return SupervisorSelectorTile(
             selectedSupervisor: sv,
+            isLoading: isSvLoading,
+            isError: leaveBloc.isSupervisorsError,
+            onRetry: () => leaveBloc.fetchSupervisors(),
             onTap: () => _showSupervisorSelector(context, LeaveFormType.izin),
           );
         },
       ),
       isLoading: leaveBloc.isLoading,
+      isEditing: widget.initialRequest != null,
+      isSupervisorError: leaveBloc.isSupervisorsError,
+      isMasterDataLoading: _isMasterDataLoading || LeaveFormData.isLoading,
       onSubmit: _handleSubmit,
     );
   }
@@ -518,17 +636,31 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       attachmentWidget: _buildAttachmentSection(LeaveFormType.sppd),
       supervisorSelectorWidget: Builder(
         builder: (context) {
-          final sv = _selectedSppdSupervisorId == null
-              ? null
-              : leaveBloc.supervisors.firstWhere(
+          final isSvLoading = leaveBloc.isSupervisorsLoading ||
+              (leaveBloc.isLoading && leaveBloc.supervisors.isEmpty) ||
+              (widget.initialRequest != null && _selectedSppdSupervisorId == null && !leaveBloc.isSupervisorsError);
+          Supervisor? sv;
+          if (_selectedSppdSupervisorId != null && leaveBloc.supervisors.isNotEmpty) {
+            try {
+              sv = leaveBloc.supervisors.firstWhere(
                   (element) => element.id == _selectedSppdSupervisorId);
+            } catch (_) {
+              sv = null;
+            }
+          }
           return SupervisorSelectorTile(
             selectedSupervisor: sv,
+            isLoading: isSvLoading,
+            isError: leaveBloc.isSupervisorsError,
+            onRetry: () => leaveBloc.fetchSupervisors(),
             onTap: () => _showSupervisorSelector(context, LeaveFormType.sppd),
           );
         },
       ),
       isLoading: leaveBloc.isLoading,
+      isEditing: widget.initialRequest != null,
+      isSupervisorError: leaveBloc.isSupervisorsError,
+      isMasterDataLoading: _isMasterDataLoading || LeaveFormData.isLoading,
       onSubmit: _handleSubmit,
     );
   }

@@ -13,6 +13,7 @@ class LeaveRequest {
   final String? applicantName;
   final String? applicantNip;
   final String? applicantNidn;
+  final String? supervisorId;
 
   LeaveRequest({
     required this.id,
@@ -26,6 +27,7 @@ class LeaveRequest {
     this.applicantName,
     this.applicantNip,
     this.applicantNidn,
+    this.supervisorId,
   });
 
   /// Domain Invariant Rule Validation (Domain Business Rules)

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hrportalv2/common/presentation/components/atoms/form_section_header.dart';
 
+import 'package:hrportalv2/core/presentation/components/atoms/pulsing_skeleton.dart';
+
 class IzinFormSection extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final DateTime izinDate;
@@ -13,6 +15,9 @@ class IzinFormSection extends StatelessWidget {
   final Widget attachmentWidget;
   final Widget supervisorSelectorWidget;
   final bool isLoading;
+  final bool isEditing;
+  final bool isSupervisorError;
+  final bool isMasterDataLoading;
   final VoidCallback onSubmit;
 
   const IzinFormSection({
@@ -27,6 +32,9 @@ class IzinFormSection extends StatelessWidget {
     required this.attachmentWidget,
     required this.supervisorSelectorWidget,
     this.isLoading = false,
+    this.isEditing = false,
+    this.isSupervisorError = false,
+    this.isMasterDataLoading = false,
     required this.onSubmit,
   });
 
@@ -37,10 +45,29 @@ class IzinFormSection extends StatelessWidget {
 
     String formatDate(DateTime date) {
       final months = [
-        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
       ];
       return '${date.day} ${months[date.month - 1]} ${date.year}';
+    }
+
+    final validNames = izinTypes.map((e) => e['name']).whereType<String>().toList();
+    String? effectiveValue;
+    if (selectedIzinType != null && selectedIzinType!.isNotEmpty) {
+      if (validNames.contains(selectedIzinType)) {
+        effectiveValue = selectedIzinType;
+      } else {
+        final cleanType = selectedIzinType!.replaceAll('Izin - ', '').replaceAll('Izin ', '').trim();
+        for (var name in validNames) {
+          final cleanName = name.replaceAll('Izin - ', '').replaceAll('Izin ', '').trim();
+          if (cleanName.toLowerCase() == cleanType.toLowerCase() ||
+              name.toLowerCase().contains(cleanType.toLowerCase()) ||
+              cleanType.toLowerCase().contains(cleanName.toLowerCase())) {
+            effectiveValue = name;
+            break;
+          }
+        }
+      }
     }
 
     return Form(
@@ -53,7 +80,7 @@ class IzinFormSection extends StatelessWidget {
           GestureDetector(
             onTap: onSelectDate,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
@@ -62,10 +89,14 @@ class IzinFormSection extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    formatDate(izinDate),
-                    style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+                  Expanded(
+                    child: Text(
+                      formatDate(izinDate),
+                      style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 4),
                   Icon(Icons.calendar_today, size: 16, color: Colors.grey[400]),
                 ],
               ),
@@ -75,31 +106,38 @@ class IzinFormSection extends StatelessWidget {
 
           const FormSectionHeader(title: 'JENIS IZIN'),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: selectedIzinType,
-            style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+          if (isMasterDataLoading)
+            const PulsingSkeleton(
+              width: double.infinity,
+              height: 48,
+              borderRadius: 10,
+            )
+          else
+            DropdownButtonFormField<String>(
+              value: effectiveValue,
+              style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
+              hint: Text('-- Pilih Jenis Izin --', style: GoogleFonts.inter(color: Colors.grey[400], fontSize: 13)),
+              items: izinTypes.map((type) {
+                return DropdownMenuItem<String>(
+                  value: type['name'],
+                  child: Text(type['name']!),
+                );
+              }).toList(),
+              onChanged: onIzinTypeChanged,
             ),
-            hint: Text('-- Pilih Jenis Izin --', style: GoogleFonts.inter(color: Colors.grey[400], fontSize: 13)),
-            items: izinTypes.map((type) {
-              return DropdownMenuItem<String>(
-                value: type['name'],
-                child: Text(type['name']!),
-              );
-            }).toList(),
-            onChanged: onIzinTypeChanged,
-          ),
           const SizedBox(height: 20),
 
           const FormSectionHeader(title: 'ALASAN PENGAJUAN'),
@@ -142,7 +180,7 @@ class IzinFormSection extends StatelessWidget {
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: isLoading ? null : onSubmit,
+            onPressed: (isLoading || isSupervisorError) ? null : onSubmit,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
@@ -167,7 +205,7 @@ class IzinFormSection extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Kirim Pengajuan Izin',
+                        isEditing ? 'Update Pengajuan Izin' : 'Kirim Pengajuan Izin',
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,

@@ -6,7 +6,7 @@ import '../application/get_verification_leaves/get_verification_leaves_query.dar
 import '../application/submit_leave/submit_leave_command.dart';
 import '../application/update_leave_status/update_leave_status_command.dart';
 import '../domain/leave.dart';
-
+import '../infrastructure/leave_repository.dart';
 import '../../../../core/api_client.dart';
 
 class LeaveBloc extends ChangeNotifier {
@@ -202,12 +202,47 @@ class LeaveBloc extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> deleteLeave(String id) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final repo = LeaveRepository();
+      final success = await repo.deleteLeave(id);
+      if (success) {
+        await fetchLeaves(isRefresh: true);
+        return true;
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+    return false;
+  }
+
+  bool _isSupervisorsLoading = false;
+  bool get isSupervisorsLoading => _isSupervisorsLoading;
+
+  bool _isSupervisorsError = false;
+  bool get isSupervisorsError => _isSupervisorsError;
+
   Future<void> fetchSupervisors() async {
+    _isSupervisorsLoading = true;
+    _isSupervisorsError = false;
+    notifyListeners();
     try {
       final res = await _mediator.send(GetSupervisorsQuery());
       _supervisors = List.from(res);
+      if (_supervisors.isEmpty) {
+        _isSupervisorsError = true;
+      }
+    } catch (_) {
+      _isSupervisorsError = true;
+    } finally {
+      _isSupervisorsLoading = false;
       notifyListeners();
-    } catch (_) {}
+    }
   }
 
   Future<bool> submitLeaveForm({

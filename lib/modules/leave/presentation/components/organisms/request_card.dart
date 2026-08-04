@@ -7,36 +7,32 @@ class RequestCard extends StatelessWidget {
   final LeaveRequest req;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const RequestCard({
     super.key,
     required this.req,
     this.onApprove,
     this.onReject,
+    this.onEdit,
+    this.onDelete,
   });
 
   String _resolveApplicantName() {
-    if (req.applicantName != null &&
-        req.applicantName!.isNotEmpty &&
-        req.applicantName != 'Pegawai') {
-      return req.applicantName!;
+    if (req.applicantName != null && req.applicantName!.trim().isNotEmpty) {
+      return req.applicantName!.trim();
     }
     final nip = req.applicantNip ?? '';
     final nidn = req.applicantNidn ?? '';
 
-    if (nip == '4102302214' || nidn == '4102302214') {
-      return 'Adam Furqon';
-    }
-    if (nip == '10411006520' || nidn == '0409098601' || nip == '0409098601') {
-      return 'ARIES MAESYA';
-    }
     if (nip.isNotEmpty) {
-      return 'Pemohon NIP $nip';
+      return 'Pegawai (NIP: $nip)';
     }
     if (nidn.isNotEmpty) {
-      return 'Pemohon NIDN $nidn';
+      return 'Dosen (NIDN: $nidn)';
     }
-    return 'Pemohon SDM';
+    return 'Pegawai';
   }
 
   String _calculateDuration() {
@@ -277,11 +273,51 @@ class RequestCard extends StatelessWidget {
               ),
             ),
 
-            if (onApprove != null || onReject != null) ...[
+            if (onApprove != null || onReject != null || onEdit != null || onDelete != null) ...[
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  if (onDelete != null) ...[
+                    OutlinedButton.icon(
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.delete_outline, size: 14, color: Colors.red),
+                      label: Text('Hapus',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red[700])),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.red[200]!),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  if (onEdit != null) ...[
+                    OutlinedButton.icon(
+                      onPressed: onEdit,
+                      icon: const Icon(Icons.edit_outlined, size: 14, color: Colors.blue),
+                      label: Text('Edit',
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[700])),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.blue[200]!),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   if (onReject != null)
                     ElevatedButton.icon(
                       onPressed: onReject,
@@ -290,14 +326,17 @@ class RequestCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.red[600],
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                        textStyle: GoogleFonts.inter(
+                            fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
-                  if (onReject != null && onApprove != null) const SizedBox(width: 8),
+                  if (onReject != null && onApprove != null)
+                    const SizedBox(width: 8),
                   if (onApprove != null)
                     ElevatedButton.icon(
                       onPressed: onApprove,
@@ -306,11 +345,13 @@ class RequestCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green[600],
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        textStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold),
+                        textStyle: GoogleFonts.inter(
+                            fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                     ),
                 ],

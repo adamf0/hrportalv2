@@ -55,6 +55,7 @@ class LeaveRepository implements ILeaveRepository {
           if (jenisCutiId == 3) type = "Cuti Melahirkan";
           if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
 
+          final svId = json['verifikasi']?.toString() ?? json['nip_atasan']?.toString();
           allRequests.add(LeaveRequest(
             id: "cuti_${json['id']}",
             type: type,
@@ -68,6 +69,7 @@ class LeaveRepository implements ILeaveRepository {
             applicantName: sessionName,
             applicantNip: sessionNip,
             applicantNidn: sessionNidn,
+            supervisorId: svId,
           ));
         }
       }
@@ -83,6 +85,7 @@ class LeaveRepository implements ILeaveRepository {
           if (jenisIzinId == 3) type = "Izin Melahirkan";
           if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
 
+          final svId = json['verifikasi']?.toString() ?? json['id_verifikasi']?.toString();
           allRequests.add(LeaveRequest(
             id: "izin_${json['id']}",
             type: type,
@@ -95,6 +98,7 @@ class LeaveRepository implements ILeaveRepository {
             applicantName: sessionName,
             applicantNip: sessionNip,
             applicantNidn: sessionNidn,
+            supervisorId: svId,
           ));
         }
       }
@@ -117,6 +121,14 @@ class LeaveRepository implements ILeaveRepository {
         String type = "SPPD - Dinas Luar";
         if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";
 
+        String? svId = json['verifikasi']?.toString();
+        if (svId == null || svId.isEmpty) {
+          final ket = json['keterangan']?.toString() ?? '';
+          if (ket.contains('Atasan:')) {
+            svId = ket.replaceAll('Atasan:', '').trim();
+          }
+        }
+
         allRequests.add(LeaveRequest(
           id: "sppd_${json['id']}",
           type: type,
@@ -130,6 +142,7 @@ class LeaveRepository implements ILeaveRepository {
           applicantName: sessionName,
           applicantNip: sessionNip,
           applicantNidn: sessionNidn,
+          supervisorId: svId,
         ));
       }
 
@@ -407,6 +420,36 @@ class LeaveRepository implements ILeaveRepository {
       }
     } catch (e, stackTrace) {
       debugPrint('[LeaveRepository updateLeaveStatus error]: $e\n$stackTrace');
+    }
+    return false;
+  }
+
+  @override
+  Future<bool> deleteLeave(String id) async {
+    try {
+      final parts = id.split('_');
+      if (parts.length < 2) return false;
+      final prefix = parts[0];
+      final realId = parts[1];
+
+      if (prefix == 'cuti') {
+        final res = await ApiClient.delete(
+          Uri.parse("${ApiClient.baseUrl}/api/leave/$realId"),
+        );
+        return res != null;
+      } else if (prefix == 'izin') {
+        final res = await ApiClient.delete(
+          Uri.parse("${ApiClient.baseUrl}/api/izin/$realId"),
+        );
+        return res != null;
+      } else if (prefix == 'sppd') {
+        final res = await ApiClient.delete(
+          Uri.parse("${ApiClient.baseUrl}/api/sppd/$realId"),
+        );
+        return res != null;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('[LeaveRepository deleteLeave error]: $e\n$stackTrace');
     }
     return false;
   }

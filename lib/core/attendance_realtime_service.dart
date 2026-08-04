@@ -18,6 +18,11 @@ class AttendanceRealtimeService {
   String _activeNip = '';
   String _activeNidn = '';
 
+  void forceReconnect(String nip, String nidn) {
+    _activeKey = '';
+    connect(nip, nidn);
+  }
+
   void connect(String nip, String nidn) {
     if (nip.isEmpty && nidn.isEmpty) return;
     final key = '$nip:$nidn';

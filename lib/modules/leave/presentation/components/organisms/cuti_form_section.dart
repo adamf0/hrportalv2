@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hrportalv2/common/presentation/components/atoms/form_section_header.dart';
 import 'package:hrportalv2/common/presentation/components/molecules/responsive_date_range_row.dart';
 
+import 'package:hrportalv2/core/presentation/components/atoms/pulsing_skeleton.dart';
+
 class CutiFormSection extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final String? selectedCutiType;
@@ -16,6 +18,9 @@ class CutiFormSection extends StatelessWidget {
   final Widget attachmentWidget;
   final Widget supervisorSelectorWidget;
   final bool isLoading;
+  final bool isEditing;
+  final bool isSupervisorError;
+  final bool isMasterDataLoading;
   final VoidCallback onSubmit;
 
   const CutiFormSection({
@@ -32,6 +37,9 @@ class CutiFormSection extends StatelessWidget {
     required this.attachmentWidget,
     required this.supervisorSelectorWidget,
     this.isLoading = false,
+    this.isEditing = false,
+    this.isSupervisorError = false,
+    this.isMasterDataLoading = false,
     required this.onSubmit,
   });
 
@@ -42,8 +50,8 @@ class CutiFormSection extends StatelessWidget {
 
     String formatDate(DateTime date) {
       final months = [
-        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
       ];
       return '${date.day} ${months[date.month - 1]} ${date.year}';
     }
@@ -51,7 +59,7 @@ class CutiFormSection extends StatelessWidget {
     final startDateField = GestureDetector(
       onTap: onSelectStartDate,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -60,11 +68,15 @@ class CutiFormSection extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              formatDate(cutiStartDate),
-              style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+            Expanded(
+              child: Text(
+                formatDate(cutiStartDate),
+                style: GoogleFonts.inter(fontSize: 12, color: onSurface, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            Icon(Icons.calendar_today, size: 16, color: Colors.grey[400]),
+            const SizedBox(width: 4),
+            Icon(Icons.calendar_today, size: 15, color: Colors.grey[400]),
           ],
         ),
       ),
@@ -73,7 +85,7 @@ class CutiFormSection extends StatelessWidget {
     final endDateField = GestureDetector(
       onTap: onSelectEndDate,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -82,11 +94,15 @@ class CutiFormSection extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              formatDate(cutiEndDate),
-              style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+            Expanded(
+              child: Text(
+                formatDate(cutiEndDate),
+                style: GoogleFonts.inter(fontSize: 12, color: onSurface, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            Icon(Icons.calendar_today, size: 16, color: Colors.grey[400]),
+            const SizedBox(width: 4),
+            Icon(Icons.calendar_today, size: 15, color: Colors.grey[400]),
           ],
         ),
       ),
@@ -99,34 +115,41 @@ class CutiFormSection extends StatelessWidget {
         children: [
           const FormSectionHeader(title: 'JENIS CUTI'),
           const SizedBox(height: 8),
-          GestureDetector(
-            onTap: onCutiTypeTap,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      selectedCutiType ?? '-- Pilih Jenis Cuti --',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: selectedCutiType == null ? Colors.grey[400] : onSurface,
-                        fontWeight: selectedCutiType == null ? FontWeight.normal : FontWeight.w500,
+          if (isMasterDataLoading)
+            const PulsingSkeleton(
+              width: double.infinity,
+              height: 48,
+              borderRadius: 10,
+            )
+          else
+            GestureDetector(
+              onTap: onCutiTypeTap,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        selectedCutiType ?? '-- Pilih Jenis Cuti --',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: selectedCutiType == null ? Colors.grey[400] : onSurface,
+                          fontWeight: selectedCutiType == null ? FontWeight.normal : FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
-                ],
+                    Icon(Icons.arrow_drop_down, color: Colors.grey[600]),
+                  ],
+                ),
               ),
             ),
-          ),
           const SizedBox(height: 20),
 
           const FormSectionHeader(title: 'TANGGAL CUTI (RANGE)'),
@@ -205,7 +228,7 @@ class CutiFormSection extends StatelessWidget {
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: isLoading ? null : onSubmit,
+            onPressed: (isLoading || isSupervisorError) ? null : onSubmit,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
@@ -230,7 +253,7 @@ class CutiFormSection extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Kirim Pengajuan Cuti',
+                        isEditing ? 'Update Pengajuan Cuti' : 'Kirim Pengajuan Cuti',
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,

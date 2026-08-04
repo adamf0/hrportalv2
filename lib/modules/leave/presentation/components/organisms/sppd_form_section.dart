@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hrportalv2/common/presentation/components/atoms/form_section_header.dart';
 import 'package:hrportalv2/common/presentation/components/molecules/responsive_date_range_row.dart';
 
+import 'package:hrportalv2/core/presentation/components/atoms/pulsing_skeleton.dart';
+
 class SppdFormSection extends StatelessWidget {
   final GlobalKey<FormState> formKey;
   final String? selectedSppdType;
@@ -18,6 +20,9 @@ class SppdFormSection extends StatelessWidget {
   final Widget attachmentWidget;
   final Widget supervisorSelectorWidget;
   final bool isLoading;
+  final bool isEditing;
+  final bool isSupervisorError;
+  final bool isMasterDataLoading;
   final VoidCallback onSubmit;
 
   const SppdFormSection({
@@ -36,6 +41,9 @@ class SppdFormSection extends StatelessWidget {
     required this.attachmentWidget,
     required this.supervisorSelectorWidget,
     this.isLoading = false,
+    this.isEditing = false,
+    this.isSupervisorError = false,
+    this.isMasterDataLoading = false,
     required this.onSubmit,
   });
 
@@ -46,8 +54,8 @@ class SppdFormSection extends StatelessWidget {
 
     String formatDate(DateTime date) {
       final months = [
-        'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-        'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+        'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
       ];
       return '${date.day} ${months[date.month - 1]} ${date.year}';
     }
@@ -55,7 +63,7 @@ class SppdFormSection extends StatelessWidget {
     final startDateField = GestureDetector(
       onTap: onSelectStartDate,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -64,11 +72,15 @@ class SppdFormSection extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              formatDate(sppdStartDate),
-              style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+            Expanded(
+              child: Text(
+                formatDate(sppdStartDate),
+                style: GoogleFonts.inter(fontSize: 12, color: onSurface, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            Icon(Icons.calendar_today, size: 16, color: Colors.grey[400]),
+            const SizedBox(width: 4),
+            Icon(Icons.calendar_today, size: 15, color: Colors.grey[400]),
           ],
         ),
       ),
@@ -77,7 +89,7 @@ class SppdFormSection extends StatelessWidget {
     final endDateField = GestureDetector(
       onTap: onSelectEndDate,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -86,15 +98,38 @@ class SppdFormSection extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              formatDate(sppdEndDate),
-              style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+            Expanded(
+              child: Text(
+                formatDate(sppdEndDate),
+                style: GoogleFonts.inter(fontSize: 12, color: onSurface, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            Icon(Icons.calendar_today, size: 16, color: Colors.grey[400]),
+            const SizedBox(width: 4),
+            Icon(Icons.calendar_today, size: 15, color: Colors.grey[400]),
           ],
         ),
       ),
     );
+
+    final validNames = sppdTypes.map((e) => e['name']).whereType<String>().toList();
+    String? effectiveValue;
+    if (selectedSppdType != null && selectedSppdType!.isNotEmpty) {
+      if (validNames.contains(selectedSppdType)) {
+        effectiveValue = selectedSppdType;
+      } else {
+        final cleanType = selectedSppdType!.replaceAll('SPPD - ', '').replaceAll('SPPD ', '').trim();
+        for (var name in validNames) {
+          final cleanName = name.replaceAll('SPPD - ', '').replaceAll('SPPD ', '').trim();
+          if (cleanName.toLowerCase() == cleanType.toLowerCase() ||
+              name.toLowerCase().contains(cleanType.toLowerCase()) ||
+              cleanType.toLowerCase().contains(cleanName.toLowerCase())) {
+            effectiveValue = name;
+            break;
+          }
+        }
+      }
+    }
 
     return Form(
       key: formKey,
@@ -103,31 +138,38 @@ class SppdFormSection extends StatelessWidget {
         children: [
           const FormSectionHeader(title: 'JENIS DINAS / SPPD'),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            value: selectedSppdType,
-            style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.white,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey[300]!),
+          if (isMasterDataLoading)
+            const PulsingSkeleton(
+              width: double.infinity,
+              height: 48,
+              borderRadius: 10,
+            )
+          else
+            DropdownButtonFormField<String>(
+              value: effectiveValue,
+              style: GoogleFonts.inter(fontSize: 13, color: onSurface, fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
+              hint: Text('-- Pilih Jenis Dinas --', style: GoogleFonts.inter(color: Colors.grey[400], fontSize: 13)),
+              items: sppdTypes.map((type) {
+                return DropdownMenuItem<String>(
+                  value: type['name'],
+                  child: Text(type['name']!),
+                );
+              }).toList(),
+              onChanged: onSppdTypeChanged,
             ),
-            hint: Text('-- Pilih Jenis Dinas --', style: GoogleFonts.inter(color: Colors.grey[400], fontSize: 13)),
-            items: sppdTypes.map((type) {
-              return DropdownMenuItem<String>(
-                value: type['name'],
-                child: Text(type['name']!),
-              );
-            }).toList(),
-            onChanged: onSppdTypeChanged,
-          ),
           const SizedBox(height: 20),
 
           const FormSectionHeader(title: 'KOTA TUJUAN DINAS'),
@@ -234,7 +276,7 @@ class SppdFormSection extends StatelessWidget {
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: isLoading ? null : onSubmit,
+            onPressed: (isLoading || isSupervisorError) ? null : onSubmit,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,
@@ -259,7 +301,7 @@ class SppdFormSection extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Kirim Pengajuan SPPD',
+                        isEditing ? 'Update Pengajuan SPPD' : 'Kirim Pengajuan SPPD',
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
