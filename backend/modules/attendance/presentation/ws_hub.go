@@ -1,0 +1,64 @@
+package presentation
+
+import (
+	"sync"
+
+	"github.com/gofiber/websocket/v2"
+)
+
+type RealtimeAttendancePayload struct {
+	Type        string `json:"type"` // "initial_state", "check_in", "check_out"
+	Nip         string `json:"nip"`
+	Nidn        string `json:"nidn,omitempty"`
+	Tanggal     string `json:"tanggal"`
+	AbsenMasuk  string `json:"absen_masuk,omitempty"`
+	AbsenKeluar string `json:"absen_keluar,omitempty"`
+}
+
+type AttendanceWsHub struct {
+	clients map[string]*websocket.Conn
+	mu      sync.RWMutex
+}
+
+var GlobalAttendanceWsHub = &AttendanceWsHub{
+	clients: make(map[string]*websocket.Conn),
+}
+
+func (h *AttendanceWsHub) Register(key string, conn *websocket.Conn) {
+	if key == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.clients[key] = conn
+}
+
+func (h *AttendanceWsHub) Unregister(key string) {
+	if key == "" {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if conn, ok := h.clients[key]; ok {
+		conn.Close()
+		delete(h.clients, key)
+	}
+}
+
+func (h *AttendanceWsHub) BroadcastToUser(nip string, nidn string, payload RealtimeAttendancePayload) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	sent := false
+	if nip != "" {
+		if conn, ok := h.clients[nip]; ok && conn != nil {
+			_ = conn.WriteJSON(payload)
+			sent = true
+		}
+	}
+	if !sent && nidn != "" {
+		if conn, ok := h.clients[nidn]; ok && conn != nil {
+			_ = conn.WriteJSON(payload)
+		}
+	}
+}

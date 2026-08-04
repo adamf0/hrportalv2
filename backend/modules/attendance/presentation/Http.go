@@ -1,7 +1,9 @@
 package presentation
 
 import (
+	"context"
 	"strconv"
+	"time"
 
 	common "hrportal_backend/common/domain"
 	"hrportal_backend/common/helper"
@@ -14,10 +16,78 @@ import (
 	"hrportal_backend/modules/attendance/domain"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 	"github.com/mehdihadeli/go-mediatr"
 )
 
 func ModuleAttendance(app *fiber.App) {
+	// WebSocket Endpoint for Real-time Attendance Stream (Initial State Snapshot + Live Broadcast Delta)
+	app.Get("/ws/attendance", websocket.New(func(c *websocket.Conn) {
+		nip := c.Query("nip")
+		nidn := c.Query("nidn")
+		if nip == "" && nidn == "" {
+			return
+		}
+
+		userKey := nip
+		if userKey == "" {
+			userKey = nidn
+		}
+
+		GlobalAttendanceWsHub.Register(userKey, c)
+		defer GlobalAttendanceWsHub.Unregister(userKey)
+
+		// Send initial state snapshot for active shift
+		query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
+			Nip:  nip,
+			Nidn: nidn,
+		}
+		res, err := mediatr.Send[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](context.Background(), query)
+		if err == nil && res.IsSuccess && len(res.Value) > 0 {
+			now := time.Now()
+			todayStr := now.Format("2006-01-02")
+			var selectedRecord *domain.Absen
+
+			for i := range res.Value {
+				if res.Value[i].Tanggal == todayStr {
+					selectedRecord = &res.Value[i]
+					break
+				}
+			}
+
+			if selectedRecord == nil && len(res.Value) > 0 {
+				selectedRecord = &res.Value[0]
+			}
+
+			if selectedRecord != nil {
+				masukStr := ""
+				if selectedRecord.AbsenMasuk != nil {
+					masukStr = selectedRecord.AbsenMasuk.Format("2006-01-02 15:04:05")
+				}
+				keluarStr := ""
+				if selectedRecord.AbsenKeluar != nil {
+					keluarStr = selectedRecord.AbsenKeluar.Format("2006-01-02 15:04:05")
+				}
+
+				_ = c.WriteJSON(RealtimeAttendancePayload{
+					Type:        "initial_state",
+					Nip:         nip,
+					Nidn:        nidn,
+					Tanggal:     selectedRecord.Tanggal,
+					AbsenMasuk:  masukStr,
+					AbsenKeluar: keluarStr,
+				})
+			}
+		}
+
+		// Keep connection alive
+		for {
+			if _, _, err := c.ReadMessage(); err != nil {
+				break
+			}
+		}
+	}))
+
 	group := app.Group("/api/attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
 
 	group.Post("/check-in", func(c *fiber.Ctx) error {
@@ -45,7 +115,7 @@ func ModuleAttendance(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		// Trigger FCM Notification for Self Attendance Success
+		// Trigger FCM Notification & WebSocket Broadcast for Check-In Success
 		if res.Value != nil {
 			absenData := res.Value
 			helper.GlobalFcmManager.DispatchNotification(
@@ -55,6 +125,18 @@ func ModuleAttendance(app *fiber.App) {
 				"attendance",
 				map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
 			)
+
+			masukStr := ""
+			if absenData.AbsenMasuk != nil {
+				masukStr = absenData.AbsenMasuk.Format("2006-01-02 15:04:05")
+			}
+			GlobalAttendanceWsHub.BroadcastToUser(absenData.Nip, absenData.Nidn, RealtimeAttendancePayload{
+				Type:       "check_in",
+				Nip:        absenData.Nip,
+				Nidn:       absenData.Nidn,
+				Tanggal:    absenData.Tanggal,
+				AbsenMasuk: masukStr,
+			})
 		}
 
 		return c.JSON(res.Value)
@@ -84,6 +166,18 @@ func ModuleAttendance(app *fiber.App) {
 				"attendance",
 				map[string]string{"type": "check-out", "id": strconv.Itoa(int(absenData.ID))},
 			)
+
+			keluarStr := ""
+			if absenData.AbsenKeluar != nil {
+				keluarStr = absenData.AbsenKeluar.Format("2006-01-02 15:04:05")
+			}
+			GlobalAttendanceWsHub.BroadcastToUser(absenData.Nip, absenData.Nidn, RealtimeAttendancePayload{
+				Type:        "check_out",
+				Nip:         absenData.Nip,
+				Nidn:        absenData.Nidn,
+				Tanggal:     absenData.Tanggal,
+				AbsenKeluar: keluarStr,
+			})
 		}
 
 		return c.JSON(res.Value)

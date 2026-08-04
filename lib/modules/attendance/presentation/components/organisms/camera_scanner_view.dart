@@ -99,51 +99,55 @@ class CameraScannerView extends StatelessWidget {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        if (isCameraInitialized && cameraController != null)
-                          FittedBox(
-                            fit: BoxFit.cover,
-                            child: SizedBox(
-                              width:
-                                  cameraController?.value.previewSize?.height ??
-                                      1280.0,
-                              height:
-                                  cameraController?.value.previewSize?.width ??
-                                      720.0,
-                              child: CameraPreview(cameraController!),
-                            ),
-                          )
-                        else
-                          Container(
-                            color:
-                                Theme.of(context).colorScheme.surfaceContainer,
-                            child: GridView.builder(
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 10,
-                              ),
-                              itemBuilder: (context, index) => Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey.withOpacity(0.1),
-                                    width: 0.5,
+                        Positioned.fill(
+                          child: isCameraInitialized && cameraController != null
+                              ? FittedBox(
+                                  fit: BoxFit.cover,
+                                  child: SizedBox(
+                                    width: cameraController
+                                            ?.value.previewSize?.height ??
+                                        1280.0,
+                                    height: cameraController
+                                            ?.value.previewSize?.width ??
+                                        720.0,
+                                    child: CameraPreview(cameraController!),
+                                  ),
+                                )
+                              : Container(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainer,
+                                  child: GridView.builder(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    gridDelegate:
+                                        const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 10,
+                                    ),
+                                    itemBuilder: (context, index) => Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Colors.grey.withOpacity(0.1),
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          ),
-                        HumanLivenessAnimationGuide(
-                          animationController: pulseController,
-                          progress: progress,
-                          detectionStatus: detectionStatus,
                         ),
-                        SizedBox(
-                          width: context.isWatch ? 120 : 240,
-                          height: context.isWatch ? 120 : 240,
+                        Positioned.fill(
+                          child: HumanLivenessAnimationGuide(
+                            animationController: pulseController,
+                            progress: progress,
+                            detectionStatus: detectionStatus,
+                          ),
+                        ),
+                        Positioned.fill(
                           child: CircularProgressIndicator(
                             value: progress,
                             strokeWidth: 5,
-                            backgroundColor: Colors.grey[300]!.withOpacity(0.4),
+                            backgroundColor:
+                                Colors.grey[300]!.withOpacity(0.4),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               progress >= 1.0 ? Colors.green : primaryColor,
                             ),

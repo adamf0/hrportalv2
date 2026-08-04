@@ -11,20 +11,87 @@ import '../application/check_out/check_out_command.dart';
 import '../application/get_history/get_history_query.dart';
 import '../domain/attendance.dart';
 
+import '../../../../core/auto_attendance_service.dart';
+import '../../../../core/attendance_realtime_service.dart';
+
 class AttendanceBloc extends ChangeNotifier {
   final Mediator _mediator = Mediator();
 
   bool _isCheckedIn = false;
   bool get isCheckedIn => _isCheckedIn;
 
-  String _checkInTime = '--:--';
-  String get checkInTime => _checkInTime;
-
   bool _isCheckedOut = false;
   bool get isCheckedOut => _isCheckedOut;
 
+  String _checkInTime = '--:--';
+  String get checkInTime => _checkInTime;
+
   String _checkOutTime = '--:--';
   String get checkOutTime => _checkOutTime;
+
+  StreamSubscription? _realtimeWsSubscription;
+
+  void initRealtimeWsListener(String nip, String nidn) {
+    if (nip.isEmpty && nidn.isEmpty) return;
+    AttendanceRealtimeService().connect(nip, nidn);
+
+    _realtimeWsSubscription?.cancel();
+    _realtimeWsSubscription =
+        AttendanceRealtimeService().stream.listen((payload) {
+      final type = payload['type'] as String?;
+
+      if (type == 'initial_state') {
+        final masukStr = payload['absen_masuk'] as String?;
+        if (masukStr != null) {
+          final dt = DateTime.tryParse(masukStr);
+          if (dt != null) {
+            _checkInTime =
+                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+            _isCheckedIn = true;
+          }
+        } else {
+          _checkInTime = '--:--';
+          _isCheckedIn = false;
+        }
+
+        final keluarStr = payload['absen_keluar'] as String?;
+        if (keluarStr != null) {
+          final dt = DateTime.tryParse(keluarStr);
+          if (dt != null) {
+            _checkOutTime =
+                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+            _isCheckedOut = true;
+          }
+        } else {
+          _checkOutTime = '--:--';
+          _isCheckedOut = false;
+        }
+        notifyListeners();
+      } else if (type == 'check_in') {
+        final masukStr = payload['absen_masuk'] as String?;
+        if (masukStr != null) {
+          final dt = DateTime.tryParse(masukStr);
+          if (dt != null) {
+            _checkInTime =
+                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+            _isCheckedIn = true;
+            notifyListeners();
+          }
+        }
+      } else if (type == 'check_out') {
+        final keluarStr = payload['absen_keluar'] as String?;
+        if (keluarStr != null) {
+          final dt = DateTime.tryParse(keluarStr);
+          if (dt != null) {
+            _checkOutTime =
+                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+            _isCheckedOut = true;
+            notifyListeners();
+          }
+        }
+      }
+    });
+  }
 
   bool _isUpacaraCheckedIn = false;
   bool get isUpacaraCheckedIn => _isUpacaraCheckedIn;
@@ -97,6 +164,7 @@ class AttendanceBloc extends ChangeNotifier {
               _simulatedLatitude, _simulatedLongitude));
 
   bool _isLoggedIn = false;
+  bool _hasAttemptedAutoCheckIn = false;
 
   int _currentTabIndex = 0;
   int get currentTabIndex => _currentTabIndex;
@@ -106,15 +174,35 @@ class AttendanceBloc extends ChangeNotifier {
     notifyListeners();
   }
 
+  void markCheckedInToday([String? time]) {
+    _isCheckedIn = true;
+    final now = DateTime.now();
+    final currentTimeStr =
+        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
+    if (time != null && time.isNotEmpty && time != 'Terverifikasi') {
+      _checkInTime = time;
+    } else if (_checkInTime == '--:--' || _checkInTime == 'Terverifikasi') {
+      _checkInTime = currentTimeStr;
+    }
+    _hasAttemptedAutoCheckIn = true;
+    notifyListeners();
+  }
+
   AttendanceBloc() {
     _initRealTimeIpAndGpsTracking();
+    AutoAttendanceService.onAttendanceUpdated = () {
+      markCheckedInToday();
+      fetchAttendanceHistory();
+    };
   }
 
   void updateLoginState(bool loggedIn) {
     _isLoggedIn = loggedIn;
     if (loggedIn) {
-      evaluateAndTriggerAutoCheckIn();
       fetchAttendanceHistory();
+    } else {
+      _hasAttemptedAutoCheckIn = false;
     }
   }
 
@@ -123,6 +211,13 @@ class AttendanceBloc extends ChangeNotifier {
       final session = await SsoHelper.getSession();
       if (session == null) return;
 
+      final nip = session['nip'] as String? ?? '';
+      final role = session['role'] as String? ?? '';
+      final nidn = role == 'Dosen' ? nip : '';
+      if (nip.isNotEmpty || nidn.isNotEmpty) {
+        initRealtimeWsListener(nip, nidn);
+      }
+
       final history = await _mediator.send(GetAttendanceHistoryQuery());
       _activities.clear();
       _activities.addAll(history.activities);
@@ -130,6 +225,14 @@ class AttendanceBloc extends ChangeNotifier {
       if (history.todayCheckInTime != null) {
         _checkInTime = history.todayCheckInTime!;
         _isCheckedIn = true;
+        _hasAttemptedAutoCheckIn = true;
+      } else if (_isCheckedIn) {
+        if (_checkInTime == '--:--' || _checkInTime == 'Terverifikasi') {
+          final now = DateTime.now();
+          _checkInTime =
+              "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+        }
+        _hasAttemptedAutoCheckIn = true;
       } else {
         _checkInTime = '--:--';
         _isCheckedIn = false;
@@ -221,6 +324,7 @@ class AttendanceBloc extends ChangeNotifier {
     _checkInTime = '--:--';
     _isCheckedOut = false;
     _checkOutTime = '--:--';
+    _hasAttemptedAutoCheckIn = false;
     notifyListeners();
   }
 
@@ -256,6 +360,12 @@ class AttendanceBloc extends ChangeNotifier {
   }
 
   Future<void> doCheckIn(String time) async {
+    if (_isCheckedIn) {
+      debugPrint(
+          '[AttendanceBloc] User is ALREADY checked in today. Skipping duplicate doCheckIn.');
+      return;
+    }
+
     final lat = _useRealNetworkAndGps ? _realLatitude : _simulatedLatitude;
     final lon = _useRealNetworkAndGps ? _realLongitude : _simulatedLongitude;
     final ip = _useRealNetworkAndGps ? _realIp : _simulatedIp;
@@ -265,15 +375,23 @@ class AttendanceBloc extends ChangeNotifier {
     if (isVpn) noteList.add("V");
     final noteStr = noteList.join(",");
 
-    final success = await _mediator.send(
-      CheckInCommand(
-        latitude: lat,
-        longitude: lon,
-        ipAddress: ip,
-        isUpacara: false,
-        note: noteStr,
-      ),
-    );
+    bool success = false;
+    try {
+      success = await _mediator.send(
+        CheckInCommand(
+          latitude: lat,
+          longitude: lon,
+          ipAddress: ip,
+          isUpacara: false,
+          note: noteStr,
+        ),
+      );
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('sudah') && errStr.contains('absen')) {
+        success = true;
+      }
+    }
 
     if (success) {
       _isCheckedIn = true;
@@ -290,34 +408,47 @@ class AttendanceBloc extends ChangeNotifier {
         ),
       );
       notifyListeners();
-      await fetchAttendanceHistory();
     }
+    await fetchAttendanceHistory();
   }
 
   Future<void> doCheckOut(String time) async {
+    final now = DateTime.now();
+    final actualTime = (time.isNotEmpty && time != '--:--')
+        ? time
+        : "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
     final lat = _useRealNetworkAndGps ? _realLatitude : _simulatedLatitude;
     final lon = _useRealNetworkAndGps ? _realLongitude : _simulatedLongitude;
     final ip = _useRealNetworkAndGps ? _realIp : _simulatedIp;
 
-    final success = await _mediator.send(
-      CheckOutCommand(latitude: lat, longitude: lon, ipAddress: ip),
-    );
+    bool success = false;
+    try {
+      success = await _mediator.send(
+        CheckOutCommand(latitude: lat, longitude: lon, ipAddress: ip),
+      );
+    } catch (e) {
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('sudah') || errStr.contains('keluar')) {
+        success = true;
+      }
+    }
 
     if (success) {
       _isCheckedOut = true;
-      _checkOutTime = time;
+      _checkOutTime = actualTime;
 
       _activities.insert(
         0,
         ActivityLogItem(
           title: 'Absen Keluar Berhasil',
-          time: 'Hari ini • $time PM',
+          time: 'Hari ini • $actualTime PM',
           isSuccess: true,
         ),
       );
       notifyListeners();
-      await fetchAttendanceHistory();
     }
+    await fetchAttendanceHistory();
   }
 
   Future<void> doUpacaraCheckIn(String time) async {
@@ -358,7 +489,7 @@ class AttendanceBloc extends ChangeNotifier {
   }
 
   Future<bool> evaluateAndTriggerAutoCheckIn() async {
-    if (!_isLoggedIn) return false;
+    if (!_isLoggedIn || _isCheckedIn || _hasAttemptedAutoCheckIn) return false;
 
     String currentIp = _useRealNetworkAndGps ? _realIp : _simulatedIp;
     double currentLat =
@@ -389,7 +520,10 @@ class AttendanceBloc extends ChangeNotifier {
         "Final Automatic Check-in Decision: ${matchesWifi || matchesLocation ? 'SUCCESS (Auto Check-In Eligible)' : 'FAILED (Criteria Not Met)'}");
     debugPrint("==================================================");
 
-    if ((matchesWifi || matchesLocation) && !_isCheckedIn) {
+    if ((matchesWifi || matchesLocation) &&
+        !_isCheckedIn &&
+        !_hasAttemptedAutoCheckIn) {
+      _hasAttemptedAutoCheckIn = true;
       final now = DateTime.now();
       final timeStr =
           "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
@@ -401,8 +535,13 @@ class AttendanceBloc extends ChangeNotifier {
 
   void _initRealTimeIpAndGpsTracking() async {
     _ipCheckTimer?.cancel();
+    int syncTicks = 0;
     _ipCheckTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
       try {
+        syncTicks++;
+        if (!_isCheckedIn && _isLoggedIn && syncTicks % 3 == 0) {
+          fetchAttendanceHistory();
+        }
         final ip = await LocationWifiHelper.getActiveDeviceIp();
         final localIp = await LocationWifiHelper.getLocalInterfaceIp();
         final vpn = await LocationWifiHelper.checkVpnActive();
@@ -424,7 +563,6 @@ class AttendanceBloc extends ChangeNotifier {
         }
         if (changed) {
           notifyListeners();
-          evaluateAndTriggerAutoCheckIn();
         }
       } catch (_) {}
     });
@@ -449,7 +587,6 @@ class AttendanceBloc extends ChangeNotifier {
       _realIpLocal = await LocationWifiHelper.getLocalInterfaceIp();
       _isVpnActive = await LocationWifiHelper.checkVpnActive();
       notifyListeners();
-      evaluateAndTriggerAutoCheckIn();
     } catch (_) {}
 
     _gpsSubscription?.cancel();
@@ -465,7 +602,6 @@ class AttendanceBloc extends ChangeNotifier {
           _simulatedLongitude = pos.longitude;
         }
         notifyListeners();
-        evaluateAndTriggerAutoCheckIn();
       }
 
       _isAutoCheckInEvaluating = false;
@@ -484,7 +620,6 @@ class AttendanceBloc extends ChangeNotifier {
               _simulatedLongitude = p.longitude;
             }
             notifyListeners();
-            evaluateAndTriggerAutoCheckIn();
           }
         } catch (_) {}
       });
@@ -506,7 +641,6 @@ class AttendanceBloc extends ChangeNotifier {
         }
 
         notifyListeners();
-        evaluateAndTriggerAutoCheckIn();
       }, onError: (err) {
         debugPrint("Realtime GPS Stream Error: $err");
       });

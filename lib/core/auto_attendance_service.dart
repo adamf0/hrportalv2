@@ -1,12 +1,17 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../modules/attendance/infrastructure/attendance_repository.dart';
+import 'location_wifi_helper.dart';
+import 'sso_helper.dart';
 import 'api_client.dart';
+import 'fcm_service.dart';
 
 class AutoAttendanceService with WidgetsBindingObserver {
   static final AutoAttendanceService instance =
       AutoAttendanceService._internal();
+
+  static Function()? onAttendanceUpdated;
 
   AutoAttendanceService._internal();
 
@@ -14,12 +19,20 @@ class AutoAttendanceService with WidgetsBindingObserver {
   String? _cachedNip;
   String? _cachedNidn;
   bool _isAutoAttendanceRunning = false;
+  bool _hasNotifiedSuccessToday = false;
+  bool _hasNotifiedFailToday = false;
+  String? _lastNotifiedDate;
   DateTime? _lastAutoAttempt;
 
-  // UNPAK Campus Coordinates
-  static const double _campusLat = -6.5888;
-  static const double _campusLon = 106.8066;
-  static const double _allowedRadiusMeters = 100.0; // 100 meters radius
+  Future<bool> _isAlreadyCheckedInToday() async {
+    try {
+      final repository = AttendanceRepository();
+      final history = await repository.fetchHistory();
+      return history.todayCheckInTime != null;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Initializes the Auto-Attendance Service & WidgetsBindingObserver for background app execution
   void initialize() {
@@ -33,7 +46,6 @@ class AutoAttendanceService with WidgetsBindingObserver {
       _cachedNip = nip;
       _cachedNidn = nidn;
       debugPrint('[AutoAttendanceService] Session updated for NIP: $nip');
-      // Trigger instant check when user logs in
       runAutoAttendanceCheck(isExplicit: true);
     }
   }
@@ -41,11 +53,10 @@ class AutoAttendanceService with WidgetsBindingObserver {
   /// Starts the periodic background worker timer (runs even when app is hidden/paused)
   void startBackgroundWorker() {
     _bgTimer?.cancel();
-    // Run background check every 30 seconds
-    _bgTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _bgTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       runAutoAttendanceCheck();
     });
-    debugPrint('[AutoAttendanceService] Background worker timer started.');
+    debugPrint('[AutoAttendanceService] Background worker timer started (15s interval).');
   }
 
   @override
@@ -54,21 +65,36 @@ class AutoAttendanceService with WidgetsBindingObserver {
     debugPrint('[AutoAttendanceService] App lifecycle state changed: $state');
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.detached) {
-      // App minimized, hidden, or closed - trigger background auto attendance check
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.resumed) {
       runAutoAttendanceCheck();
     }
   }
 
   /// Executes auto-attendance and auto-ceremony-attendance evaluation
   Future<void> runAutoAttendanceCheck({bool isExplicit = false}) async {
+    final now = DateTime.now();
+    final todayStr = "${now.year}-${now.month}-${now.day}";
+    if (_lastNotifiedDate != todayStr) {
+      _lastNotifiedDate = todayStr;
+      _hasNotifiedSuccessToday = false;
+      _hasNotifiedFailToday = false;
+    }
+
+    if (_cachedNip == null || _cachedNip!.isEmpty) {
+      final session = await SsoHelper.getSession();
+      if (session != null && session['nip'] != null) {
+        _cachedNip = session['nip'] as String?;
+        _cachedNidn = session['role'] == 'Dosen' ? _cachedNip : '';
+      }
+    }
+
     if (_cachedNip == null || _cachedNip!.isEmpty) {
       return;
     }
 
     if (_isAutoAttendanceRunning) return;
 
-    // Prevent duplicate attempts within 10 seconds
     if (_lastAutoAttempt != null &&
         DateTime.now().difference(_lastAutoAttempt!) <
             const Duration(seconds: 10) &&
@@ -80,27 +106,37 @@ class AutoAttendanceService with WidgetsBindingObserver {
     _lastAutoAttempt = DateTime.now();
 
     try {
+      if (await _isAlreadyCheckedInToday()) {
+        debugPrint(
+            '[AutoAttendanceService] User has ALREADY checked in today. Skipping auto check-in request.');
+        onAttendanceUpdated?.call();
+        return;
+      }
+
       debugPrint(
           '[AutoAttendanceService] Evaluating location & network for auto-attendance...');
 
-      // 1. Simulate/Evaluate Location & Campus Radius Connection
-      // In production/emulator, check GPS coordinates & Network connection status
       final isInsideRadiusOrNetwork = await _evaluateCampusLocationAndNetwork();
 
       if (isInsideRadiusOrNetwork) {
-        // SUCCESS CASE: Inside Campus Radius or Connected to Campus Network
         debugPrint(
             '[AutoAttendanceService] User is INSIDE campus radius / network.');
 
-        // Perform Auto Check-in
         final successCheckIn =
             await _performAutoCheckIn(_cachedNip!, _cachedNidn!);
         if (successCheckIn) {
           debugPrint(
               '[AutoAttendanceService] Auto-attendance check-in SUCCESS.');
+          onAttendanceUpdated?.call();
+          if (!_hasNotifiedSuccessToday) {
+            _hasNotifiedSuccessToday = true;
+            await FcmService.showCustomNotification(
+              title: 'Presensi Otomatis Berhasil',
+              body: 'Sistem sudah melakukan absensi otomatis',
+            );
+          }
         }
 
-        // Perform Auto Ceremony Check-in (if today is ceremony day e.g. Monday/17th)
         final successUpacara =
             await _performAutoUpacaraCheckIn(_cachedNip!, _cachedNidn!);
         if (successUpacara) {
@@ -108,10 +144,12 @@ class AutoAttendanceService with WidgetsBindingObserver {
               '[AutoAttendanceService] Auto-ceremony-attendance check-in SUCCESS.');
         }
       } else {
-        // FAILURE CASE: Outside Campus Radius or No Network
         debugPrint(
             '[AutoAttendanceService] User is OUTSIDE campus radius or disconnected.');
-        await _notifyAutoAttendanceFailed(_cachedNip!);
+        if (!_hasNotifiedFailToday) {
+          _hasNotifiedFailToday = true;
+          await _notifyAutoAttendanceFailed(_cachedNip!);
+        }
       }
     } catch (e) {
       debugPrint(
@@ -123,34 +161,49 @@ class AutoAttendanceService with WidgetsBindingObserver {
 
   /// Evaluates GPS Radius & Network connection
   Future<bool> _evaluateCampusLocationAndNetwork() async {
-    // Current location coordinates (or mock device coordinates)
-    const double currentLat = -6.5888;
-    const double currentLon = 106.8066;
+    try {
+      final ip = await LocationWifiHelper.getActiveDeviceIp();
+      final pos = await LocationWifiHelper.getCurrentLocation();
 
-    final distance = _calculateDistanceMeters(
-        currentLat, currentLon, _campusLat, _campusLon);
-    debugPrint(
-        '[AutoAttendanceService] Distance to campus center: ${distance.toStringAsFixed(2)} meters');
+      final matchesWifi = LocationWifiHelper.isPakuanIp(ip);
+      bool matchesLocation = false;
 
-    return distance <= _allowedRadiusMeters;
+      if (pos != null) {
+        final insidePoly1 = LocationWifiHelper.isPointInPolygon(
+            pos.latitude, pos.longitude, LocationWifiHelper.polygon1);
+        final insidePoly2 = LocationWifiHelper.isPointInPolygon(
+            pos.latitude, pos.longitude, LocationWifiHelper.polygon2);
+        matchesLocation = insidePoly1 || insidePoly2;
+      }
+
+      debugPrint(
+          '[AutoAttendanceService] Evaluation -> IP: $ip (WifiMatch: $matchesWifi), GPS: ${pos?.latitude}, ${pos?.longitude} (LocationMatch: $matchesLocation)');
+
+      return matchesWifi || matchesLocation;
+    } catch (e) {
+      debugPrint('[AutoAttendanceService Evaluation Error]: $e');
+      return false;
+    }
   }
 
   /// Performs Auto Check-In API call
   Future<bool> _performAutoCheckIn(String nip, String nidn) async {
     try {
-      final url = Uri.parse('${ApiClient.baseUrl}/api/attendance/check-in');
-      final response = await http.post(
-        url,
-        body: {
-          'nip': nip,
-          'nidn': nidn,
-          'latitude': _campusLat.toString(),
-          'longitude': _campusLon.toString(),
-          'note': 'Auto Attendance (Background Job)',
-        },
-      ).timeout(const Duration(seconds: 5));
+      final pos = await LocationWifiHelper.getCurrentLocation();
+      final lat = pos?.latitude ?? -6.5989;
+      final lon = pos?.longitude ?? 106.8106;
+      final ip = await LocationWifiHelper.getActiveDeviceIp();
 
-      return response.statusCode == 200;
+      final repository = AttendanceRepository();
+      final success = await repository.checkIn(
+        lat,
+        lon,
+        ip,
+        false,
+        'AutoBG',
+      );
+
+      return success;
     } catch (e) {
       debugPrint('[AutoAttendanceService] Check-in API failed: $e');
     }
@@ -197,16 +250,6 @@ class AutoAttendanceService with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('[AutoAttendanceService] Notify fail API failed: $e');
     }
-  }
-
-  /// Haversine distance formula calculation in meters
-  double _calculateDistanceMeters(
-      double lat1, double lon1, double lat2, double lon2) {
-    const p = 0.017453292519943295;
-    final a = 0.5 -
-        cos((lat2 - lat1) * p) / 2 +
-        cos(lat1 * p) * cos(lat2 * p) * (1 - cos((lon2 - lon1) * p)) / 2;
-    return 12742 * asin(sqrt(a)) * 1000;
   }
 
   void dispose() {

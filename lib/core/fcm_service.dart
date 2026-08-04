@@ -139,7 +139,10 @@ class FcmService {
         iOS: iosDetails,
       );
 
-      final id = notif.id.hashCode & 0x7FFFFFFF;
+      final isAutoNotif = notif.title.contains('Presensi Otomatis') ||
+          notif.type.contains('auto_attendance') ||
+          notif.type.contains('attendance');
+      final id = isAutoNotif ? 8888 : (notif.id.hashCode & 0x7FFFFFFF);
 
       await _localNotificationsPlugin.show(
         id,
@@ -152,6 +155,62 @@ class FcmService {
     } catch (e) {
       debugPrint(
           '[FCM Service Error] Failed pushing system notification drawer: $e');
+    }
+  }
+
+  static final Set<String> _pushedCustomNotificationTitles = {};
+
+  /// Pushes a custom local notification (e.g. background JWT refresh or auto-attendance result)
+  static Future<void> showCustomNotification({
+    required String title,
+    required String body,
+  }) async {
+    final key = '$title|$body';
+    if (_pushedCustomNotificationTitles.contains(key)) {
+      debugPrint('[FCM Service] Custom notification "$title" already pushed in this session. Skipping duplicate.');
+      return;
+    }
+    _pushedCustomNotificationTitles.add(key);
+
+    await initLocalNotifications();
+    try {
+      const androidDetails = AndroidNotificationDetails(
+        'hrportal_channel',
+        'HR Portal Notifications',
+        channelDescription:
+            'Notifications for attendance, leave, and approval status',
+        importance: Importance.max,
+        priority: Priority.high,
+        ticker: 'HR Portal Notification',
+        playSound: true,
+        icon: '@mipmap/ic_launcher',
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBanner: true,
+        presentList: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      final isAuto = title.contains('Presensi Otomatis') || title.contains('Sesi');
+      final id = isAuto ? 8888 : (DateTime.now().millisecondsSinceEpoch & 0x7FFFFFFF);
+
+      await _localNotificationsPlugin.show(
+        id,
+        title,
+        body,
+        platformDetails,
+      );
+      debugPrint('[FCM Service] Custom Notification Pushed: $title');
+    } catch (e) {
+      debugPrint('[FCM Service Error] Failed pushing custom notification: $e');
     }
   }
 
@@ -252,10 +311,23 @@ class FcmService {
       if (response.statusCode == 200) {
         final Map<String, dynamic> body = json.decode(response.body);
         final List<dynamic> list = body['data'] as List<dynamic>? ?? [];
-        return list
+        final items = list
             .map((item) =>
                 NotificationModel.fromJson(item as Map<String, dynamic>))
             .toList();
+
+        // Client-side safeguard: Filter out verification request notifications
+        // intended for supervisors (e.g. "Pegawai NIP X mengajukan... Mohon verifikasi")
+        // if current active NIP is the applicant (X).
+        return items.where((notif) {
+          final isVerificationRequest = notif.title.toLowerCase().contains('pengajuan') ||
+              notif.body.toLowerCase().contains('mohon verifikasi');
+          if (isVerificationRequest && notif.body.contains(nip)) {
+            // Current user is the applicant, not the verifier -> do not notify applicant
+            return false;
+          }
+          return true;
+        }).toList();
       }
     } catch (e) {
       debugPrint('[FCM Service Error] Fetch notifications failed: $e');

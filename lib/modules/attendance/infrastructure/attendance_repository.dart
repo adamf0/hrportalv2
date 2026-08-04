@@ -10,10 +10,8 @@ class AttendanceRepository implements IAttendanceRepository {
   Future<bool> checkIn(
       double lat, double lon, String ip, bool isUpacara, String note) async {
     final insideCampus = await isWithinCampusPolygon(lat, lon);
-    if (!insideCampus) return false;
-
     final validWifi = await isPakuanWifi(ip);
-    if (!validWifi) return false;
+    if (!insideCampus && !validWifi) return false;
 
     try {
       final session = await SsoHelper.getSession();
@@ -26,16 +24,26 @@ class AttendanceRepository implements IAttendanceRepository {
           ? "/api/ceremony-attendance"
           : "/api/attendance/check-in";
 
+      if (!isUpacara) {
+        final currentHistory = await fetchHistory();
+        if (currentHistory.todayCheckInTime != null) {
+          debugPrint('[AttendanceRepository] User is ALREADY checked in today in DB. Returning true without re-requesting API.');
+          return true;
+        }
+      }
+
       final now = DateTime.now();
       final todayStr =
           "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+      final safeNote = note.length > 10 ? note.substring(0, 10) : note;
 
       final Map<String, String> bodyData = {
         "nip": nip,
         "nidn": nidn,
         "latitude": lat.toString(),
         "longitude": lon.toString(),
-        "note": note,
+        "note": safeNote,
       };
       if (isUpacara) {
         bodyData["tanggal"] = todayStr;
@@ -49,6 +57,10 @@ class AttendanceRepository implements IAttendanceRepository {
       return responseData != null;
     } catch (e, stackTrace) {
       debugPrint('[AttendanceRepository checkIn error]: $e\n$stackTrace');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('sudah') && errStr.contains('absen')) {
+        return true;
+      }
       return false;
     }
   }
@@ -56,7 +68,8 @@ class AttendanceRepository implements IAttendanceRepository {
   @override
   Future<bool> checkOut(double lat, double lon, String ip) async {
     final insideCampus = await isWithinCampusPolygon(lat, lon);
-    if (!insideCampus) return false;
+    final validWifi = await isPakuanWifi(ip);
+    if (!insideCampus && !validWifi) return false;
 
     try {
       final session = await SsoHelper.getSession();
@@ -76,6 +89,10 @@ class AttendanceRepository implements IAttendanceRepository {
       return responseData != null;
     } catch (e, stackTrace) {
       debugPrint('[AttendanceRepository checkOut error]: $e\n$stackTrace');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('sudah') || errStr.contains('keluar')) {
+        return true;
+      }
       return false;
     }
   }
@@ -97,11 +114,22 @@ class AttendanceRepository implements IAttendanceRepository {
   @override
   Future<AttendanceHistoryResult> fetchHistory() async {
     try {
+      final session = await SsoHelper.getSession();
+      final nip = session?['nip'] as String? ?? '';
+      final nidn = session?['role'] == 'Dosen' ? nip : '';
+
       final responseData = await ApiClient.get(
-        Uri.parse("${ApiClient.baseUrl}/api/attendance/history"),
+        Uri.parse("${ApiClient.baseUrl}/api/attendance/history?nip=$nip&nidn=$nidn"),
       );
 
+      List items = [];
       if (responseData is List) {
+        items = responseData;
+      } else if (responseData is Map<String, dynamic> && responseData['data'] is List) {
+        items = responseData['data'] as List;
+      }
+
+      if (items.isNotEmpty || responseData != null) {
         final List<ActivityLogItem> activities = [];
         String? todayCheckIn;
         String? todayCheckOut;
@@ -109,21 +137,28 @@ class AttendanceRepository implements IAttendanceRepository {
         final now = DateTime.now();
         final String todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-        for (var json in responseData) {
+        for (var json in items) {
           final tanggalStr = json['tanggal'] as String? ?? '';
           final masukStr = json['absen_masuk'] as String?;
           final keluarStr = json['absen_keluar'] as String?;
 
-          final isToday = tanggalStr == todayStr;
+          bool isToday = tanggalStr.contains(todayStr);
 
           if (masukStr != null) {
             final dt = DateTime.tryParse(masukStr);
             if (dt != null) {
-              // Convert to local time because the database stores in UTC
               final localDt = dt.toLocal();
+              if (!isToday) {
+                isToday = (localDt.year == now.year &&
+                        localDt.month == now.month &&
+                        localDt.day == now.day) ||
+                    (dt.year == now.year &&
+                        dt.month == now.month &&
+                        dt.day == now.day);
+              }
               activities.add(ActivityLogItem(
                 title: 'Absen Masuk Berhasil',
-                time: '$tanggalStr • ${_formatTime(localDt)} AM',
+                time: '$todayStr • ${_formatTime(localDt)} AM',
                 isSuccess: true,
               ));
               if (isToday) {
@@ -135,11 +170,18 @@ class AttendanceRepository implements IAttendanceRepository {
           if (keluarStr != null) {
             final dt = DateTime.tryParse(keluarStr);
             if (dt != null) {
-              // Convert to local time because the database stores in UTC
               final localDt = dt.toLocal();
+              if (!isToday) {
+                isToday = (localDt.year == now.year &&
+                        localDt.month == now.month &&
+                        localDt.day == now.day) ||
+                    (dt.year == now.year &&
+                        dt.month == now.month &&
+                        dt.day == now.day);
+              }
               activities.add(ActivityLogItem(
                 title: 'Absen Keluar Berhasil',
-                time: '$tanggalStr • ${_formatTime(localDt)} PM',
+                time: '$todayStr • ${_formatTime(localDt)} PM',
                 isSuccess: true,
               ));
               if (isToday) {

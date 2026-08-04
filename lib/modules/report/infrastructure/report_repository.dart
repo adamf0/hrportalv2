@@ -602,10 +602,11 @@ class ReportRepository implements IReportRepository {
 
             note = (info['catatan'] ?? info['note'] ?? info['kode'] ?? '')
                 .toString();
-            if (note.contains('G') ||
-                note.contains('V') ||
-                note.contains('Verifikasi') ||
-                info['is_anomaly'] == true) {
+            final trimmedNote = note.trim();
+            if (trimmedNote == 'G' ||
+                trimmedNote == 'V' ||
+                trimmedNote == 'G,V' ||
+                trimmedNote == 'G, V') {
               cellStatus = ReportCellStatus.absenAnomaly;
               hasAnomaly = true;
             } else {

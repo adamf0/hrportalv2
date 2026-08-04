@@ -108,6 +108,9 @@ class ApiClient {
     }
   }
 
+  static String? _lastToastMessage;
+  static DateTime? _lastToastTime;
+
   /// Display a Toast SnackBar for API errors
   static void showToast(String message, {String? scope}) {
     final pageContext = scope ?? _activeScope;
@@ -115,6 +118,17 @@ class ApiClient {
     final formattedMsg = '[$pageTitle] $message';
     debugPrint('[API Toast Notification]: $formattedMsg');
 
+    // Deduplicate: Don't show exact same toast within 5 seconds
+    final now = DateTime.now();
+    if (_lastToastMessage == formattedMsg &&
+        _lastToastTime != null &&
+        now.difference(_lastToastTime!) < const Duration(seconds: 5)) {
+      return;
+    }
+    _lastToastMessage = formattedMsg;
+    _lastToastTime = now;
+
+    scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
     scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Row(
@@ -133,7 +147,7 @@ class ApiClient {
           ],
         ),
         backgroundColor: AppTheme.error,
-        duration: const Duration(seconds: 4),
+        duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
@@ -214,8 +228,12 @@ class ApiClient {
           '[API Error Log] Non-JSON error body on status $statusCode: ${response.body}');
     }
 
-    debugPrint('[API Error Log] Status $statusCode Exception: $errorMessage');
-    showToast(errorMessage);
+    final lowerMsg = errorMessage.toLowerCase();
+    final isAlreadyCheckedInMsg =
+        lowerMsg.contains('sudah') && lowerMsg.contains('absen');
+    if (!isAlreadyCheckedInMsg) {
+      showToast(errorMessage);
+    }
     throw ApiException(errorMessage,
         statusCode: statusCode, body: jsonBody ?? response.body);
   }

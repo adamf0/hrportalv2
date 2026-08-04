@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import 'package:hrportalv2/core/app_theme.dart';
-import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
 
 class AutoCheckInStatusCard extends StatelessWidget {
   final bool isCheckedIn;
@@ -25,13 +23,6 @@ class AutoCheckInStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
-    final attendanceBloc = Provider.of<AttendanceBloc>(context);
-    final isG = attendanceBloc.isFakeGps;
-    final isV = attendanceBloc.isVpn;
-    final noteList = <String>[];
-    if (isG) noteList.add('G');
-    if (isV) noteList.add('V');
-    final noteStr = noteList.isEmpty ? '' : ' | Note: ${noteList.map((e) => '[$e]').join(', ')}';
 
     if (isCheckedIn) {
       return Container(
@@ -51,7 +42,7 @@ class AutoCheckInStatusCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Absen Otomatis Berhasil',
+                    'Sudah Absen Masuk Hari Ini',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -60,7 +51,7 @@ class AutoCheckInStatusCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Kehadiran Anda hari ini telah berhasil diverifikasi secara otomatis.',
+                    'Kehadiran Anda hari ini telah berhasil terverifikasi di server.',
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       color: AppTheme.success,
@@ -68,7 +59,7 @@ class AutoCheckInStatusCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}$noteStr',
+                    'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}',
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
@@ -83,56 +74,12 @@ class AutoCheckInStatusCard extends StatelessWidget {
       );
     }
 
-    if (isAutoCheckInEvaluating) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppTheme.infoContainer,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue[200]!),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: primaryColor),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Proses Absensi Otomatis...',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'mencoba absen otomatis dari jaringan / gps unpak...',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: primaryColor.withOpacity(0.8),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.errorContainer,
+        color: AppTheme.infoContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red[200]!),
+        border: Border.all(color: primaryColor.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -140,44 +87,35 @@ class AutoCheckInStatusCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.error_outline, color: Colors.red, size: 24),
+              Icon(Icons.info_outline, color: primaryColor, size: 24),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Absen Otomatis Gagal',
+                      'Belum Absen Masuk Hari Ini',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.error,
+                        color: primaryColor,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'sistem gagal absensi otomatis, perlu presensi manual oleh pengguna',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.error,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Pencegahan: Posisi Anda berada di luar area kampus Pakuan.',
+                      'Anda belum melakukan presensi masuk hari ini. Silakan presensi manual atau biarkan sistem latar belakang memproses.',
                       style: GoogleFonts.inter(
                         fontSize: 11,
-                        color: AppTheme.error,
+                        color: primaryColor.withOpacity(0.85),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}$noteStr',
+                      'IP: $realIp | GPS: ${realLatitude.toStringAsFixed(6)}, ${realLongitude.toStringAsFixed(6)}',
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w500,
-                        color: AppTheme.error.withOpacity(0.8),
+                        color: primaryColor.withOpacity(0.75),
                       ),
                     ),
                   ],
@@ -194,7 +132,7 @@ class AutoCheckInStatusCard extends StatelessWidget {
               style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.error,
+              backgroundColor: primaryColor,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               minimumSize: const Size(double.infinity, 38),

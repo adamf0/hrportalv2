@@ -46,6 +46,8 @@ class AuthRepository implements IAuthRepository {
               : (resolvedRole == 'Dosen' ? ['Dosen'] : ['Tendik']);
 
           await SsoHelper.saveSession(
+            username: username,
+            password: password,
             token: token,
             name: name,
             nip: nip,
@@ -91,6 +93,11 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<AuthSession?> checkValidSession() async {
     try {
+      final validToken = await SsoHelper.getValidToken();
+      if (validToken == null) {
+        throw const UnauthorizedError();
+      }
+
       final sessionData = await SsoHelper.getSession();
       if (sessionData != null) {
         return AuthSession(
@@ -103,7 +110,7 @@ class AuthRepository implements IAuthRepository {
                   .map((e) => e.toString())
                   .toList()
               : [],
-          token: sessionData['token'] ?? '',
+          token: validToken,
         );
       } else {
         throw const UnauthorizedError();

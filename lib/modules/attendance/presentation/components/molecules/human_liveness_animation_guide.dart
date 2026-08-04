@@ -44,15 +44,6 @@ class _HumanLivenessAnimationGuideState
         return Stack(
           alignment: Alignment.center,
           children: [
-            // 1. Scanning Progress Ring & Face Placement Oval
-            CustomPaint(
-              size: const Size(220, 220),
-              painter: _FaceContourPainter(
-                progress: widget.progress,
-                color: primaryColor,
-                pulse: animValue,
-              ),
-            ),
 
 
             // 3. Sweeping Laser Scan Line
@@ -310,51 +301,4 @@ class _FaceIdVectorPainter extends CustomPainter {
   }
 }
 
-/// Custom Painter for Outer Scanning Circle Contour & Progress Arc
-class _FaceContourPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final double pulse;
 
-  _FaceContourPainter({
-    required this.progress,
-    required this.color,
-    required this.pulse,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final rect = Rect.fromCenter(
-      center: center,
-      width: size.width * 0.94,
-      height: size.height * 0.94,
-    );
-
-    // Background dashed/faint oval path
-    final bgPaint = Paint()
-      ..color = Colors.white.withOpacity(0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    canvas.drawOval(rect, bgPaint);
-
-    // Active Glowing Progress Arc
-    final activePaint = Paint()
-      ..color = color.withOpacity(0.85 + 0.15 * math.sin(pulse * math.pi))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.0
-      ..strokeCap = StrokeCap.round;
-
-    if (progress > 0) {
-      final sweepAngle = 2 * math.pi * progress;
-      canvas.drawArc(rect, -math.pi / 2, sweepAngle, false, activePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _FaceContourPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.pulse != pulse ||
-        oldDelegate.color != color;
-  }
-}

@@ -5,6 +5,7 @@ import 'package:hrportalv2/core/responsive_helper.dart';
 import 'package:hrportalv2/modules/auth/presentation/auth_bloc.dart';
 import 'permission_page.dart';
 import 'login_page.dart';
+import 'package:hrportalv2/pages/main_shell.dart';
 
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
@@ -54,10 +55,17 @@ class _SplashPageState extends State<SplashPage>
         MaterialPageRoute(builder: (context) => const PermissionPage()),
       );
     } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-      );
+      if (authBloc.isLoggedIn) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainShell()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+        );
+      }
     }
   }
 

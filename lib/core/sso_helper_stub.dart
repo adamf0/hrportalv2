@@ -5,6 +5,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:path_provider/path_provider.dart';
+import 'sqlite_auth_storage.dart';
+import 'fcm_service.dart';
+import 'api_client.dart';
 
 class SsoHelper {
   static const String _clientId = "unpak_link_gate";
@@ -14,12 +17,17 @@ class SsoHelper {
   static const _appAuth = FlutterAppAuth();
 
   static Future<String?> getLoggedInName() async {
+    final session = await SqliteAuthStorage.instance.getSession();
+    if (session != null && (session['name'] as String).isNotEmpty) {
+      return session['name'];
+    }
     return await LocalStorageMobile.read('name');
   }
 
   static Future<void> printSsoTelemetry() async {
     try {
-      final token = await LocalStorageMobile.read('token');
+      final session = await SqliteAuthStorage.instance.getSession();
+      final token = session?['token'] ?? await LocalStorageMobile.read('token');
       final refresh = await LocalStorageMobile.read('refresh');
       final idToken = await LocalStorageMobile.read('idToken');
       print("========== KEYCLOAK SSO DEBUG TELEMETRY ==========");
@@ -80,12 +88,16 @@ class SsoHelper {
           level = "Tendik";
         }
 
-        await LocalStorageMobile.write('name', name);
-        await LocalStorageMobile.write('level', level);
-        await LocalStorageMobile.write('nip', nip);
-        await LocalStorageMobile.write('email', email);
-        await LocalStorageMobile.write('role', level);
-        await LocalStorageMobile.write('groups', jsonEncode([level]));
+        await saveSession(
+          username: nip,
+          password: "",
+          token: accessToken,
+          name: name,
+          nip: nip,
+          email: email,
+          role: level,
+          groups: [level],
+        );
 
         return {
           "name": name,
@@ -105,6 +117,7 @@ class SsoHelper {
 
   static Future<void> logout() async {
     final refreshToken = await LocalStorageMobile.read('refresh');
+    await SqliteAuthStorage.instance.clearAll();
     await LocalStorageMobile.clear();
 
     if (refreshToken != null) {
@@ -136,38 +149,80 @@ class SsoHelper {
   }
 
   static Future<String?> getValidToken() async {
-    final token = await LocalStorageMobile.read('token');
-    final refresh = await LocalStorageMobile.read('refresh');
+    final session = await getSession();
+    if (session == null) return null;
 
-    if (token == null) return null;
+    final token = session['token'] as String?;
+    if (token == null || token.isEmpty) return null;
 
     if (_isTokenExpired(token)) {
-      if (refresh != null) {
-        print("Token expired. Attempting to refresh token...");
+      final username = session['username'] as String?;
+      final password = session['password'] as String?;
+
+      if (username != null &&
+          username.isNotEmpty &&
+          password != null &&
+          password.isNotEmpty) {
+        print("JWT Token expired. Attempting background re-login via SQLite credentials...");
         try {
-          final result = await _appAuth.token(
-            TokenRequest(
-              _clientId,
-              "com.unpak.hrportal:/oauth2redirect",
-              issuer: "https://gerbang.unpak.ac.id/realms/gateway",
-              refreshToken: refresh,
-              scopes: ['openid', 'profile', 'email'],
-            ),
+          final responseData = await ApiClient.post(
+            Uri.parse("${ApiClient.baseUrlUnpak}/account/login"),
+            body: {
+              "username": username,
+              "password": password,
+            },
           );
-          if (result.accessToken != null) {
-            await LocalStorageMobile.write('token', result.accessToken!);
-            if (result.refreshToken != null) {
-              await LocalStorageMobile.write('refresh', result.refreshToken!);
+
+          if (responseData is Map<String, dynamic> &&
+              responseData['token'] != null) {
+            final newToken = responseData['token'] as String;
+
+            final whoamiData = await ApiClient.get(
+              Uri.parse("${ApiClient.baseUrlUnpak}/account/whoami"),
+              headers: {"Authorization": "Bearer $newToken"},
+            );
+
+            if (whoamiData is Map<String, dynamic>) {
+              final name = whoamiData['nama'] ?? whoamiData['name'] ?? session['name'];
+              final nip = whoamiData['nip'] ?? session['nip'];
+              final email = whoamiData['email'] ?? session['email'];
+              final role = session['role'] as String? ?? 'Dosen';
+              final groups = List<String>.from(session['groups'] ?? []);
+
+              await saveSession(
+                username: username,
+                password: password,
+                token: newToken,
+                name: name,
+                nip: nip,
+                email: email,
+                role: role,
+                groups: groups,
+              );
+
+              await FcmService.showCustomNotification(
+                title: 'Sesi Keamanan Diperbarui',
+                body: 'Token JWT Anda berhasil diperbarui secara otomatis di latar belakang.',
+              );
+
+              print("Background token refresh SUCCESS.");
+              return newToken;
             }
-            print("Token refreshed successfully.");
-            return result.accessToken;
           }
         } catch (e) {
-          print("Failed to refresh token: $e");
+          print("Background token refresh failed: $e");
         }
       }
+
+      // Re-login failed or no stored password
+      await clearSession();
+      await FcmService.showCustomNotification(
+        title: 'Sesi Berakhir',
+        body: 'Token JWT telah kadaluarsa. Silakan login kembali ke HR Portal.',
+      );
       return null;
     }
+
     return token;
   }
 
@@ -189,6 +244,8 @@ class SsoHelper {
   }
 
   static Future<void> saveSession({
+    required String username,
+    required String password,
     required String token,
     required String name,
     required String nip,
@@ -196,6 +253,18 @@ class SsoHelper {
     required String role,
     required List<String> groups,
   }) async {
+    await SqliteAuthStorage.instance.saveSession(
+      username: username,
+      password: password,
+      token: token,
+      name: name,
+      nip: nip,
+      email: email,
+      role: role,
+      groups: groups,
+    );
+    await LocalStorageMobile.write('username', username);
+    await LocalStorageMobile.write('password', password);
     await LocalStorageMobile.write('token', token);
     await LocalStorageMobile.write('name', name);
     await LocalStorageMobile.write('nip', nip);
@@ -205,8 +274,15 @@ class SsoHelper {
   }
 
   static Future<Map<String, dynamic>?> getSession() async {
+    final sqliteSession = await SqliteAuthStorage.instance.getSession();
+    if (sqliteSession != null && (sqliteSession['token'] ?? '').isNotEmpty) {
+      return sqliteSession;
+    }
+
     final token = await LocalStorageMobile.read('token');
-    if (token == null) return null;
+    if (token == null || token.isEmpty) return null;
+    final username = await LocalStorageMobile.read('username') ?? '';
+    final password = await LocalStorageMobile.read('password') ?? '';
     final name = await LocalStorageMobile.read('name') ?? '';
     final nip = await LocalStorageMobile.read('nip') ?? '';
     final email = await LocalStorageMobile.read('email') ?? '';
@@ -220,6 +296,8 @@ class SsoHelper {
       } catch (_) {}
     }
     return {
+      'username': username,
+      'password': password,
       'token': token,
       'name': name,
       'nip': nip,
@@ -230,6 +308,7 @@ class SsoHelper {
   }
 
   static Future<void> clearSession() async {
+    await SqliteAuthStorage.instance.clearAll();
     await LocalStorageMobile.clear();
   }
 }

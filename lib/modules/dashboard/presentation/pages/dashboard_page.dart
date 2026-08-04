@@ -666,7 +666,10 @@ class _DashboardPageState extends State<DashboardPage> {
             onPressed: () async {
               final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(context);
-              await appState.doCheckOut("17:05");
+              final now = DateTime.now();
+              final timeStr =
+                  "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+              await appState.doCheckOut(timeStr);
               messenger.showSnackBar(
                 const SnackBar(
                     content: Text('Absen pulang berhasil dilakukan!')),
