@@ -16,9 +16,9 @@ import '../core/fcm_service.dart';
 class MainShell extends StatelessWidget {
   const MainShell({super.key});
 
-  void _onTabSelect(int index, AttendanceBloc attendanceBloc) {
+  void _onTabSelect(int index, AttendanceBloc attendanceBloc, bool isSdm) {
     attendanceBloc.setTabIndex(index);
-    final scopes = ['dashboard', 'attendance', 'requests', 'payroll'];
+    final scopes = [isSdm ? 'sdm_report' : 'dashboard', 'attendance', 'requests', 'payroll'];
     if (index < scopes.length) {
       ApiClient.setActivePageScope(scopes[index]);
     }
@@ -118,10 +118,11 @@ class MainShell extends StatelessWidget {
     final bool isWatch = context.isWatch;
     final primaryColor = Theme.of(context).colorScheme.primary;
     final secondaryColor = Theme.of(context).colorScheme.secondary;
+    final isSdm = Provider.of<AuthBloc>(context, listen: false).isSdmUser;
 
     if (isWatch) {
       return GestureDetector(
-        onTap: () => _onTabSelect(index, attendanceBloc),
+        onTap: () => _onTabSelect(index, attendanceBloc, isSdm),
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -135,7 +136,7 @@ class MainShell extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: () => _onTabSelect(index, attendanceBloc),
+      onTap: () => _onTabSelect(index, attendanceBloc, isSdm),
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),

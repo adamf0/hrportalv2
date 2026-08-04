@@ -44,9 +44,12 @@ class _AttendancePageState extends State<AttendancePage>
     )..repeat(reverse: true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authBloc = context.read<AuthBloc>();
-      if (authBloc.isSdmUser) return;
-      ApiClient.setActivePageScope('attendance');
+      final attendanceBloc = context.read<AttendanceBloc>();
+      if (attendanceBloc.currentTabIndex == 1) {
+        final authBloc = context.read<AuthBloc>();
+        if (authBloc.isSdmUser) return;
+        ApiClient.setActivePageScope('attendance');
+      }
     });
   }
 

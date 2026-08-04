@@ -48,10 +48,11 @@ class LeaveBloc extends ChangeNotifier {
     List<Map<String, dynamic>> jenisCutiList = [];
     try {
       final res = await ApiClient.get(
-        Uri.parse("${ApiClient.baseUrl}/api/masterdata/jenis-cuti"),
+        Uri.parse("${ApiClient.baseUrlUnpak}/masterdata/jenis-cuti"),
       );
       if (res is List) {
-        jenisCutiList = res.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        jenisCutiList =
+            res.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       }
     } catch (_) {}
 
@@ -64,9 +65,17 @@ class LeaveBloc extends ChangeNotifier {
         {"id": 5, "name": "Menunaikan Ibadah Umroh", "quota": 12},
         {"id": 6, "name": "Diluar Tanggungan", "quota": 0},
         {"id": 7, "name": "Alasan Penting (Pernikahan)", "quota": 3},
-        {"id": 8, "name": "Alasan Penting (Keluarga Meninggal Dunia)", "quota": 3},
+        {
+          "id": 8,
+          "name": "Alasan Penting (Keluarga Meninggal Dunia)",
+          "quota": 3
+        },
         {"id": 9, "name": "Alasan Penting (Menikahkan Anak)", "quota": 2},
-        {"id": 10, "name": "Alasan Penting (Mengkhitan / Baptis Anak)", "quota": 2},
+        {
+          "id": 10,
+          "name": "Alasan Penting (Mengkhitan / Baptis Anak)",
+          "quota": 2
+        },
         {"id": 11, "name": "Alasan Penting (Istri Melahirkan)", "quota": 2},
       ];
     }
@@ -74,9 +83,12 @@ class LeaveBloc extends ChangeNotifier {
     final List<CutiTypeSummary> summaries = [];
 
     for (var jc in jenisCutiList) {
-      final id = jc['id'] is int ? jc['id'] as int : int.tryParse(jc['id'].toString()) ?? 1;
+      final id = jc['id'] is int
+          ? jc['id'] as int
+          : int.tryParse(jc['id'].toString()) ?? 1;
       final name = (jc['name'] ?? jc['nama'] ?? 'Cuti').toString();
-      int defaultQuota = jc['quota'] is int ? jc['quota'] as int : (id == 1 ? 12 : 0);
+      int defaultQuota =
+          jc['quota'] is int ? jc['quota'] as int : (id == 1 ? 12 : 0);
 
       int diambil = 0;
       int pending = 0;
@@ -91,7 +103,8 @@ class LeaveBloc extends ChangeNotifier {
         final nameLower = name.toLowerCase();
 
         bool isMatch = false;
-        if (id == 1 && (leaveTypeLower.contains("tahunan") || leaveTypeLower == "cuti")) {
+        if (id == 1 &&
+            (leaveTypeLower.contains("tahunan") || leaveTypeLower == "cuti")) {
           isMatch = true;
         } else if (leaveTypeLower.contains(nameLower)) {
           isMatch = true;

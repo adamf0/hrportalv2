@@ -12,7 +12,7 @@ class AuthRepository implements IAuthRepository {
   Future<AuthSession?> login(String username, String password) async {
     try {
       final responseData = await ApiClient.post(
-        Uri.parse("${ApiClient.baseUrl}/api/account/login"),
+        Uri.parse("${ApiClient.baseUrlUnpak}/account/login"),
         body: {
           "username": username,
           "password": password,
@@ -25,7 +25,7 @@ class AuthRepository implements IAuthRepository {
 
         // Fetch user info from /api/account/whoami using the token
         final whoamiData = await ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/account/whoami"),
+          Uri.parse("${ApiClient.baseUrlUnpak}/account/whoami"),
           headers: {
             "Authorization": "Bearer $token",
           },

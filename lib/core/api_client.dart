@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'app_theme.dart';
@@ -69,15 +68,19 @@ class ApiClient {
   }
 
   static String get baseUrl {
-    if (kIsWeb) {
-      return 'http://localhost:3000';
-    }
-    try {
-      if (Platform.isAndroid) {
-        return 'http://10.0.2.2:3000';
-      }
-    } catch (_) {}
-    return 'http://localhost:3000';
+    // if (kIsWeb) {
+    //   return 'http://217.216.75.192:3000';
+    // }
+    // try {
+    //   if (Platform.isAndroid) {
+    //     return 'http://10.0.2.2:3000';
+    //   }
+    // } catch (_) {}
+    return 'http://217.216.75.192:3000';
+  }
+
+  static String get baseUrlUnpak {
+    return 'https://hrportal.unpak.ac.id/api/v2';
   }
 
   /// Global key for displaying Toast/SnackBar for API notifications

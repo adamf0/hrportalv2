@@ -46,7 +46,7 @@ class SsoHelper {
       final result = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
           _clientId,
-          "com.sipaksi.sipaksiv2:/oauth2redirect",
+          "com.unpak.hrportal:/oauth2redirect",
           issuer: "https://gerbang.unpak.ac.id/realms/gateway",
           scopes: ['openid', 'profile', 'email'],
         ),
@@ -148,7 +148,7 @@ class SsoHelper {
           final result = await _appAuth.token(
             TokenRequest(
               _clientId,
-              "com.sipaksi.sipaksiv2:/oauth2redirect",
+              "com.unpak.hrportal:/oauth2redirect",
               issuer: "https://gerbang.unpak.ac.id/realms/gateway",
               refreshToken: refresh,
               scopes: ['openid', 'profile', 'email'],

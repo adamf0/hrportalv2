@@ -11,6 +11,7 @@ import 'package:hrportalv2/core/app_theme.dart';
 import 'package:hrportalv2/core/sso_helper.dart';
 import 'package:hrportalv2/modules/auth/presentation/auth_bloc.dart';
 import 'package:hrportalv2/modules/auth/presentation/components/pages/login_page.dart';
+import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
 import '../../report_bloc.dart';
 import '../../../domain/report_domain.dart';
 
@@ -46,13 +47,34 @@ class _SdmReportPageState extends State<SdmReportPage> {
 
   final List<int> _years = [2023, 2024, 2025, 2026, 2027];
 
+  int? _previousTabIndex;
+
   @override
   void initState() {
     super.initState();
-    ApiClient.setActivePageScope('sdm_report');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ReportBloc>().fetchReportData();
+      final attendanceBloc = context.read<AttendanceBloc>();
+      if (attendanceBloc.currentTabIndex == 0) {
+        ApiClient.setActivePageScope('sdm_report');
+        context.read<ReportBloc>().fetchReportData();
+      }
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final attendanceBloc = Provider.of<AttendanceBloc>(context);
+    final currentIndex = attendanceBloc.currentTabIndex;
+    if (_previousTabIndex != null &&
+        _previousTabIndex != 0 &&
+        currentIndex == 0) {
+      ApiClient.setActivePageScope('sdm_report');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        context.read<ReportBloc>().fetchReportData();
+      });
+    }
+    _previousTabIndex = currentIndex;
   }
 
   @override

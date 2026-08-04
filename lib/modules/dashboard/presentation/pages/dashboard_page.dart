@@ -109,17 +109,20 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    ApiClient.setActivePageScope('dashboard');
     _calendarLoading = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authBloc = context.read<AuthBloc>();
-      if (authBloc.isSdmUser) {
-        _calendarLoading = false;
-        context.read<ReportBloc>().fetchReportData();
-        return;
+      final attendanceBloc = context.read<AttendanceBloc>();
+      if (attendanceBloc.currentTabIndex == 0) {
+        ApiClient.setActivePageScope('dashboard');
+        final authBloc = context.read<AuthBloc>();
+        if (authBloc.isSdmUser) {
+          _calendarLoading = false;
+          context.read<ReportBloc>().fetchReportData();
+          return;
+        }
+        _fetchCalendarEvents();
+        _initDashboardDependencies();
       }
-      _fetchCalendarEvents();
-      _initDashboardDependencies();
     });
   }
 

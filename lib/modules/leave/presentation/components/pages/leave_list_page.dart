@@ -48,9 +48,12 @@ class _LeaveListPageState extends State<LeaveListPage> {
   @override
   void initState() {
     super.initState();
-    ApiClient.setActivePageScope('requests');
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<LeaveBloc>().fetchLeaves();
+      final attendanceBloc = context.read<AttendanceBloc>();
+      if (attendanceBloc.currentTabIndex == 2) {
+        ApiClient.setActivePageScope('requests');
+        context.read<LeaveBloc>().fetchLeaves();
+      }
     });
   }
 

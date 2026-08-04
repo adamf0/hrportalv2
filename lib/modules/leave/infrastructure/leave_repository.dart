@@ -196,35 +196,44 @@ class LeaveRepository implements ILeaveRepository {
 
           String type = "Cuti Tahunan";
           if (path.contains("sppd")) {
-            final jenisSppdId = json['jenis_sppd_id'] as int? ?? json['id_jenis_sppd'] as int? ?? 1;
+            final jenisSppdId = json['jenis_sppd_id'] as int? ??
+                json['id_jenis_sppd'] as int? ??
+                1;
             type = "SPPD - Dinas Luar";
             if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";
             if (jenisSppdId == 3) type = "SPPD - Konsultasi / Diklat";
             if (jenisSppdId == 4) type = "SPPD - Workshop / Seminar";
             if (jenisSppdId == 5) type = "SPPD - Kerjasama Luar Negeri";
-            if (json['nama_jenis_sppd'] != null && json['nama_jenis_sppd'].toString().isNotEmpty) {
+            if (json['nama_jenis_sppd'] != null &&
+                json['nama_jenis_sppd'].toString().isNotEmpty) {
               type = json['nama_jenis_sppd'].toString();
             }
           } else if (path.contains("izin")) {
-            final jenisIzinId = json['id_jenis_izin'] as int? ?? json['jenis_izin_id'] as int? ?? 1;
+            final jenisIzinId = json['id_jenis_izin'] as int? ??
+                json['jenis_izin_id'] as int? ??
+                1;
             type = "Izin Sakit";
             if (jenisIzinId == 2) type = "Izin Sakit Tanpa Dokter";
             if (jenisIzinId == 3) type = "Izin Melahirkan";
             if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
             if (jenisIzinId == 5) type = "Izin Terlambat Masuk";
             if (jenisIzinId == 6) type = "Izin Pulang Cepat";
-            if (json['nama_jenis_izin'] != null && json['nama_jenis_izin'].toString().isNotEmpty) {
+            if (json['nama_jenis_izin'] != null &&
+                json['nama_jenis_izin'].toString().isNotEmpty) {
               type = json['nama_jenis_izin'].toString();
             }
           } else {
-            final jenisCutiId = json['jenis_cuti_id'] as int? ?? json['id_jenis_cuti'] as int? ?? 1;
+            final jenisCutiId = json['jenis_cuti_id'] as int? ??
+                json['id_jenis_cuti'] as int? ??
+                1;
             type = "Cuti Tahunan";
             if (jenisCutiId == 2) type = "Cuti Sakit";
             if (jenisCutiId == 3) type = "Cuti Melahirkan";
             if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
             if (jenisCutiId == 5) type = "Cuti Besar";
             if (jenisCutiId == 6) type = "Cuti Alasan Penting";
-            if (json['nama_jenis_cuti'] != null && json['nama_jenis_cuti'].toString().isNotEmpty) {
+            if (json['nama_jenis_cuti'] != null &&
+                json['nama_jenis_cuti'].toString().isNotEmpty) {
               type = json['nama_jenis_cuti'].toString();
             }
           }
@@ -233,8 +242,10 @@ class LeaveRepository implements ILeaveRepository {
               json['nama_pegawai'] as String? ??
               json['nama_pemohon'] as String? ??
               json['user_nama'] as String?;
-          final appNip = json['nip'] as String? ?? json['nip_pemohon'] as String?;
-          final appNidn = json['nidn'] as String? ?? json['nidn_pemohon'] as String?;
+          final appNip =
+              json['nip'] as String? ?? json['nip_pemohon'] as String?;
+          final appNidn =
+              json['nidn'] as String? ?? json['nidn_pemohon'] as String?;
 
           verificationRequests.add(LeaveRequest(
             id: idStr,
@@ -248,9 +259,11 @@ class LeaveRepository implements ILeaveRepository {
                 'Menunggu verifikasi',
             startDate: startDate,
             endDate: endDate,
-            applicantName: (appName != null && appName.isNotEmpty) ? appName : null,
+            applicantName:
+                (appName != null && appName.isNotEmpty) ? appName : null,
             applicantNip: (appNip != null && appNip.isNotEmpty) ? appNip : null,
-            applicantNidn: (appNidn != null && appNidn.isNotEmpty) ? appNidn : null,
+            applicantNidn:
+                (appNidn != null && appNidn.isNotEmpty) ? appNidn : null,
           ));
         }
       }
@@ -402,7 +415,7 @@ class LeaveRepository implements ILeaveRepository {
   Future<List<Supervisor>> getSupervisors() async {
     try {
       final responseData = await ApiClient.get(
-        Uri.parse("${ApiClient.baseUrl}/api/masterdata/verifikator?type=cuti"),
+        Uri.parse("${ApiClient.baseUrlUnpak}/masterdata/verifikator?type=cuti"),
       );
       if (responseData is List && responseData.isNotEmpty) {
         final List<Supervisor> list = [];

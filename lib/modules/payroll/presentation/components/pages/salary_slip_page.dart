@@ -46,11 +46,14 @@ class _SalarySlipPageState extends State<SalarySlipPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authBloc = context.read<AuthBloc>();
-      if (authBloc.isSdmUser) return;
-      ApiClient.setActivePageScope('payroll');
-      final userNip = authBloc.session?.nip ?? "10616049757";
-      context.read<PayrollBloc>().fetchPayroll(userNip);
+      final attendanceBloc = context.read<AttendanceBloc>();
+      if (attendanceBloc.currentTabIndex == 3) {
+        final authBloc = context.read<AuthBloc>();
+        if (authBloc.isSdmUser) return;
+        ApiClient.setActivePageScope('payroll');
+        final userNip = authBloc.session?.nip ?? "10616049757";
+        context.read<PayrollBloc>().fetchPayroll(userNip);
+      }
     });
   }
 
