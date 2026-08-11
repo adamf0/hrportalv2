@@ -50,6 +50,7 @@ class AuthRepository implements IAuthRepository {
             password: password,
             token: token,
             name: name,
+            nidn: nidn,
             nip: nip,
             email: email,
             role: resolvedRole,

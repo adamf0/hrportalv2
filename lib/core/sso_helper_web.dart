@@ -105,25 +105,28 @@ class SsoHelper {
           final decoded = _decodeJwt(idToken ?? accessToken);
           final name = decoded['name'] ?? "User";
           final email = decoded['email'] ?? "";
-          final preferredUsername =
-              decoded['preferred_username']?.toString() ?? "";
           final employeeId = decoded['employeeid']?.toString() ?? "";
-          final nip = employeeId.isNotEmpty ? employeeId : preferredUsername;
           final groups = (decoded['group'] as List?) ?? [];
 
           String level = "tendik";
+          String nip = "-";
+          String nidn = "-";
 
           if (groups.contains("SDM")) {
             level = "sdm";
+            nip = employeeId.isNotEmpty ? employeeId : "-";
           } else if (groups.contains("Dosen")) {
             level = "dosen";
+            nidn = employeeId.isNotEmpty ? employeeId : "-";
           } else if (groups.contains("Tendik")) {
             level = "tendik";
+            nip = employeeId.isNotEmpty ? employeeId : "-";
           }
 
           html.window.localStorage['name'] = name;
           html.window.localStorage['level'] = level;
           html.window.localStorage['nip'] = nip;
+          html.window.localStorage['nidn'] = nidn;
           html.window.localStorage['email'] = email;
           html.window.localStorage['role'] = level;
           html.window.localStorage['groups'] = jsonEncode([level]);
@@ -244,6 +247,7 @@ class SsoHelper {
   static Future<void> saveSession({
     required String token,
     required String name,
+    required String nidn,
     required String nip,
     required String email,
     required String role,
@@ -251,6 +255,7 @@ class SsoHelper {
   }) async {
     html.window.localStorage['token'] = token;
     html.window.localStorage['name'] = name;
+    html.window.localStorage['nidn'] = nidn;
     html.window.localStorage['nip'] = nip;
     html.window.localStorage['email'] = email;
     html.window.localStorage['role'] = role;
@@ -261,6 +266,7 @@ class SsoHelper {
     final token = html.window.localStorage['token'];
     if (token == null) return null;
     final name = html.window.localStorage['name'] ?? '';
+    final nidn = html.window.localStorage['nidn'] ?? '';
     final nip = html.window.localStorage['nip'] ?? '';
     final email = html.window.localStorage['email'] ?? '';
     final role = html.window.localStorage['role'] ?? '';
@@ -275,6 +281,7 @@ class SsoHelper {
     return {
       'token': token,
       'name': name,
+      'nidn': nidn,
       'nip': nip,
       'email': email,
       'role': role,
@@ -285,6 +292,7 @@ class SsoHelper {
   static Future<void> clearSession() async {
     html.window.localStorage.remove('token');
     html.window.localStorage.remove('name');
+    html.window.localStorage.remove('nidn');
     html.window.localStorage.remove('nip');
     html.window.localStorage.remove('email');
     html.window.localStorage.remove('role');

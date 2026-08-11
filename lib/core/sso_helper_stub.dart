@@ -95,24 +95,33 @@ class SsoHelper {
         final preferredUsername =
             decoded['preferred_username']?.toString() ?? "";
         final employeeId = decoded['employeeid']?.toString() ?? "";
-        final nip = employeeId.isNotEmpty ? employeeId : preferredUsername;
         final groups = (decoded['group'] as List?) ?? [];
 
         String level = "tendik";
+        String nip = "-";
+        String nidn = "-";
 
         if (groups.contains("SDM")) {
           level = "sdm";
+          nip = employeeId.isNotEmpty ? employeeId : "-";
         } else if (groups.contains("Dosen")) {
           level = "dosen";
+          nidn = employeeId.isNotEmpty ? employeeId : "-";
         } else if (groups.contains("Tendik")) {
           level = "tendik";
+          nip = employeeId.isNotEmpty ? employeeId : "-";
         }
 
+        final usernameStr = employeeId.isNotEmpty
+            ? employeeId
+            : (preferredUsername.isNotEmpty ? preferredUsername : "-");
+
         await saveSession(
-          username: preferredUsername.isNotEmpty ? preferredUsername : nip,
+          username: usernameStr,
           password: "",
           token: accessToken,
           name: name,
+          nidn: nidn,
           nip: nip,
           email: email,
           role: level,
@@ -204,6 +213,7 @@ class SsoHelper {
               password: '',
               token: newToken,
               name: session['name'] ?? '',
+              nidn: session['nidn'] ?? '',
               nip: session['nip'] ?? '',
               email: session['email'] ?? '',
               role: session['role'] ?? 'Dosen',
@@ -264,6 +274,7 @@ class SsoHelper {
     required String password,
     required String token,
     required String name,
+    required String nidn,
     required String nip,
     required String email,
     required String role,
@@ -274,6 +285,7 @@ class SsoHelper {
       password: password,
       token: token,
       name: name,
+      nidn: nidn,
       nip: nip,
       email: email,
       role: role,
@@ -283,6 +295,7 @@ class SsoHelper {
     await LocalStorageMobile.write('password', password);
     await LocalStorageMobile.write('token', token);
     await LocalStorageMobile.write('name', name);
+    await LocalStorageMobile.write('nidn', nidn);
     await LocalStorageMobile.write('nip', nip);
     await LocalStorageMobile.write('email', email);
     await LocalStorageMobile.write('role', role);
@@ -300,6 +313,7 @@ class SsoHelper {
     final username = await LocalStorageMobile.read('username') ?? '';
     final password = await LocalStorageMobile.read('password') ?? '';
     final name = await LocalStorageMobile.read('name') ?? '';
+    final nidn = await LocalStorageMobile.read('nidn') ?? '';
     final nip = await LocalStorageMobile.read('nip') ?? '';
     final email = await LocalStorageMobile.read('email') ?? '';
     final role = await LocalStorageMobile.read('role') ?? '';
@@ -317,6 +331,7 @@ class SsoHelper {
       'token': token,
       'name': name,
       'nip': nip,
+      'nidn': nidn,
       'email': email,
       'role': role,
       'groups': groups,

@@ -91,6 +91,7 @@ class SqliteAuthStorage {
     required String password,
     required String token,
     required String name,
+    required String nidn,
     required String nip,
     required String email,
     required String role,
@@ -100,6 +101,7 @@ class SqliteAuthStorage {
     await write('password', password);
     await write('token', token);
     await write('name', name);
+    await write('nidn', nidn);
     await write('nip', nip);
     await write('email', email);
     await write('role', role);
@@ -115,6 +117,7 @@ class SqliteAuthStorage {
     final username = await read('username') ?? '';
     final password = await read('password') ?? '';
     final name = await read('name') ?? '';
+    final nidn = await read('nidn') ?? '';
     final nip = await read('nip') ?? '';
     final email = await read('email') ?? '';
     final role = await read('role') ?? '';
@@ -132,6 +135,7 @@ class SqliteAuthStorage {
       'password': password,
       'token': token,
       'name': name,
+      'nidn': nidn,
       'nip': nip,
       'email': email,
       'role': role,
