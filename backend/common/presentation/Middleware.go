@@ -459,11 +459,15 @@ func accountFromToken(tokenStr string) *Account {
 		return nil
 	}
 
-	sid, _ := claims["sid"].(string)
-	source, _ := claims["source"].(string)
-	if sid == "" {
+	iss, _ := claims["iss"].(string)
+	var sid string
+	if strings.Contains(iss, "gerbang.unpak.ac.id") {
 		sid, _ = claims["employeeid"].(string)
+	} else {
+		sid, _ = claims["sid"].(string)
 	}
+
+	source, _ := claims["source"].(string)
 	if source == "" {
 		source = "simpeg"
 		if groupRaw, ok := claims["group"].([]interface{}); ok {
