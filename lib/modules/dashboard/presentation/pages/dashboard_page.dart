@@ -112,6 +112,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _calendarLoading = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final attendanceBloc = context.read<AttendanceBloc>();
+      attendanceBloc.fetchAttendanceHistory();
       if (attendanceBloc.currentTabIndex == 0) {
         ApiClient.setActivePageScope('dashboard');
         final authBloc = context.read<AuthBloc>();
@@ -135,6 +136,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _previousTabIndex != 0 &&
         currentIndex == 0) {
       ApiClient.setActivePageScope('dashboard');
+      attendanceBloc.fetchAttendanceHistory();
       final authBloc = context.read<AuthBloc>();
       if (authBloc.isSdmUser) {
         context.read<ReportBloc>().fetchReportData();
@@ -150,10 +152,11 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _initDashboardDependencies() async {
+    final attendanceBloc = context.read<AttendanceBloc>();
+    await attendanceBloc.fetchAttendanceHistory();
     await LocationWifiHelper.getCurrentLocation();
     if (!mounted) return;
     final authBloc = context.read<AuthBloc>();
-    final attendanceBloc = context.read<AttendanceBloc>();
     attendanceBloc.updateLoginState(authBloc.isLoggedIn);
     await context.read<LeaveBloc>().fetchLeaves();
   }
@@ -261,13 +264,20 @@ class _DashboardPageState extends State<DashboardPage> {
         _totalSppd1To31 = summaryCalendar['total_sppd'] ?? 0;
         _totalUpacara1To31 = summaryCalendar['total_upacara'] ?? 0;
 
-        final start =
-            DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 1);
-        final end = DateTime(
-            _selectedCalendarDay.year, _selectedCalendarDay.month + 1, 0);
-        final totalLibur = summaryCalendar['total_libur'] ?? 0;
-        _tidakMasuk1To31 = _calculateTidakMasukFromDB(_totalAbsen1To31,
-            _totalIzin1To31, _totalSppd1To31, totalLibur, start, end);
+        if (summaryCalendar['total_tidak_masuk'] != null) {
+          _tidakMasuk1To31 = summaryCalendar['total_tidak_masuk'] is int
+              ? summaryCalendar['total_tidak_masuk']
+              : int.tryParse(summaryCalendar['total_tidak_masuk'].toString()) ??
+                  0;
+        } else {
+          final start = DateTime(
+              _selectedCalendarDay.year, _selectedCalendarDay.month, 1);
+          final end = DateTime(
+              _selectedCalendarDay.year, _selectedCalendarDay.month + 1, 0);
+          final totalLibur = summaryCalendar['total_libur'] ?? 0;
+          _tidakMasuk1To31 = _calculateTidakMasukFromDB(_totalAbsen1To31,
+              _totalIzin1To31, _totalSppd1To31, totalLibur, start, end);
+        }
       }
 
       // Parse CALENDAR-CUTOFF summary (15-15)
@@ -278,13 +288,20 @@ class _DashboardPageState extends State<DashboardPage> {
         _totalSppd15To15 = summaryCutoff['total_sppd'] ?? 0;
         _totalUpacara15To15 = summaryCutoff['total_upacara'] ?? 0;
 
-        final start = DateTime(
-            _selectedCalendarDay.year, _selectedCalendarDay.month - 1, 16);
-        final end =
-            DateTime(_selectedCalendarDay.year, _selectedCalendarDay.month, 15);
-        final totalLibur = summaryCutoff['total_libur'] ?? 0;
-        _tidakMasuk15To15 = _calculateTidakMasukFromDB(_totalAbsen15To15,
-            _totalIzin15To15, _totalSppd15To15, totalLibur, start, end);
+        if (summaryCutoff['total_tidak_masuk'] != null) {
+          _tidakMasuk15To15 = summaryCutoff['total_tidak_masuk'] is int
+              ? summaryCutoff['total_tidak_masuk']
+              : int.tryParse(summaryCutoff['total_tidak_masuk'].toString()) ??
+                  0;
+        } else {
+          final start = DateTime(
+              _selectedCalendarDay.year, _selectedCalendarDay.month - 1, 16);
+          final end = DateTime(
+              _selectedCalendarDay.year, _selectedCalendarDay.month, 15);
+          final totalLibur = summaryCutoff['total_libur'] ?? 0;
+          _tidakMasuk15To15 = _calculateTidakMasukFromDB(_totalAbsen15To15,
+              _totalIzin15To15, _totalSppd15To15, totalLibur, start, end);
+        }
       }
     } catch (e) {
       debugPrint("Error fetching calendar events: $e");
@@ -305,19 +322,14 @@ class _DashboardPageState extends State<DashboardPage> {
   int _calculateTidakMasukFromDB(int totalAbsen, int totalIzin, int totalSppd,
       int totalLibur, DateTime start, DateTime end) {
     int totalDays = 0;
-    int sundays = 0;
     DateTime cur = start;
     final today = DateTime.now();
     final limit = end.isAfter(today) ? today : end;
     while (cur.isBefore(limit) || DateUtils.isSameDay(cur, limit)) {
       totalDays++;
-      if (cur.weekday == DateTime.sunday) {
-        sundays++;
-      }
       cur = cur.add(const Duration(days: 1));
     }
-    final missing =
-        totalDays - totalAbsen - totalIzin - totalSppd - sundays - totalLibur;
+    final missing = totalDays - totalAbsen - totalIzin - totalSppd - totalLibur;
     return missing > 0 ? missing : 0;
   }
 

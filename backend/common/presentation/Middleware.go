@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"errors"
+	"fmt"
 	"html"
 	"io"
 	"net"
@@ -417,9 +418,12 @@ func injectRequestValues(c *fiber.Ctx, claims jwt.MapClaims, tokenStr string) er
 	iss, _ := claims["iss"].(string)
 	if strings.Contains(iss, "gerbang.unpak.ac.id") {
 		// Keycloak SSO Token
-		employeeId, ok := claims["employeeid"].(string)
-		if !ok || employeeId == "" {
-			return fiber.NewError(400, "employeeid is missing in sso token")
+		employeeId, _ := claims["employeeid"].(string)
+		if employeeId == "" {
+			employeeId, _ = claims["preferred_username"].(string)
+		}
+		if employeeId == "" {
+			return fiber.NewError(400, "employeeid and preferred_username missing in sso token")
 		}
 		c.Request().PostArgs().Set("sid", employeeId)
 
@@ -448,6 +452,60 @@ func injectRequestValues(c *fiber.Ctx, claims jwt.MapClaims, tokenStr string) er
 	return nil
 }
 
+func accountFromToken(tokenStr string) *Account {
+	token, err := parseJWT(tokenStr)
+	if err != nil || token == nil {
+		return nil
+	}
+	claims, err := validateClaims(token)
+	if err != nil || claims == nil {
+		return nil
+	}
+
+	sid, _ := claims["sid"].(string)
+	source, _ := claims["source"].(string)
+	if sid == "" {
+		sid, _ = claims["employeeid"].(string)
+		if sid == "" {
+			sid, _ = claims["preferred_username"].(string)
+		}
+	}
+	if source == "" {
+		source = "simpeg"
+		if groupRaw, ok := claims["group"].([]interface{}); ok {
+			for _, g := range groupRaw {
+				if gStr, ok := g.(string); ok && strings.ToLower(gStr) == "dosen" {
+					source = "simak"
+					break
+				}
+			}
+		}
+	}
+
+	role := "dosen"
+	if strings.ToLower(source) == "simpeg" {
+		role = "tendik"
+	}
+
+	nip := ""
+	nidn := ""
+	if strings.ToLower(source) == "simak" {
+		nidn = sid
+	} else {
+		nip = sid
+	}
+
+	return &Account{
+		SID:    sid,
+		Source: source,
+		Role:   role,
+		Level:  role,
+		NIP:    nip,
+		NIDN:   nidn,
+		Name:   sid,
+	}
+}
+
 func RBACMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		if strings.Contains(c.Path(), "/recalculate") {
@@ -467,9 +525,14 @@ func RBACMiddleware() fiber.Handler {
 			return badRequest(c, err)
 		}
 
-		user, err := fetchWhoAmI(token, whoamiURL, c)
-		if err != nil {
-			return badRequest(c, err)
+		user := accountFromToken(token)
+		if user == nil {
+			user, _ = fetchWhoAmI(token, whoamiURL, c)
+		}
+
+		if user == nil {
+			return c.Status(401).
+				JSON(commoninfra.NewResponseError(logCommonRbac, "Unauthenticated or invalid token"))
 		}
 
 		c.Request().PostArgs().Set("role", user.Role)
@@ -515,20 +578,20 @@ func fetchWhoAmI(token, whoamiURL string, c *fiber.Ctx) (*Account, error) {
 	req, err := http.NewRequest("GET", whoamiURL, nil)
 	if err != nil {
 		log.Printf("[RBAC] Failed to create request: %v", err)
-		return nil, c.Status(500).
-			JSON(commoninfra.NewResponseError(logCommonRbac, "Failed to create request: "+err.Error()))
+		return nil, err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Accept", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("[RBAC] Failed to call whoami: %v", err)
-		return nil, c.Status(500).
-			JSON(commoninfra.NewResponseError(logCommonRbac, "Failed to call whoami: "+err.Error()))
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -536,14 +599,13 @@ func fetchWhoAmI(token, whoamiURL string, c *fiber.Ctx) (*Account, error) {
 	log.Printf("[RBAC] Whoami response status: %d, body: %s", resp.StatusCode, string(body))
 
 	if resp.StatusCode != 200 {
-		return nil, handleWhoAmIError(body, c)
+		return nil, fmt.Errorf("whoami status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var user Account
 	if err := json.Unmarshal(body, &user); err != nil {
 		log.Printf("[RBAC] Failed to parse whoami response: %v", err)
-		return nil, c.Status(400).
-			JSON(commoninfra.NewResponseError(logCommonRbac, "Failed to parse whoami response"))
+		return nil, err
 	}
 
 	log.Printf("[RBAC] Whoami user: %+v", user)

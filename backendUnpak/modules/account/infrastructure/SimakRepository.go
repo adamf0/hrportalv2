@@ -36,7 +36,7 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 		Aktif  string `gorm:"column:aktif"`
 	}
 
-	_ = r.dbSimak.WithContext(ctx).Table("user").Debug().
+	_ = r.dbSimak.WithContext(ctx).Table("user").
 		Where("username = ? AND (password = SHA1(MD5(?)) OR password = SHA1(?) OR password = MD5(?) OR password = ?)",
 			rawUsername, rawPassword, rawPassword, rawPassword, rawPassword).
 		Where("level = ?", "DOSEN").
@@ -55,7 +55,7 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 			NIP  *string `gorm:"column:NIP"`
 			Nama *string `gorm:"column:nama"`
 		}
-		_ = r.dbSimak.WithContext(ctx).Table("m_dosen").Where("NIDN = ?", userid).First(&dosen)
+		_ = r.dbSimak.WithContext(ctx).Table("m_dosen").Where("NIDN = ? OR NIP = ?", userid, userid).First(&dosen)
 
 		sid := userid
 		if helper.StringValue(dosen.NIDN) != "" {
@@ -75,9 +75,6 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 }
 
 func (r *SimakRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
-	if r.dbSimak == nil {
-		return nil, errors.New("database SIMAK connection not available")
-	}
 	var simakU struct {
 		Nama  string  `gorm:"column:nama"`
 		Email *string `gorm:"column:email"`

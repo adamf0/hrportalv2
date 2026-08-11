@@ -1,11 +1,8 @@
 package helper
 
 import (
-	"context"
 	"log"
 	"time"
-
-	reportInfra "hrportal_backend/modules/report/infrastructure"
 
 	"gorm.io/gorm"
 )
@@ -49,7 +46,6 @@ func StartSdmAutoVerifyBackgroundJob(db *gorm.DB) {
 func processAutoVerifyRequests(db *gorm.DB) {
 	thresholdTime := time.Now().Add(-24 * time.Hour)
 	now := time.Now()
-	reportRepo := reportInfra.NewReportRepository(db)
 
 	// 1. Auto-verify Cuti (Leave)
 	var pendingLeaves []struct {
@@ -79,12 +75,7 @@ func processAutoVerifyRequests(db *gorm.DB) {
 				"updated_at": now,
 			})
 
-			// Increment counter in report repository
-			if reportRepo != nil {
-				if err := reportRepo.IncrementCounter(context.Background(), leave.Nip, leave.Nidn, now, "cuti", leave.NamaPemohon, leave.Unit, leave.Fakultas, leave.Prodi); err != nil {
-					log.Printf("[SDM Auto-Verify Job] IncrementCounter error for Cuti ID %d: %v", leave.ID, err)
-				}
-			}
+
 
 			// Dispatch FCM Notifications to Employee and Atasan
 			var targets []string
@@ -140,12 +131,7 @@ func processAutoVerifyRequests(db *gorm.DB) {
 				"updated_at": now,
 			})
 
-			// Increment counter in report repository
-			if reportRepo != nil {
-				if err := reportRepo.IncrementCounter(context.Background(), iz.Nip, iz.Nidn, now, "izin", iz.NamaPemohon, iz.Unit, iz.Fakultas, iz.Prodi); err != nil {
-					log.Printf("[SDM Auto-Verify Job] IncrementCounter error for Izin ID %d: %v", iz.ID, err)
-				}
-			}
+
 
 			targets := []string{iz.Nip}
 			if iz.Verifikasi != "" {
@@ -194,12 +180,7 @@ func processAutoVerifyRequests(db *gorm.DB) {
 				"updated_at": now,
 			})
 
-			// Increment counter in report repository
-			if reportRepo != nil {
-				if err := reportRepo.IncrementCounter(context.Background(), sppd.Nip, sppd.Nidn, now, "sppd", sppd.NamaPemohon, sppd.Unit, sppd.Fakultas, sppd.Prodi); err != nil {
-					log.Printf("[SDM Auto-Verify Job] IncrementCounter error for SPPD ID %d: %v", sppd.ID, err)
-				}
-			}
+
 
 			targets := []string{sppd.Nip}
 			if sppd.Verifikasi != "" {

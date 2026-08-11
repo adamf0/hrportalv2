@@ -45,20 +45,25 @@ func StartSdmAutoVerifyBackgroundJob(db *gorm.DB) {
 
 func processAutoVerifyRequests(db *gorm.DB) {
 	thresholdTime := time.Now().Add(-24 * time.Hour)
+	now := time.Now()
 
 	// 1. Auto-verify Cuti (Leave)
 	var pendingLeaves []struct {
-		ID         uint   `gorm:"column:id"`
-		Nidn       string `gorm:"column:nidn"`
-		Nip        string `gorm:"column:nip"`
-		Verifikasi string `gorm:"column:verifikasi"`
-		Status     string `gorm:"column:status"`
-		CreatedAt  time.Time
-		UpdatedAt  time.Time
+		ID          uint   `gorm:"column:id"`
+		Nidn        string `gorm:"column:nidn"`
+		Nip         string `gorm:"column:nip"`
+		NamaPemohon string `gorm:"column:nama_pemohon"`
+		Unit        string `gorm:"column:unit"`
+		Fakultas    string `gorm:"column:fakultas"`
+		Prodi       string `gorm:"column:prodi"`
+		Verifikasi  string `gorm:"column:verifikasi"`
+		Status      string `gorm:"column:status"`
+		CreatedAt   time.Time
+		UpdatedAt   time.Time
 	}
 
 	errLeave := db.Table("cuti").
-		Select("id, nidn, nip, verifikasi, status, created_at, updated_at").
+		Select("id, nidn, nip, nama_pemohon, unit, fakultas, prodi, verifikasi, status, created_at, updated_at").
 		Where("LOWER(status) IN ('terima atasan', 'disetujui atasan') AND (updated_at <= ? OR created_at <= ?)", thresholdTime, thresholdTime).
 		Find(&pendingLeaves).Error
 
@@ -67,8 +72,10 @@ func processAutoVerifyRequests(db *gorm.DB) {
 			log.Printf("[SDM Auto-Verify Job] Auto-verifying Cuti ID %d for NIP %s NIDN %s (1x24h threshold met)", leave.ID, leave.Nip, leave.Nidn)
 			db.Table("cuti").Where("id = ?", leave.ID).Updates(map[string]interface{}{
 				"status":     "terima sdm",
-				"updated_at": time.Now(),
+				"updated_at": now,
 			})
+
+
 
 			// Dispatch FCM Notifications to Employee and Atasan
 			var targets []string
@@ -98,16 +105,21 @@ func processAutoVerifyRequests(db *gorm.DB) {
 
 	// 2. Auto-verify Izin
 	var pendingIzin []struct {
-		ID         uint   `gorm:"column:id"`
-		Nip        string `gorm:"column:nip"`
-		Verifikasi string `gorm:"column:verifikasi"`
-		Status     string `gorm:"column:status"`
-		CreatedAt  time.Time
-		UpdatedAt  time.Time
+		ID          uint   `gorm:"column:id"`
+		Nidn        string `gorm:"column:nidn"`
+		Nip         string `gorm:"column:nip"`
+		NamaPemohon string `gorm:"column:nama_pemohon"`
+		Unit        string `gorm:"column:unit"`
+		Fakultas    string `gorm:"column:fakultas"`
+		Prodi       string `gorm:"column:prodi"`
+		Verifikasi  string `gorm:"column:verifikasi"`
+		Status      string `gorm:"column:status"`
+		CreatedAt   time.Time
+		UpdatedAt   time.Time
 	}
 
 	errIzin := db.Table("izin").
-		Select("id, nip, verifikasi, status, created_at, updated_at").
+		Select("id, nidn, nip, nama_pemohon, unit, fakultas, prodi, verifikasi, status, created_at, updated_at").
 		Where("LOWER(status) IN ('terima atasan', 'disetujui atasan') AND (updated_at <= ? OR created_at <= ?)", thresholdTime, thresholdTime).
 		Find(&pendingIzin).Error
 
@@ -116,8 +128,10 @@ func processAutoVerifyRequests(db *gorm.DB) {
 			log.Printf("[SDM Auto-Verify Job] Auto-verifying Izin ID %d for NIP %s (1x24h threshold met)", iz.ID, iz.Nip)
 			db.Table("izin").Where("id = ?", iz.ID).Updates(map[string]interface{}{
 				"status":     "terima sdm",
-				"updated_at": time.Now(),
+				"updated_at": now,
 			})
+
+
 
 			targets := []string{iz.Nip}
 			if iz.Verifikasi != "" {
@@ -140,16 +154,21 @@ func processAutoVerifyRequests(db *gorm.DB) {
 
 	// 3. Auto-verify SPPD
 	var pendingSppd []struct {
-		ID         uint   `gorm:"column:id"`
-		Nip        string `gorm:"column:nip"`
-		Verifikasi string `gorm:"column:verifikasi"`
-		Status     string `gorm:"column:status"`
-		CreatedAt  time.Time
-		UpdatedAt  time.Time
+		ID          uint   `gorm:"column:id"`
+		Nidn        string `gorm:"column:nidn"`
+		Nip         string `gorm:"column:nip"`
+		NamaPemohon string `gorm:"column:nama_pemohon"`
+		Unit        string `gorm:"column:unit"`
+		Fakultas    string `gorm:"column:fakultas"`
+		Prodi       string `gorm:"column:prodi"`
+		Verifikasi  string `gorm:"column:verifikasi"`
+		Status      string `gorm:"column:status"`
+		CreatedAt   time.Time
+		UpdatedAt   time.Time
 	}
 
 	errSppd := db.Table("sppd").
-		Select("id, nip, verifikasi, status, created_at, updated_at").
+		Select("id, nidn, nip, nama_pemohon, unit, fakultas, prodi, verifikasi, status, created_at, updated_at").
 		Where("LOWER(status) IN ('terima atasan', 'disetujui atasan') AND (updated_at <= ? OR created_at <= ?)", thresholdTime, thresholdTime).
 		Find(&pendingSppd).Error
 
@@ -158,8 +177,10 @@ func processAutoVerifyRequests(db *gorm.DB) {
 			log.Printf("[SDM Auto-Verify Job] Auto-verifying SPPD ID %d for NIP %s (1x24h threshold met)", sppd.ID, sppd.Nip)
 			db.Table("sppd").Where("id = ?", sppd.ID).Updates(map[string]interface{}{
 				"status":     "terima sdm",
-				"updated_at": time.Now(),
+				"updated_at": now,
 			})
+
+
 
 			targets := []string{sppd.Nip}
 			if sppd.Verifikasi != "" {

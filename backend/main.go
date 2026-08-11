@@ -22,9 +22,6 @@ import (
 	commoninfra "hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 
-	// accountInfrastructure "hrportal_backend/modules/account/infrastructure"
-	// accountPresentation "hrportal_backend/modules/account/presentation"
-
 	attendanceInfrastructure "hrportal_backend/modules/attendance/infrastructure"
 	attendancePresentation "hrportal_backend/modules/attendance/presentation"
 
@@ -196,9 +193,15 @@ func main() {
 		db, err = tryConnectDB("DB_HRPORTAL", "unpak_hrportal")
 		if err == nil && db != nil {
 			commonhelper.GlobalFcmManager.SetDB(db)
+		} else {
+			log.Printf("[DATABASE ERROR] Failed to connect to MySQL database! err: %v", err)
 		}
 		return err
 	})
+
+	if db == nil {
+		log.Printf("[WARNING] MySQL Database is not connected or nil. Endpoints requiring DB will return errors.")
+	}
 
 	// mustStart("Database SIMAK", func() error {
 	// 	dsn := os.Getenv("DB_SIMAK")
@@ -270,7 +273,6 @@ func main() {
 		log.Printf("Startup warnings/errors encountered: %v", startupErrors)
 	}
 
-	// accountPresentation.ModuleAccount(app)
 	attendancePresentation.ModuleAttendance(app)
 	leavePresentation.ModuleLeave(app)
 	// masterdataPresentation.ModuleMasterData(app)

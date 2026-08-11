@@ -2,7 +2,6 @@ package presentation
 
 import (
 	"strconv"
-	"strings"
 
 	common "hrportal_backend/common/domain"
 	"hrportal_backend/common/infrastructure"
@@ -43,9 +42,9 @@ func getHolidaysHandler(c *fiber.Ctx, db *gorm.DB) error {
 		return infrastructure.HandleError(c, err)
 	}
 
-	// Populate dynamic 'libur' field: 1 if type contains "Holiday" or is_national_holiday is true/1, else 0
+	// Populate dynamic 'libur' field: 1 if is_national_holiday is true/1, else 0
 	for i := range list {
-		if strings.Contains(list[i].Type, "Holiday") || list[i].IsNationalHoliday {
+		if list[i].IsNationalHoliday {
 			list[i].Libur = 1
 		} else {
 			list[i].Libur = 0

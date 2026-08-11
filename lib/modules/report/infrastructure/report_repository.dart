@@ -36,16 +36,28 @@ class ReportRepository implements IReportRepository {
   String _formatTimeStr(String? timeStr) {
     if (timeStr == null || timeStr.isEmpty) return '';
     try {
-      final dt = DateTime.tryParse(timeStr);
+      final str = timeStr.trim();
+      final dt = DateTime.tryParse(str);
       if (dt != null) {
-        return "${_twoDigits(dt.hour)}:${_twoDigits(dt.minute)}";
+        final localDt = dt.toLocal();
+        return "${_twoDigits(localDt.hour)}:${_twoDigits(localDt.minute)}";
       }
-      final parts = timeStr.split(' ');
+      final normalized = str.replaceAll('T', ' ');
+      final parts = normalized.split(' ');
       if (parts.length > 1) {
         final timePart = parts[1];
         final subParts = timePart.split(':');
         if (subParts.length >= 2) {
           return "${subParts[0]}:${subParts[1]}";
+        }
+      } else {
+        final subParts = str.split(':');
+        if (subParts.length >= 2) {
+          final h = int.tryParse(subParts[0]);
+          final m = int.tryParse(subParts[1]);
+          if (h != null && m != null) {
+            return "${_twoDigits(h)}:${_twoDigits(m)}";
+          }
         }
       }
     } catch (_) {}
@@ -102,9 +114,14 @@ class ReportRepository implements IReportRepository {
       final Set<String> holidays = {};
       for (var item in _extractList(holidayData)) {
         if (item is Map<String, dynamic>) {
-          final hDate = item['tanggal']?.toString() ?? '';
-          if (hDate.isNotEmpty) {
-            holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+          final isNat = item['is_national_holiday'] == true ||
+              item['is_national_holiday'] == 1 ||
+              item['libur'] == 1;
+          if (isNat) {
+            final hDate = item['tanggal']?.toString() ?? '';
+            if (hDate.isNotEmpty) {
+              holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+            }
           }
         }
       }
@@ -136,9 +153,14 @@ class ReportRepository implements IReportRepository {
           await ApiClient.get(Uri.parse("${ApiClient.baseUrl}/api/holiday"));
       for (var item in _extractList(hRes)) {
         if (item is Map<String, dynamic>) {
-          final hDate = item['tanggal']?.toString() ?? '';
-          if (hDate.isNotEmpty) {
-            holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+          final isNat = item['is_national_holiday'] == true ||
+              item['is_national_holiday'] == 1 ||
+              item['libur'] == 1;
+          if (isNat) {
+            final hDate = item['tanggal']?.toString() ?? '';
+            if (hDate.isNotEmpty) {
+              holidays.add(hDate.length >= 10 ? hDate.substring(0, 10) : hDate);
+            }
           }
         }
       }
@@ -525,6 +547,9 @@ class ReportRepository implements IReportRepository {
         totalPresensiMap[empId] = annualTotal;
       }
     } else {
+      final now = DateTime.now();
+      final todayDate = DateTime(now.year, now.month, now.day);
+
       for (var emp in employees) {
         final empId = emp.primaryId;
         cellMatrix[empId] = {};
@@ -542,6 +567,11 @@ class ReportRepository implements IReportRepository {
               cellMatrix[empId]![dateStr] = ReportCellData(
                 status: ReportCellStatus.libur,
                 text: isSunday ? 'Minggu' : 'Libur',
+              );
+            } else if (dt.isAfter(todayDate)) {
+              cellMatrix[empId]![dateStr] = ReportCellData(
+                status: ReportCellStatus.libur,
+                text: '-',
               );
             } else {
               cellMatrix[empId]![dateStr] = ReportCellData(

@@ -142,7 +142,7 @@ func (w *ExportWorker) processSingleJob(job *domain.ExportJob) {
 
 	excelFile := excelize.NewFile()
 	sheet1Name := "Tab 01 - 31 (Kalender)"
-	sheet2Name := "Tab 15 - 15 (Cutoff)"
+	sheet2Name := "Tab 16 - 15 (Cutoff)"
 	sheet3Name := "Presensi Upacara"
 
 	excelFile.SetSheetName("Sheet1", sheet1Name)

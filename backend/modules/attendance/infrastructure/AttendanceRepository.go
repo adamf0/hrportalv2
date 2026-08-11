@@ -39,19 +39,18 @@ func (r *AttendanceRepository) UpdateAbsen(ctx context.Context, absen *domain.Ab
 func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Absen, error) {
 	var items []domain.Absen
 
-	var query *gorm.DB
+	query := r.db.WithContext(ctx).Model(&domain.Absen{})
+
 	if nip != "" && nidn != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Absen{}).Where("(nip = ? OR nidn = ?)", nip, nidn)
+		query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
 	} else if nip != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Absen{}).Where("nip = ?", nip)
+		query = query.Where("(nip = ? OR nidn = ?)", nip, nip)
 	} else if nidn != "" {
-		query = r.db.WithContext(ctx).Model(&domain.Absen{}).Where("nidn = ?", nidn)
-	} else {
-		query = r.db.WithContext(ctx).Model(&domain.Absen{})
+		query = query.Where("(nip = ? OR nidn = ?)", nidn, nidn)
 	}
 
-	if tanggal_mulai != nil && tanggal_akhir != nil {
-		query = query.Where("tanggal between ? and ?", tanggal_mulai, tanggal_akhir)
+	if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
+		query = query.Where("tanggal between ? and ?", *tanggal_mulai, *tanggal_akhir)
 	}
 
 	err := query.Order("tanggal desc").Find(&items).Error

@@ -83,11 +83,6 @@ func (h *SubmitCutiCommandHandler) Handle(ctx context.Context, cmd *SubmitCutiCo
 			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
 		}
 
-		// if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "cuti", cmd.NamaPemohon, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
-		// 	tx.Rollback()
-		// 	return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
-		// }
-
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
 		}

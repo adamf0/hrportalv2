@@ -76,6 +76,45 @@ class AttendanceRealtimeService {
     });
   }
 
+  void sendCheckIn({
+    required String nip,
+    required String nidn,
+    double? latitude,
+    double? longitude,
+    String? note,
+    String? nama,
+    String? unit,
+    String? fakultas,
+    String? prodi,
+  }) {
+    if (_channel != null) {
+      final payload = {
+        'action': 'check_in',
+        'nip': nip,
+        'nidn': nidn,
+        'latitude': latitude ?? 0.0,
+        'longitude': longitude ?? 0.0,
+        'note': note ?? '',
+        'nama': nama ?? '',
+        'unit': unit ?? '',
+        'fakultas': fakultas ?? '',
+        'prodi': prodi ?? '',
+      };
+      _channel!.sink.add(jsonEncode(payload));
+    }
+  }
+
+  void sendCheckOut({required String nip, required String nidn}) {
+    if (_channel != null) {
+      final payload = {
+        'action': 'check_out',
+        'nip': nip,
+        'nidn': nidn,
+      };
+      _channel!.sink.add(jsonEncode(payload));
+    }
+  }
+
   void disconnect() {
     _subscription?.cancel();
     _subscription = null;

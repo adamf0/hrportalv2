@@ -45,7 +45,7 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        manifestPlaceholders += [appAuthRedirectScheme: 'com.sipaksi.sipaksiv2']
+        manifestPlaceholders += [appAuthRedirectScheme: 'com.unpak.hrportal']
     }
 
     signingConfigs {

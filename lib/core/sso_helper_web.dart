@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
+import 'api_client.dart';
 
 class SsoHelper {
   static const String _clientId = "unpak_link_gate";
@@ -28,7 +29,8 @@ class SsoHelper {
   }
 
   static Future<String?> getLoggedInName() async {
-    final idToken = html.window.localStorage['idToken'] ?? html.window.localStorage['token'];
+    final idToken = html.window.localStorage['idToken'] ??
+        html.window.localStorage['token'];
     if (idToken != null) {
       final decoded = _decodeJwt(idToken);
       return decoded['name'] as String?;
@@ -103,18 +105,20 @@ class SsoHelper {
           final decoded = _decodeJwt(idToken ?? accessToken);
           final name = decoded['name'] ?? "User";
           final email = decoded['email'] ?? "";
-          final nip = decoded['preferred_username'] ?? "";
+          final preferredUsername =
+              decoded['preferred_username']?.toString() ?? "";
+          final employeeId = decoded['employeeid']?.toString() ?? "";
+          final nip = employeeId.isNotEmpty ? employeeId : preferredUsername;
           final groups = (decoded['group'] as List?) ?? [];
 
-          String level = "Dosen";
-          if (groups.contains("adm_pusat")) {
-            level = "Admin";
-          } else if (groups.contains("Mahasiswa")) {
-            level = "Mahasiswa";
+          String level = "tendik";
+
+          if (groups.contains("SDM")) {
+            level = "sdm";
           } else if (groups.contains("Dosen")) {
-            level = "Dosen";
+            level = "dosen";
           } else if (groups.contains("Tendik")) {
-            level = "Tendik";
+            level = "tendik";
           }
 
           html.window.localStorage['name'] = name;
@@ -176,23 +180,26 @@ class SsoHelper {
   static Future<String?> getValidToken() async {
     final token = html.window.localStorage['token'];
     final refresh = html.window.localStorage['refresh'];
-    
+
     if (token == null) return null;
-    
+
     if (_isTokenExpired(token)) {
       if (refresh != null) {
-        print("Token expired. Attempting to refresh token via API...");
+        print("Token expired. Attempting to refresh token via Golang API...");
         try {
           final request = html.HttpRequest();
-          request.open('POST', _tokenUrl, async: false);
-          request.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-          final body = "grant_type=refresh_token&client_id=$_clientId&refresh_token=${Uri.encodeComponent(refresh)}";
+          request.open('POST', '${ApiClient.baseUrl}/api/account/refresh-token',
+              async: false);
+          request.setRequestHeader(
+              'Content-Type', 'application/x-www-form-urlencoded');
+          final body = "refresh_token=${Uri.encodeComponent(refresh)}";
           request.send(body);
-          
+
           if (request.status == 200) {
-            final response = jsonDecode(request.responseText ?? '{}') as Map<String, dynamic>;
-            final newAccessToken = response['access_token'] as String?;
-            final newRefreshToken = response['refresh_token'] as String?;
+            final response = jsonDecode(request.responseText ?? '{}')
+                as Map<String, dynamic>;
+            final newAccessToken = response['token'] as String?;
+            final newRefreshToken = response['refresh'] as String?;
             if (newAccessToken != null) {
               html.window.localStorage['token'] = newAccessToken;
               if (newRefreshToken != null) {
@@ -206,6 +213,8 @@ class SsoHelper {
           print("Failed to refresh token: $e");
         }
       }
+      print("Token & Refresh Token EXPIRED. Force clearing local storage...");
+      logout();
       return null;
     }
     return token;
@@ -228,7 +237,8 @@ class SsoHelper {
     }
   }
 
-  static void initDeepLinkListener(void Function(Map<String, dynamic>) onLoginSuccess) {}
+  static void initDeepLinkListener(
+      void Function(Map<String, dynamic>) onLoginSuccess) {}
   static void disposeListener() {}
 
   static Future<void> saveSession({
@@ -258,7 +268,8 @@ class SsoHelper {
     List<String> groups = [];
     if (groupsRaw != null) {
       try {
-        groups = (jsonDecode(groupsRaw) as List).map((e) => e.toString()).toList();
+        groups =
+            (jsonDecode(groupsRaw) as List).map((e) => e.toString()).toList();
       } catch (_) {}
     }
     return {

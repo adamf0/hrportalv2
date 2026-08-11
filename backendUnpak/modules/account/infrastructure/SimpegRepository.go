@@ -37,9 +37,9 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 		Status   string `gorm:"column:status"`
 	}
 
-	errUser := r.dbSimpeg.WithContext(ctx).Table("pengguna").Debug().
-		Where("username = ? AND password = SHA1(?) AND LOWER(level) IN ('dosen', 'pegawai') AND LOWER(status) = 'aktif'",
-			rawUsername, rawPassword).
+	errUser := r.dbSimpeg.WithContext(ctx).Table("pengguna").
+		Where("username = ? AND (password = SHA1(?) OR password = MD5(?) OR password = ?) AND LOWER(level) IN ('dosen', 'pegawai') AND UPPER(status) = 'AKTIF'",
+			rawUsername, rawPassword, rawPassword, rawPassword).
 		First(&pengguna).Error
 
 	if errUser != nil || pengguna.ID == 0 {
@@ -103,9 +103,6 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 }
 
 func (r *SimpegRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
-	if r.dbSimpeg == nil {
-		return nil, errors.New("database SIMPEG connection not available")
-	}
 	cleanSid := strings.TrimSpace(sid)
 
 	// Query e_pribadi (Dosen)

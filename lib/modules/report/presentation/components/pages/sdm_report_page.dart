@@ -255,7 +255,8 @@ class _SdmReportPageState extends State<SdmReportPage> {
       final file = File(filePath);
       if (!await file.exists()) {
         if (mounted) {
-          ApiClient.showToast("File export tidak ditemukan.", scope: 'sdm_report');
+          ApiClient.showToast("File export tidak ditemukan.",
+              scope: 'sdm_report');
         }
         return;
       }
@@ -377,7 +378,7 @@ class _SdmReportPageState extends State<SdmReportPage> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    'Tab 15 - 15',
+                                    'Tab 16 - 15',
                                     textAlign: TextAlign.center,
                                     style: GoogleFonts.inter(
                                       fontSize: 10,
@@ -502,8 +503,8 @@ class _SdmReportPageState extends State<SdmReportPage> {
         rows.add(row);
       }
     } else if (activeTab == 1) {
-      // Tab 15-15 (Cutoff: 15th prev month to 15th curr month)
-      final cutStart = DateTime(filter.year, filter.month - 1, 15);
+      // Tab 15-15 (Cutoff: 16th prev month to 15th curr month)
+      final cutStart = DateTime(filter.year, filter.month - 1, 16);
       final cutEnd = DateTime(filter.year, filter.month, 15);
       final dates = <DateTime>[];
       for (var d = cutStart;
@@ -1036,7 +1037,7 @@ class _SdmReportPageState extends State<SdmReportPage> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              'Tab 15 - 15',
+                              'Tab 16 - 15',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.inter(
                                 fontSize: 10,

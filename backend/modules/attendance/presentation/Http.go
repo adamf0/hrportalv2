@@ -29,13 +29,8 @@ func ModuleAttendance(app *fiber.App) {
 			return
 		}
 
-		userKey := nip
-		if userKey == "" {
-			userKey = nidn
-		}
-
-		GlobalAttendanceWsHub.Register(userKey, c)
-		defer GlobalAttendanceWsHub.Unregister(userKey)
+		GlobalAttendanceWsHub.RegisterUser(nip, nidn, c)
+		defer GlobalAttendanceWsHub.UnregisterUser(nip, nidn)
 
 		// Send initial state snapshot for active shift
 		query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
@@ -80,10 +75,91 @@ func ModuleAttendance(app *fiber.App) {
 			}
 		}
 
-		// Keep connection alive
+		// Keep connection alive & handle incoming WebSocket actions (check_in, check_out, refresh)
 		for {
-			if _, _, err := c.ReadMessage(); err != nil {
+			var msg struct {
+				Action    string  `json:"action"`
+				Nip       string  `json:"nip"`
+				Nidn      string  `json:"nidn"`
+				Nama      string  `json:"nama"`
+				Unit      string  `json:"unit"`
+				Fakultas  string  `json:"fakultas"`
+				Prodi     string  `json:"prodi"`
+				Latitude  float64 `json:"latitude"`
+				Longitude float64 `json:"longitude"`
+				Note      string  `json:"note"`
+			}
+
+			err := c.ReadJSON(&msg)
+			if err != nil {
 				break
+			}
+
+			if msg.Nip == "" {
+				msg.Nip = nip
+			}
+			if msg.Nidn == "" {
+				msg.Nidn = nidn
+			}
+
+			switch msg.Action {
+			case "check_in":
+				cmd := CheckIn.CheckInCommand{
+					Nip:         msg.Nip,
+					Nidn:        msg.Nidn,
+					NamaPegawai: msg.Nama,
+					Unit:        msg.Unit,
+					Fakultas:    msg.Fakultas,
+					Prodi:       msg.Prodi,
+					Latitude:    msg.Latitude,
+					Longitude:   msg.Longitude,
+					Note:        msg.Note,
+				}
+				res, err := mediatr.Send[*CheckIn.CheckInCommand, common.ResultValue[*domain.Absen]](context.Background(), &cmd)
+				if err == nil && res.IsSuccess && res.Value != nil {
+					masukStr := ""
+					if res.Value.AbsenMasuk != nil {
+						masukStr = res.Value.AbsenMasuk.In(time.Local).Format("2006-01-02 15:04:05")
+					}
+					keluarStr := ""
+					if res.Value.AbsenKeluar != nil {
+						keluarStr = res.Value.AbsenKeluar.In(time.Local).Format("2006-01-02 15:04:05")
+					}
+
+					GlobalAttendanceWsHub.BroadcastToUser(msg.Nip, msg.Nidn, RealtimeAttendancePayload{
+						Type:        "check_in",
+						Nip:         msg.Nip,
+						Nidn:        msg.Nidn,
+						Tanggal:     res.Value.Tanggal,
+						AbsenMasuk:  masukStr,
+						AbsenKeluar: keluarStr,
+					})
+				}
+			case "check_out":
+				cmd := CheckOut.CheckOutCommand{
+					Nip:  msg.Nip,
+					Nidn: msg.Nidn,
+				}
+				res, err := mediatr.Send[*CheckOut.CheckOutCommand, common.ResultValue[*domain.Absen]](context.Background(), &cmd)
+				if err == nil && res.IsSuccess && res.Value != nil {
+					masukStr := ""
+					if res.Value.AbsenMasuk != nil {
+						masukStr = res.Value.AbsenMasuk.In(time.Local).Format("2006-01-02 15:04:05")
+					}
+					keluarStr := ""
+					if res.Value.AbsenKeluar != nil {
+						keluarStr = res.Value.AbsenKeluar.In(time.Local).Format("2006-01-02 15:04:05")
+					}
+
+					GlobalAttendanceWsHub.BroadcastToUser(msg.Nip, msg.Nidn, RealtimeAttendancePayload{
+						Type:        "check_out",
+						Nip:         msg.Nip,
+						Nidn:        msg.Nidn,
+						Tanggal:     res.Value.Tanggal,
+						AbsenMasuk:  masukStr,
+						AbsenKeluar: keluarStr,
+					})
+				}
 			}
 		}
 	}))
@@ -205,9 +281,17 @@ func ModuleAttendance(app *fiber.App) {
 	})
 
 	group.Get("/history", func(c *fiber.Ctx) error {
+		nidn := c.FormValue("nidn")
+		if nidn == "" {
+			nidn = c.Query("nidn")
+		}
+		nip := c.FormValue("nip")
+		if nip == "" {
+			nip = c.Query("nip")
+		}
 		query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
-			Nidn:         c.Query("nidn"),
-			Nip:          c.Query("nip"),
+			Nidn:         nidn,
+			Nip:          nip,
 			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
 		}
@@ -221,10 +305,7 @@ func ModuleAttendance(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
-		sseAdapter := &commonpresentation.SSEAdapter[domain.Absen]{}
-
-		return sseAdapter.Send(c, pagedData)
+		return c.JSON(res.Value)
 	})
 
 	group.Delete("/empty-masuk", func(c *fiber.Ctx) error {

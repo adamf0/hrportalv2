@@ -110,6 +110,7 @@ class FcmService {
             'Menampilkan status IP, GPS, dan area kampus secara terus-menerus',
         importance: Importance.low,
         playSound: false,
+        showBadge: false,
       );
       await androidPlugin?.createNotificationChannel(ongoingChannel);
 

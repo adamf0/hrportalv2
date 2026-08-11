@@ -99,13 +99,6 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 			return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed", err.Error())), nil
 		}
 
-		if cmd.Status == "terima sdm" {
-			if err := repo.IncrementCounter(ctxTx, izin.Nip, izin.Nidn, now, "izin", izin.NamaPemohon, izin.Unit, izin.Fakultas, izin.Prodi); err != nil {
-				tx.Rollback()
-				return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed2", err.Error())), err
-			}
-		}
-
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Izin](common.FailureError("Izin.CommitFailed", err.Error())), nil
 		}

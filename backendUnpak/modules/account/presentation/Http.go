@@ -2,19 +2,14 @@ package presentation
 
 import (
 	"context"
-	"log"
-	"runtime/debug"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/mehdihadeli/go-mediatr"
 
-	commondomain "hrportal_backend_unpak/common/domain"
 	commoninfra "hrportal_backend_unpak/common/infrastructure"
 	commonpresentation "hrportal_backend_unpak/common/presentation"
 	login "hrportal_backend_unpak/modules/account/application/Login"
 	who "hrportal_backend_unpak/modules/account/application/Whoami"
-	domainaccount "hrportal_backend_unpak/modules/account/domain"
 	accountInfrastructure "hrportal_backend_unpak/modules/account/infrastructure"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -48,12 +43,6 @@ func generateJWT(sid string, source string, duration time.Duration) (string, err
 }
 
 func LoginHandlerfunc(c *fiber.Ctx) error {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[LOGIN PANIC RECOVERED] %v\n%s", r, debug.Stack())
-		}
-	}()
-
 	cmd := login.LoginCommand{
 		Username: c.FormValue("username"),
 		Password: c.FormValue("password"),
@@ -64,18 +53,14 @@ func LoginHandlerfunc(c *fiber.Ctx) error {
 		ctx = context.Background()
 	}
 
-	result, err := mediatr.Send[*login.LoginCommand, commondomain.ResultValue[login.LoginResult]](ctx, &cmd)
+	handler := login.NewLoginCommandHandler(
+		accountInfrastructure.GlobalRepoLocal,
+		accountInfrastructure.GlobalRepoSimak,
+		accountInfrastructure.GlobalRepoSimpeg,
+	)
+	result, err := handler.Handle(ctx, &cmd)
 	if err != nil {
-		handler := login.NewLoginCommandHandler(
-			accountInfrastructure.GlobalRepoLocal,
-			accountInfrastructure.GlobalRepoSimak,
-			accountInfrastructure.GlobalRepoSimpeg,
-		)
-		var errDirect error
-		result, errDirect = handler.Handle(ctx, &cmd)
-		if errDirect != nil {
-			return commoninfra.HandleError(c, errDirect)
-		}
+		return commoninfra.HandleError(c, err)
 	}
 
 	if !result.IsSuccess {
@@ -87,7 +72,7 @@ func LoginHandlerfunc(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate access token"})
 	}
 
-	refreshStr, errRefresh := generateJWT(result.Value.Sid, result.Value.Source, 7*24*time.Hour)
+	refreshStr, errRefresh := generateJWT(result.Value.Sid, result.Value.Source, 365*24*time.Hour)
 	if errRefresh != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate refresh token"})
 	}
@@ -115,24 +100,98 @@ func WhoAmIHandler(c *fiber.Ctx) error {
 		ctx = context.Background()
 	}
 
-	result, err := mediatr.Send[*who.WhoamiQuery, commondomain.ResultValue[*domainaccount.UserInfo]](ctx, &query)
+	handler := who.NewWhoamiQueryHandler(
+		accountInfrastructure.GlobalRepoLocal,
+		accountInfrastructure.GlobalRepoSimak,
+		accountInfrastructure.GlobalRepoSimpeg,
+	)
+	result, err := handler.Handle(ctx, &query)
 	if err != nil {
-		handler := who.NewWhoamiQueryHandler(
-			accountInfrastructure.GlobalRepoLocal,
-			accountInfrastructure.GlobalRepoSimak,
-			accountInfrastructure.GlobalRepoSimpeg,
-		)
-		var errDirect error
-		result, errDirect = handler.Handle(ctx, &query)
-		if errDirect != nil {
-			return commoninfra.HandleError(c, errDirect)
-		}
+		return commoninfra.HandleError(c, err)
 	}
 
 	return c.JSON(result.Value)
 }
 
+// =======================================================
+// POST /refresh-token
+// =======================================================
+func RefreshTokenHandler(c *fiber.Ctx) error {
+	refreshTokenStr := c.FormValue("refresh_token")
+	if refreshTokenStr == "" {
+		refreshTokenStr = c.FormValue("refresh")
+	}
+	if refreshTokenStr == "" {
+		var req struct {
+			RefreshToken string `json:"refresh_token"`
+			Refresh      string `json:"refresh"`
+		}
+		if err := c.BodyParser(&req); err == nil {
+			if req.RefreshToken != "" {
+				refreshTokenStr = req.RefreshToken
+			} else if req.Refresh != "" {
+				refreshTokenStr = req.Refresh
+			}
+		}
+	}
+	if refreshTokenStr == "" {
+		authHeader := c.Get("Authorization")
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			refreshTokenStr = authHeader[7:]
+		}
+	}
+
+	if refreshTokenStr == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "Missing refresh_token"})
+	}
+
+	token, err := jwt.Parse(refreshTokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return jwtSecret, nil
+	})
+
+	if err != nil || token == nil || !token.Valid {
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid or expired refresh token"})
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid token claims"})
+	}
+
+	sid, _ := claims["sid"].(string)
+	source, _ := claims["source"].(string)
+	if sid == "" {
+		return c.Status(401).JSON(fiber.Map{"error": "Token missing SID"})
+	}
+
+	newTokenStr, errToken := generateJWT(sid, source, 3*time.Hour)
+	if errToken != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate access token"})
+	}
+
+	newRefreshStr, errRefresh := generateJWT(sid, source, 365*24*time.Hour)
+	if errRefresh != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate refresh token"})
+	}
+
+	return c.JSON(fiber.Map{
+		"token":   newTokenStr,
+		"refresh": newRefreshStr,
+	})
+}
+
 func ModuleAccount(app *fiber.App) {
 	app.Post("/api/account/login", LoginHandlerfunc)
+	app.Post("/api/v2/account/login", LoginHandlerfunc)
+	app.Post("/account/login", LoginHandlerfunc)
+
+	app.Post("/api/account/refresh-token", RefreshTokenHandler)
+	app.Post("/api/v2/account/refresh-token", RefreshTokenHandler)
+	app.Post("/account/refresh-token", RefreshTokenHandler)
+
 	app.Get("/api/account/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
+	app.Get("/api/v2/account/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
 }

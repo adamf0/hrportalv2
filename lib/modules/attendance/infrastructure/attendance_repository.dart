@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../../../core/location_wifi_helper.dart';
 import '../../../core/api_client.dart';
@@ -16,14 +18,14 @@ class AttendanceRepository implements IAttendanceRepository {
       final role = session['role'] ?? '';
       final nidn = role == 'Dosen' ? nip : '';
 
-      final endpoint = isUpacara
-          ? "/api/ceremony-attendance"
-          : "/api/attendance/check-in";
+      final endpoint =
+          isUpacara ? "/api/ceremony-attendance" : "/api/attendance/check-in";
 
       if (!isUpacara) {
         final currentHistory = await fetchHistory();
         if (currentHistory.todayCheckInTime != null) {
-          debugPrint('[AttendanceRepository] User is ALREADY checked in today in DB. Returning true without re-requesting API.');
+          debugPrint(
+              '[AttendanceRepository] User is ALREADY checked in today in DB. Returning true without re-requesting API.');
           return true;
         }
       }
@@ -117,17 +119,38 @@ class AttendanceRepository implements IAttendanceRepository {
     try {
       final session = await SsoHelper.getSession();
       final nip = session?['nip'] as String? ?? '';
-      final nidn = session?['role'] == 'Dosen' ? nip : '';
+      var nidn = session?['nidn'] as String? ?? '';
+      if (nidn.isEmpty) {
+        nidn = session?['sid'] as String? ??
+            (session?['role'] == 'Dosen' ? nip : '');
+      }
 
       final responseData = await ApiClient.get(
-        Uri.parse("${ApiClient.baseUrl}/api/attendance/history?nip=$nip&nidn=$nidn"),
+        Uri.parse("${ApiClient.baseUrl}/api/attendance/history"),
       );
 
+      debugPrint("responseData: $responseData");
       List items = [];
       if (responseData is List) {
         items = responseData;
-      } else if (responseData is Map<String, dynamic> && responseData['data'] is List) {
+      } else if (responseData is Map<String, dynamic> &&
+          responseData['data'] is List) {
         items = responseData['data'] as List;
+      } else if (responseData is String) {
+        try {
+          final lines = responseData.split('\n');
+          for (var line in lines) {
+            if (line.startsWith('data: ')) {
+              final jsonStr = line.substring(6).trim();
+              if (jsonStr.isNotEmpty) {
+                final map = jsonDecode(jsonStr);
+                if (map is Map<String, dynamic>) {
+                  items.add(map);
+                }
+              }
+            }
+          }
+        } catch (_) {}
       }
 
       if (items.isNotEmpty || responseData != null) {
@@ -136,7 +159,8 @@ class AttendanceRepository implements IAttendanceRepository {
         String? todayCheckOut;
 
         final now = DateTime.now();
-        final String todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+        final String todayStr =
+            "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
         for (var json in items) {
           final tanggalStr = json['tanggal'] as String? ?? '';

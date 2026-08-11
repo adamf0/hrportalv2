@@ -201,14 +201,16 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
 
 		if err := h.sppdRepo.UpdateSppd(ctxTx, sppd); err != nil {
+			tx.Rollback()
 			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed", err.Error())), nil
 		}
 
-		if cmd.Status == "terima sdm" {
-			if err := repo.IncrementCounter(ctxTx, sppd.Nip, sppd.Nidn, now, "sppd", sppd.NamaPemohon, sppd.Unit, sppd.Fakultas, sppd.Prodi); err != nil {
-				tx.Rollback()
-				return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed2", err.Error())), err
-			}
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.CommitFailed", err.Error())), nil
+		}
+	} else {
+		if err := h.sppdRepo.UpdateSppd(ctx, sppd); err != nil {
+			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed", err.Error())), nil
 		}
 	}
 

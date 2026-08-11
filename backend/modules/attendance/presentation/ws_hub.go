@@ -33,6 +33,17 @@ func (h *AttendanceWsHub) Register(key string, conn *websocket.Conn) {
 	h.clients[key] = conn
 }
 
+func (h *AttendanceWsHub) RegisterUser(nip string, nidn string, conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if nip != "" {
+		h.clients[nip] = conn
+	}
+	if nidn != "" {
+		h.clients[nidn] = conn
+	}
+}
+
 func (h *AttendanceWsHub) Unregister(key string) {
 	if key == "" {
 		return
@@ -42,6 +53,23 @@ func (h *AttendanceWsHub) Unregister(key string) {
 	if conn, ok := h.clients[key]; ok {
 		conn.Close()
 		delete(h.clients, key)
+	}
+}
+
+func (h *AttendanceWsHub) UnregisterUser(nip string, nidn string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if nip != "" {
+		if conn, ok := h.clients[nip]; ok && conn != nil {
+			conn.Close()
+			delete(h.clients, nip)
+		}
+	}
+	if nidn != "" {
+		if conn, ok := h.clients[nidn]; ok && conn != nil {
+			conn.Close()
+			delete(h.clients, nidn)
+		}
 	}
 }
 

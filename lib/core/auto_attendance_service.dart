@@ -29,20 +29,28 @@ void callbackDispatcher() {
 @pragma('vm:entry-point')
 void onStart(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
-  await FcmService.initLocalNotifications();
+  try {
+    await FcmService.initLocalNotifications();
+  } catch (_) {}
 
   if (service is AndroidServiceInstance) {
     service.on('setAsForeground').listen((event) {
-      service.setAsForegroundService();
+      try {
+        service.setAsForegroundService();
+      } catch (_) {}
     });
 
     service.on('setAsBackground').listen((event) {
-      service.setAsBackgroundService();
+      try {
+        service.setAsBackgroundService();
+      } catch (_) {}
     });
   }
 
   service.on('stopService').listen((event) {
-    service.stopSelf();
+    try {
+      service.stopSelf();
+    } catch (_) {}
   });
 
   // Periodic Foreground Service Timer (Runs continuously even across app kills)
@@ -150,7 +158,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
           androidConfiguration: AndroidConfiguration(
             onStart: onStart,
             autoStart: false,
-            isForegroundMode: true,
+            isForegroundMode: false,
             notificationChannelId: 'hrportal_ongoing_channel',
             initialNotificationTitle: 'HR Portal • Presensi Active',
             initialNotificationContent: 'Memuat status IP & GPS...',
@@ -164,7 +172,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
         );
         await service.startService();
       }
-      debugPrint('[AutoAttendanceService] Native Foreground Service started.');
+      debugPrint('[AutoAttendanceService] Native Background Service started.');
     } catch (e) {
       debugPrint('[AutoAttendanceService Foreground Service Error]: $e');
     }
@@ -313,12 +321,13 @@ class AutoAttendanceService with WidgetsBindingObserver {
           onAttendanceUpdated?.call();
         }
 
-        final successUpacara =
-            await _performAutoUpacaraCheckIn(_cachedNip!, _cachedNidn!);
-        if (successUpacara) {
-          debugPrint(
-              '[AutoAttendanceService] Auto-ceremony-attendance check-in SUCCESS.');
-        }
+        // Auto-upacara check-in disabled from foreground as requested
+        // final successUpacara =
+        //     await _performAutoUpacaraCheckIn(_cachedNip!, _cachedNidn!);
+        // if (successUpacara) {
+        //   debugPrint(
+        //       '[AutoAttendanceService] Auto-ceremony-attendance check-in SUCCESS.');
+        // }
       } else {
         debugPrint(
             '[AutoAttendanceService] User is OUTSIDE campus radius or disconnected.');
@@ -398,38 +407,38 @@ class AutoAttendanceService with WidgetsBindingObserver {
     return false;
   }
 
-  /// Performs Auto Ceremony Check-In API call
-  Future<bool> _performAutoUpacaraCheckIn(String nip, String nidn) async {
-    try {
-      final session = await SsoHelper.getSession();
-      final name = session?['name'] ?? session?['nama'] ?? '';
-      final unit = session?['unit'] ?? '';
-      final fakultas = session?['fakultas'] ?? '';
-      final prodi = session?['prodi'] ?? '';
-
-      final now = DateTime.now();
-      final todayStr =
-          "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-      final responseData = await ApiClient.post(
-        Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance'),
-        body: {
-          'nip': nip,
-          'nidn': nidn,
-          'nama': name,
-          'unit': unit,
-          'fakultas': fakultas,
-          'prodi': prodi,
-          'tanggal': todayStr,
-          'note': 'Auto Ceremony Attendance',
-        },
-      );
-
-      return responseData != null;
-    } catch (e) {
-      debugPrint('[AutoAttendanceService] Upacara API failed: $e');
-    }
-    return false;
-  }
+  // /// Performs Auto Ceremony Check-In API call (Disabled)
+  // Future<bool> _performAutoUpacaraCheckIn(String nip, String nidn) async {
+  //   try {
+  //     final session = await SsoHelper.getSession();
+  //     final name = session?['name'] ?? session?['nama'] ?? '';
+  //     final unit = session?['unit'] ?? '';
+  //     final fakultas = session?['fakultas'] ?? '';
+  //     final prodi = session?['prodi'] ?? '';
+  // 
+  //     final now = DateTime.now();
+  //     final todayStr =
+  //         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+  //     final responseData = await ApiClient.post(
+  //       Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance'),
+  //       body: {
+  //         'nip': nip,
+  //         'nidn': nidn,
+  //         'nama': name,
+  //         'unit': unit,
+  //         'fakultas': fakultas,
+  //         'prodi': prodi,
+  //         'tanggal': todayStr,
+  //         'note': 'Auto Ceremony Attendance',
+  //       },
+  //     );
+  // 
+  //     return responseData != null;
+  //   } catch (e) {
+  //     debugPrint('[AutoAttendanceService] Upacara API failed: $e');
+  //   }
+  //   return false;
+  // }
 
   /// Triggers notification when user is outside radius / disconnected
   Future<void> _notifyAutoAttendanceFailed(String nip) async {

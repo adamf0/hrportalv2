@@ -77,10 +77,6 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 				tx.Rollback()
 				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 			}
-			if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk", cmd.NamaPegawai, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
-				tx.Rollback()
-				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
-			}
 			if err := tx.Commit().Error; err != nil {
 				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 			}
@@ -95,10 +91,6 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 			tx.Rollback()
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 		}
-		// if err := repo.IncrementCounter(ctxTx, cmd.Nip, cmd.Nidn, now, "masuk", cmd.NamaPegawai, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
-		// 	tx.Rollback()
-		// 	return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
-		// }
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
 		}

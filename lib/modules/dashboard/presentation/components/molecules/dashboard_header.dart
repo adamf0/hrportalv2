@@ -4,19 +4,18 @@ import 'package:google_fonts/google_fonts.dart';
 class DashboardHeader extends StatelessWidget {
   final String userName;
   final VoidCallback onLogoutTap;
-  final VoidCallback onNotificationTap;
+  final VoidCallback? onNotificationTap;
 
   const DashboardHeader({
     super.key,
     required this.userName,
     required this.onLogoutTap,
-    required this.onNotificationTap,
+    this.onNotificationTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final onSurfaceVariant = Theme.of(context).colorScheme.secondary;
-    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -55,45 +54,11 @@ class DashboardHeader extends StatelessWidget {
             ),
           ],
         ),
-        Row(
-          children: [
-            IconButton(
-              icon: Icon(Icons.logout, color: onSurfaceVariant, size: 20),
-              onPressed: onLogoutTap,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-            const SizedBox(width: 14),
-            GestureDetector(
-              onTap: onNotificationTap,
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(Icons.notifications_none, color: primaryColor, size: 20),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        IconButton(
+          icon: Icon(Icons.logout, color: onSurfaceVariant, size: 20),
+          onPressed: onLogoutTap,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
         ),
       ],
     );

@@ -139,8 +139,6 @@ func (h *CreateSppdCommandHandler) Handle(ctx context.Context, cmd *CreateSppdCo
 		nipVal = cmd.Nidn
 	}
 
-	nidnVal := cmd.Nidn
-
 	repo := reportInfra.GetReportRepository()
 	if repo != nil && nipVal != "" {
 		db := repo.GetDB()
@@ -153,11 +151,6 @@ func (h *CreateSppdCommandHandler) Handle(ctx context.Context, cmd *CreateSppdCo
 		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
 
 		if err := h.sppdRepo.CreateSppd(ctxTx, sppd); err != nil {
-			tx.Rollback()
-			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
-		}
-
-		if err := repo.IncrementCounter(ctxTx, nipVal, nidnVal, now, "sppd", cmd.NamaPemohon, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
 			tx.Rollback()
 			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
 		}

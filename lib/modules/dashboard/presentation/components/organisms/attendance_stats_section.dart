@@ -85,11 +85,16 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
       );
     }
 
-    final currentAbsen = _is15To15 ? widget.totalAbsen15To15 : widget.totalAbsen1To31;
-    final currentIzin = _is15To15 ? widget.totalIzin15To15 : widget.totalIzin1To31;
-    final currentSppd = _is15To15 ? widget.totalSppd15To15 : widget.totalSppd1To31;
-    final currentTidakMasuk = _is15To15 ? widget.tidakMasuk15To15 : widget.tidakMasuk1To31;
-    final currentUpacara = _is15To15 ? widget.totalUpacara15To15 : widget.totalUpacara1To31;
+    final currentAbsen =
+        _is15To15 ? widget.totalAbsen15To15 : widget.totalAbsen1To31;
+    final currentIzin =
+        _is15To15 ? widget.totalIzin15To15 : widget.totalIzin1To31;
+    final currentSppd =
+        _is15To15 ? widget.totalSppd15To15 : widget.totalSppd1To31;
+    final currentTidakMasuk =
+        _is15To15 ? widget.tidakMasuk15To15 : widget.tidakMasuk1To31;
+    final currentUpacara =
+        _is15To15 ? widget.totalUpacara15To15 : widget.totalUpacara1To31;
 
     final card1 = StatCard(
       icon: Icons.check_circle_outline,
@@ -173,7 +178,8 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: !_is15To15 ? primaryColor : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
@@ -195,13 +201,14 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
                       });
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: _is15To15 ? primaryColor : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        '15 - 15',
+                        '16 - 15',
                         style: GoogleFonts.inter(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,

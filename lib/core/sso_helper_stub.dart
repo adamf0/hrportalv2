@@ -67,6 +67,14 @@ class SsoHelper {
           "com.unpak.hrportal:/oauth2redirect",
           issuer: "https://gerbang.unpak.ac.id/realms/gateway",
           scopes: ['openid', 'profile', 'email'],
+          serviceConfiguration: const AuthorizationServiceConfiguration(
+            authorizationEndpoint:
+                "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/auth",
+            tokenEndpoint:
+                "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/token",
+            endSessionEndpoint:
+                "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout",
+          ),
         ),
       );
 
@@ -84,29 +92,31 @@ class SsoHelper {
         final decoded = _decodeJwt(idToken ?? accessToken);
         final name = decoded['name'] ?? "User";
         final email = decoded['email'] ?? "";
-        final nip = decoded['preferred_username'] ?? "";
+        final preferredUsername =
+            decoded['preferred_username']?.toString() ?? "";
+        final employeeId = decoded['employeeid']?.toString() ?? "";
+        final nip = employeeId.isNotEmpty ? employeeId : preferredUsername;
         final groups = (decoded['group'] as List?) ?? [];
 
-        String level = "Dosen";
-        if (groups.contains("adm_pusat")) {
-          level = "Admin";
-        } else if (groups.contains("Mahasiswa")) {
-          level = "Mahasiswa";
+        String level = "tendik";
+
+        if (groups.contains("SDM")) {
+          level = "sdm";
         } else if (groups.contains("Dosen")) {
-          level = "Dosen";
+          level = "dosen";
         } else if (groups.contains("Tendik")) {
-          level = "Tendik";
+          level = "tendik";
         }
 
         await saveSession(
-          username: nip,
+          username: preferredUsername.isNotEmpty ? preferredUsername : nip,
           password: "",
           token: accessToken,
           name: name,
           nip: nip,
           email: email,
           role: level,
-          groups: [level],
+          groups: List<String>.from(groups.map((e) => e.toString())),
         );
 
         return {
@@ -168,62 +178,17 @@ class SsoHelper {
 
     if (_isTokenExpired(token)) {
       final username = session['username'] as String?;
-      final password = session['password'] as String?;
       final refreshToken = await LocalStorageMobile.read('refresh');
 
-      // 1. Try SSO OAuth2 Refresh Token Exchange
+      // 1. Refresh Token Exchange via Golang Backend API
       if (refreshToken != null && refreshToken.isNotEmpty) {
-        print("JWT Token expired. Attempting background SSO token refresh via OAuth2...");
-        try {
-          final tokenResult = await _appAuth.token(
-            TokenRequest(
-              _clientId,
-              "com.unpak.hrportal:/oauth2redirect",
-              issuer: "https://gerbang.unpak.ac.id/realms/gateway",
-              refreshToken: refreshToken,
-            ),
-          );
-
-          if (tokenResult.accessToken != null) {
-            final newToken = tokenResult.accessToken!;
-            await saveSession(
-              username: username ?? '',
-              password: password ?? '',
-              token: newToken,
-              name: session['name'] ?? '',
-              nip: session['nip'] ?? '',
-              email: session['email'] ?? '',
-              role: session['role'] ?? 'Dosen',
-              groups: List<String>.from(session['groups'] ?? []),
-            );
-            if (tokenResult.refreshToken != null) {
-              await LocalStorageMobile.write('refresh', tokenResult.refreshToken!);
-            }
-            await FcmService.showCustomNotification(
-              title: 'Sesi Keamanan Diperbarui',
-              body: 'Token SSO Anda berhasil diperbarui secara otomatis di latar belakang.',
-            );
-            updateTokenRefreshTime();
-            print("Background SSO token refresh SUCCESS.");
-            return newToken;
-          }
-        } catch (e) {
-          print("Background SSO token refresh failed: $e");
-        }
-      }
-
-      // 2. Try Manual Login Credentials Re-authentication
-      if (username != null &&
-          username.isNotEmpty &&
-          password != null &&
-          password.isNotEmpty) {
-        print("JWT Token expired. Attempting background re-login via credentials...");
+        print(
+            "JWT Token expired. Attempting background token refresh via Golang API...");
         try {
           final responseData = await ApiClient.post(
-            Uri.parse("${ApiClient.baseUrlUnpak}/account/login"),
+            Uri.parse("${ApiClient.baseUrl}/api/account/refresh-token"),
             body: {
-              "username": username,
-              "password": password,
+              "refresh_token": refreshToken,
             },
             scope: 'global',
           );
@@ -231,51 +196,42 @@ class SsoHelper {
           if (responseData is Map<String, dynamic> &&
               responseData['token'] != null) {
             final newToken = responseData['token'] as String;
+            final newRefresh =
+                responseData['refresh'] as String? ?? refreshToken;
 
-            final whoamiData = await ApiClient.get(
-              Uri.parse("${ApiClient.baseUrlUnpak}/account/whoami"),
-              headers: {"Authorization": "Bearer $newToken"},
-              scope: 'global',
+            await saveSession(
+              username: username ?? '',
+              password: '',
+              token: newToken,
+              name: session['name'] ?? '',
+              nip: session['nip'] ?? '',
+              email: session['email'] ?? '',
+              role: session['role'] ?? 'Dosen',
+              groups: List<String>.from(session['groups'] ?? []),
             );
+            await LocalStorageMobile.write('refresh', newRefresh);
 
-            if (whoamiData is Map<String, dynamic>) {
-              final name = whoamiData['nama'] ?? whoamiData['name'] ?? session['name'];
-              final nip = whoamiData['nip'] ?? session['nip'];
-              final email = whoamiData['email'] ?? session['email'];
-              final role = session['role'] as String? ?? 'Dosen';
-              final groups = List<String>.from(session['groups'] ?? []);
-
-              await saveSession(
-                username: username,
-                password: password,
-                token: newToken,
-                name: name,
-                nip: nip,
-                email: email,
-                role: role,
-                groups: groups,
-              );
-
-              await FcmService.showCustomNotification(
-                title: 'Sesi Keamanan Diperbarui',
-                body: 'Token JWT Anda berhasil diperbarui secara otomatis di latar belakang.',
-              );
-
-              updateTokenRefreshTime();
-              print("Background manual token refresh SUCCESS.");
-              return newToken;
-            }
+            await FcmService.showCustomNotification(
+              title: 'Sesi Keamanan Diperbarui',
+              body: 'Token JWT Anda berhasil diperbarui secara otomatis.',
+            );
+            updateTokenRefreshTime();
+            print("Background token refresh SUCCESS via Golang API.");
+            return newToken;
           }
         } catch (e) {
-          print("Background manual token refresh failed: $e");
+          print("Background token refresh via Golang API failed: $e");
         }
       }
 
-      // Re-login failed or no stored credentials
+      // 2. Refresh Token Expired: FORCE CLEAR LOCAL DB & DISCARD ALL TOKENS!
+      print(
+          "Token & Refresh Token EXPIRED. Force clearing local DB and local session...");
       await clearSession();
       await FcmService.showCustomNotification(
         title: 'Sesi Berakhir',
-        body: 'Sesi login telah kadaluarsa. Silakan login kembali ke HR Portal.',
+        body:
+            'Sesi login telah kadaluarsa. Akun dan token telah dibersihkan secara aman dari DB lokal.',
       );
       return null;
     }

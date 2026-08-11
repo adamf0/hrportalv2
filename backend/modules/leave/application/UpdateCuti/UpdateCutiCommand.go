@@ -111,11 +111,12 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 			return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed", err.Error())), nil
 		}
 
-		if cmd.Status == "terima sdm" {
-			if err := repo.IncrementCounter(ctxTx, cuti.Nip, cuti.Nidn, now, "cuti", cuti.NamaPemohon, cuti.Unit, cuti.Fakultas, cuti.Prodi); err != nil {
-				tx.Rollback()
-				return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed2", err.Error())), err
-			}
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.CommitFailed", err.Error())), nil
+		}
+	} else {
+		if err := h.leaveRepo.UpdateCuti(ctx, cuti); err != nil {
+			return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed", err.Error())), nil
 		}
 	}
 

@@ -75,11 +75,6 @@ func (h *CreateAbsenUpacaraCommandHandler) Handle(ctx context.Context, cmd *Crea
 			return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
 		}
 
-		// if err := repo.IncrementCounter(ctxTx, nipVal, cmd.Nidn, now, "upacara", cmd.Nama, cmd.Unit, cmd.Fakultas, cmd.Prodi); err != nil {
-		// 	tx.Rollback()
-		// 	return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
-		// }
-
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.CreateFailed", err.Error())), nil
 		}

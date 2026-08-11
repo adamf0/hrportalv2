@@ -2,14 +2,12 @@ package domain
 
 import (
 	"context"
-	"time"
 
 	"gorm.io/gorm"
 )
 
 type IReportRepository interface {
 	GetDB() *gorm.DB
-	IncrementCounter(ctx context.Context, nip string, nidn string, date time.Time, counterType string, nama string, unit string, fakultas string, prodi string) error
 	GetReportSummary(ctx context.Context, nip string, periodeType PeriodeType, periodeKey string) (*RekapLaporanBulanan, error)
 	GetAllLaporanAbsen(ctx context.Context, tanggalMulai string, tanggalAkhir string, nip string, nidn string) (map[string]interface{}, error)
 	GetLaporanMergedParallel(ctx context.Context, tanggalMulai string, tanggalAkhir string, nip string, nidn string, userType string) ([]LaporanPenggunaMerged, error)

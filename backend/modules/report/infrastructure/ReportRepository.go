@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	commoninfra "hrportal_backend/common/infrastructure"
 	accountDomain "hrportal_backend/modules/account/domain"
 	attendanceDomain "hrportal_backend/modules/attendance/domain"
 	permissionDomain "hrportal_backend/modules/izin/domain"
@@ -31,129 +30,197 @@ func (r *ReportRepository) GetDB() *gorm.DB {
 	return r.db
 }
 
-func (r *ReportRepository) IncrementCounter(ctx context.Context, nip string, nidn string, date time.Time, counterType string, nama string, unit string, fakultas string, prodi string) error {
-	nipClean := strings.TrimSpace(nip)
-	nidnClean := strings.TrimSpace(nidn)
-	if nipClean == "" && nidnClean == "" {
-		return nil
-	}
-	nip = nipClean
-	nidn = nidnClean
-
-	calStart := time.Date(date.Year(), date.Month(), 1, 0, 0, 0, 0, date.Location())
-	calEnd := calStart.AddDate(0, 1, -1)
-	calKey := calStart.Format("2006-01")
-
-	var cutStart, cutEnd time.Time
-	var cutKey string
-
-	if date.Day() < 16 {
-		cutStart = time.Date(date.Year(), date.Month()-1, 16, 0, 0, 0, 0, date.Location())
-		cutEnd = time.Date(date.Year(), date.Month(), 15, 0, 0, 0, 0, date.Location())
-		cutKey = date.Format("2006-01")
-	} else {
-		cutStart = time.Date(date.Year(), date.Month(), 16, 0, 0, 0, 0, date.Location())
-		cutEnd = time.Date(date.Year(), date.Month()+1, 15, 0, 0, 0, 0, date.Location())
-		cutKey = date.AddDate(0, 1, 0).Format("2006-01")
-	}
-
-	periods := []struct {
-		pType domain.PeriodeType
-		pKey  string
-		start string
-		end   string
-	}{
-		{domain.PeriodeCalendar, calKey, calStart.Format("2006-01-02"), calEnd.Format("2006-01-02")},
-		{domain.PeriodeCutoff, cutKey, cutStart.Format("2006-01-02"), cutEnd.Format("2006-01-02")},
-	}
-
-	for _, p := range periods {
-		now := time.Now()
-		item := domain.RekapLaporanBulanan{
-			Nip:          nip,
-			Nidn:         nidn,
-			Nama:         nama,
-			Unit:         unit,
-			Fakultas:     fakultas,
-			Prodi:        prodi,
-			PeriodeType:  p.pType,
-			PeriodeKey:   p.pKey,
-			TanggalMulai: p.start,
-			TanggalAkhir: p.end,
-			UpdatedAt:    &now,
-		}
-
-		switch counterType {
-		case "masuk":
-			item.TotalMasuk = 1
-		case "izin":
-			item.TotalIzin = 1
-		case "cuti":
-			item.TotalCuti = 1
-		case "sppd":
-			item.TotalSppd = 1
-		case "upacara":
-			item.TotalUpacara = 1
-		}
-
-		columnToInc := "total_" + counterType
-
-		conflictCols := []clause.Column{{Name: "nip"}, {Name: "nidn"}, {Name: "periode_type"}, {Name: "periode_key"}}
-
-		assignments := map[string]interface{}{
-			columnToInc:  gorm.Expr("rekap_laporan_bulanan."+columnToInc+" + ?", 1),
-			"updated_at": now,
-		}
-		if nama != "" {
-			assignments["nama"] = nama
-		}
-		if unit != "" {
-			assignments["unit"] = unit
-		}
-		if fakultas != "" {
-			assignments["fakultas"] = fakultas
-		}
-		if prodi != "" {
-			assignments["prodi"] = prodi
-		}
-
-		err := commoninfra.GetTx(ctx, r.db).Clauses(clause.OnConflict{
-			Columns:   conflictCols,
-			DoUpdates: clause.Assignments(assignments),
-		}).Create(&item).Error
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, periodeType domain.PeriodeType, periodeKey string) (*domain.RekapLaporanBulanan, error) {
+	targetNip := strings.TrimSpace(nip)
 	if periodeKey == "" {
 		periodeKey = time.Now().Format("2006-01")
 	}
-	var rekap domain.RekapLaporanBulanan
-	err := r.db.WithContext(ctx).
-		Where("(nip = ? OR nidn = ?) AND periode_type = ? AND periode_key = ?", nip, nip, periodeType, periodeKey).
-		First(&rekap).Error
-	if err != nil {
+
+	if r == nil || r.db == nil {
 		now := time.Now()
 		return &domain.RekapLaporanBulanan{
-			Nip:          nip,
-			Nidn:         nip,
-			PeriodeType:  periodeType,
-			PeriodeKey:   periodeKey,
-			TotalMasuk:   0,
-			TotalIzin:    0,
-			TotalCuti:    0,
-			TotalSppd:    0,
-			TotalUpacara: 0,
-			UpdatedAt:    &now,
+			Nip:         targetNip,
+			Nidn:        targetNip,
+			PeriodeType: periodeType,
+			PeriodeKey:  periodeKey,
+			UpdatedAt:   &now,
 		}, nil
 	}
-	return &rekap, nil
+
+	loc := time.Local
+	refDate, err := time.ParseInLocation("2006-01", periodeKey, loc)
+	if err != nil {
+		refDate = time.Now().In(loc)
+	}
+
+	var vStart, vEnd time.Time
+	if periodeType == domain.PeriodeCutoff {
+		vStart = time.Date(refDate.Year(), refDate.Month()-1, 16, 0, 0, 0, 0, loc)
+		vEnd = time.Date(refDate.Year(), refDate.Month(), 15, 0, 0, 0, 0, loc)
+	} else {
+		vStart = time.Date(refDate.Year(), refDate.Month(), 1, 0, 0, 0, 0, loc)
+		vEnd = time.Date(refDate.Year(), refDate.Month()+1, 0, 0, 0, 0, 0, loc)
+	}
+
+	startStr := vStart.Format("2006-01-02")
+	endStr := vEnd.Format("2006-01-02")
+
+	now := time.Now().In(loc)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	evalEnd := vEnd
+	if evalEnd.After(today) {
+		evalEnd = today
+	}
+	evalEndStr := evalEnd.Format("2006-01-02")
+
+	var (
+		wg                                            sync.WaitGroup
+		cMasuk, cIzin, cCuti, cSppd, cUpacara, cLibur int64
+		emp                                           accountDomain.Pegawai
+	)
+
+	wg.Add(7)
+
+	// 1. Employee info
+	go func() {
+		defer wg.Done()
+		if targetNip != "" && r.db != nil {
+			_ = r.db.WithContext(ctx).Model(&accountDomain.Pegawai{}).
+				Where("nip = ? OR nidn = ?", targetNip, targetNip).
+				First(&emp).Error
+		}
+	}()
+
+	// 2. Absen Masuk (active up to today)
+	go func() {
+		defer wg.Done()
+		if r.db != nil {
+			buildUserWhere(r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}), targetNip, targetNip).
+				Where("tanggal >= ? AND tanggal <= ? AND absen_masuk IS NOT NULL", startStr, evalEndStr).
+				Count(&cMasuk)
+		}
+	}()
+
+	// 3. Izin (Terima SDM) (active up to today)
+	go func() {
+		defer wg.Done()
+		if r.db != nil {
+			buildUserWhere(r.db.WithContext(ctx).Model(&permissionDomain.Izin{}), targetNip, targetNip).
+				Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm')", startStr, evalEndStr).
+				Count(&cIzin)
+		}
+	}()
+
+	// 4. Cuti (Terima SDM) (active up to today)
+	go func() {
+		defer wg.Done()
+		if r.db != nil {
+			buildUserWhere(r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}), targetNip, targetNip).
+				Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm')", evalEndStr, startStr).
+				Count(&cCuti)
+		}
+	}()
+
+	// 5. SPPD + Anggota (Terima SDM) (active up to today)
+	go func() {
+		defer wg.Done()
+		if r.db != nil {
+			buildSppdUserWhere(r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}), targetNip, targetNip).
+				Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm')", evalEndStr, startStr).
+				Count(&cSppd)
+		}
+	}()
+
+	// 6. Absen Upacara (active up to today)
+	go func() {
+		defer wg.Done()
+		if r.db != nil {
+			buildUserWhere(r.db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{}), targetNip, targetNip).
+				Where("tanggal >= ? AND tanggal <= ?", startStr, evalEndStr).
+				Count(&cUpacara)
+		}
+	}()
+
+	// 7. Master Libur (active up to today)
+	go func() {
+		defer wg.Done()
+		if r.db != nil {
+			r.db.WithContext(ctx).Table("master_libur").
+				Where("tanggal >= ? AND tanggal <= ? AND is_national_holiday = 1", startStr, evalEndStr).
+				Count(&cLibur)
+		}
+	}()
+
+	wg.Wait()
+
+	totalElapsedDays := 0
+	sundaysCount := 0
+	if !vStart.After(evalEnd) {
+		for d := vStart; !d.After(evalEnd); d = d.AddDate(0, 0, 1) {
+			totalElapsedDays++
+			if d.Weekday() == time.Sunday {
+				sundaysCount++
+			}
+		}
+	}
+
+	if periodeType == domain.PeriodeCutoff && sundaysCount == 4 {
+		sundaysCount = 3
+	}
+
+	totalOffDays := sundaysCount + int(cLibur)
+	elapsedWorkingDays := totalElapsedDays - totalOffDays
+	if elapsedWorkingDays < 0 {
+		elapsedWorkingDays = 0
+	}
+
+	totalTidakMasuk := elapsedWorkingDays - int(cMasuk) - int(cIzin) - int(cCuti) - int(cSppd)
+	if totalTidakMasuk < 0 {
+		totalTidakMasuk = 0
+	}
+
+	namaVal := emp.Nama
+	if namaVal == "" {
+		namaVal = targetNip
+	}
+	unitVal := ""
+	if emp.UnitKerja != nil && *emp.UnitKerja != "" {
+		unitVal = *emp.UnitKerja
+	} else if emp.Unit != nil {
+		unitVal = *emp.Unit
+	}
+	fakultasVal := ""
+	if emp.Fakultas != nil {
+		fakultasVal = *emp.Fakultas
+	}
+	prodiVal := ""
+	if emp.Prodi != nil {
+		prodiVal = *emp.Prodi
+	}
+
+	rekap := &domain.RekapLaporanBulanan{
+		Nip:             targetNip,
+		Nidn:            targetNip,
+		Nama:            namaVal,
+		Unit:            unitVal,
+		Fakultas:        fakultasVal,
+		Prodi:           prodiVal,
+		PeriodeType:     periodeType,
+		PeriodeKey:      periodeKey,
+		TanggalMulai:    startStr,
+		TanggalAkhir:    endStr,
+		TotalMasuk:      int(cMasuk),
+		TotalIzin:       int(cIzin),
+		TotalCuti:       int(cCuti),
+		TotalSppd:       int(cSppd),
+		TotalUpacara:    int(cUpacara),
+		TotalLibur:      totalOffDays,
+		TotalTidakMasuk: totalTidakMasuk,
+		UpdatedAt:       &now,
+	}
+
+	return rekap, nil
 }
 
 func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai string, tanggalAkhir string, nip string, nidn string) (map[string]interface{}, error) {
@@ -386,13 +453,22 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	recordsByNidn := make(map[string][]domain.RecordItem)
 
 	for _, a := range absens {
+		var masukStr, keluarStr *string
+		if a.AbsenMasuk != nil {
+			s := a.AbsenMasuk.In(time.Local).Format("2006-01-02 15:04:05")
+			masukStr = &s
+		}
+		if a.AbsenKeluar != nil {
+			s := a.AbsenKeluar.In(time.Local).Format("2006-01-02 15:04:05")
+			keluarStr = &s
+		}
 		rec := domain.RecordItem{
 			ID:      a.ID,
 			Tanggal: a.Tanggal,
 			Type:    "absen",
 			Info: map[string]interface{}{
-				"masuk":  a.AbsenMasuk,
-				"keluar": a.AbsenKeluar,
+				"masuk":  masukStr,
+				"keluar": keluarStr,
 			},
 		}
 		if a.Nip != "" {
@@ -664,28 +740,29 @@ func (r *ReportRepository) CalculateReport(ctx context.Context) (map[string]inte
 	var totalRecordsProcessed int64
 
 	for _, mStr := range months {
-		refDate, err := time.Parse("2006-01", mStr)
+		loc := time.Local
+		refDate, err := time.ParseInLocation("2006-01", mStr, loc)
 		if err != nil {
 			continue
 		}
 
 		// 1. Versi 1 (Calendar Month: 1st to last day)
-		v1Start := time.Date(refDate.Year(), refDate.Month(), 1, 0, 0, 0, 0, refDate.Location())
-		v1End := v1Start.AddDate(0, 1, -1)
+		v1Start := time.Date(refDate.Year(), refDate.Month(), 1, 0, 0, 0, 0, loc)
+		v1End := time.Date(refDate.Year(), refDate.Month()+1, 0, 0, 0, 0, 0, loc)
 		v1Key := v1Start.Format("2006-01")
 
-		// 2. Versi 2 (Cutoff Period: 15th of prev month to 14th of curr month)
-		v2Start := time.Date(refDate.Year(), refDate.Month()-1, 16, 0, 0, 0, 0, refDate.Location())
-		v2End := time.Date(refDate.Year(), refDate.Month(), 15, 0, 0, 0, 0, refDate.Location())
+		// 2. Versi 2 (Cutoff Period: 16th of prev month to 15th of curr month)
+		v2Start := time.Date(refDate.Year(), refDate.Month()-1, 16, 0, 0, 0, 0, loc)
+		v2End := time.Date(refDate.Year(), refDate.Month(), 15, 0, 0, 0, 0, loc)
 		v2Key := refDate.Format("2006-01")
 
 		var cLiburV1, cLiburV2 int64
 		r.db.WithContext(ctx).Table("master_libur").
-			Where("tanggal >= ? AND tanggal <= ? AND (is_national_holiday = 1 OR type LIKE '%Holiday%')", v1Start.Format("2006-01-02"), v1End.Format("2006-01-02")).
+			Where("tanggal >= ? AND tanggal <= ? AND is_national_holiday = 1", v1Start.Format("2006-01-02"), v1End.Format("2006-01-02")).
 			Count(&cLiburV1)
 
 		r.db.WithContext(ctx).Table("master_libur").
-			Where("tanggal >= ? AND tanggal <= ? AND (is_national_holiday = 1 OR type LIKE '%Holiday%')", v2Start.Format("2006-01-02"), v2End.Format("2006-01-02")).
+			Where("tanggal >= ? AND tanggal <= ? AND is_national_holiday = 1", v2Start.Format("2006-01-02"), v2End.Format("2006-01-02")).
 			Count(&cLiburV2)
 
 		type job struct {

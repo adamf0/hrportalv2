@@ -12,8 +12,11 @@ var TxKey = txContextKey{}
 
 // GetTx returns the transaction from the context if it exists, otherwise returning the fallback DB.
 func GetTx(ctx context.Context, fallback *gorm.DB) *gorm.DB {
-	if tx, ok := ctx.Value(TxKey).(*gorm.DB); ok {
+	if tx, ok := ctx.Value(TxKey).(*gorm.DB); ok && tx != nil {
 		return tx.WithContext(ctx)
 	}
-	return fallback.WithContext(ctx)
+	if fallback != nil {
+		return fallback.WithContext(ctx)
+	}
+	return nil
 }

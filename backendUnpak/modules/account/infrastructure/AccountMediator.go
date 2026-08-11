@@ -1,8 +1,6 @@
 package infrastructure
 
 import (
-	"log"
-
 	commondomain "hrportal_backend_unpak/common/domain"
 	login "hrportal_backend_unpak/modules/account/application/Login"
 	who "hrportal_backend_unpak/modules/account/application/Whoami"
@@ -51,6 +49,5 @@ func RegisterModuleAccount(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB) err
 		commondomain.ResultValue[login.LoginResult],
 	](login.NewLoginCommandHandler(GlobalRepoLocal, GlobalRepoSimak, GlobalRepoSimpeg))
 
-	log.Printf("[Account Module] RegisterModuleAccount completed successfully")
 	return nil
 }

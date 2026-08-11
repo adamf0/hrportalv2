@@ -99,8 +99,8 @@ class ReportPeriodFilter {
     } else if (periodType == ReportPeriodType.calendar) {
       return DateTime(year, month, 1);
     } else {
-      // Cutoff: 15th of previous month
-      return DateTime(year, month - 1, 15);
+      // Cutoff: 16th of previous month
+      return DateTime(year, month - 1, 16);
     }
   }
 

@@ -40,15 +40,33 @@ class AttendanceBloc extends ChangeNotifier {
         AttendanceRealtimeService().stream.listen((payload) {
       final type = payload['type'] as String?;
 
+      String parseTime(String? timeStr) {
+        if (timeStr == null || timeStr.isEmpty) return '--:--';
+        try {
+          final dt = DateTime.tryParse(timeStr);
+          if (dt != null) {
+            final localDt = dt.toLocal();
+            return "${localDt.hour.toString().padLeft(2, '0')}:${localDt.minute.toString().padLeft(2, '0')}";
+          }
+          final parts = timeStr.split(' ');
+          if (parts.length > 1) {
+            final sub = parts[1].split(':');
+            if (sub.length >= 2) return "${sub[0]}:${sub[1]}";
+          } else {
+            final sub = timeStr.split(':');
+            if (sub.length >= 2) return "${sub[0]}:${sub[1]}";
+          }
+        } catch (_) {}
+        return '--:--';
+      }
+
       if (type == 'initial_state') {
         final masukStr = payload['absen_masuk'] as String?;
         if (masukStr != null && masukStr.isNotEmpty) {
-          final dt = DateTime.tryParse(masukStr);
-          if (dt != null) {
-            _checkInTime =
-                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+          final formatted = parseTime(masukStr);
+          if (formatted != '--:--') {
+            _checkInTime = formatted;
             _isCheckedIn = true;
-            // AutoAttendanceService.instance.markAlreadyCheckedInInitial();
           }
         } else {
           _checkInTime = '--:--';
@@ -57,10 +75,9 @@ class AttendanceBloc extends ChangeNotifier {
 
         final keluarStr = payload['absen_keluar'] as String?;
         if (keluarStr != null && keluarStr.isNotEmpty) {
-          final dt = DateTime.tryParse(keluarStr);
-          if (dt != null) {
-            _checkOutTime =
-                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
+          final formatted = parseTime(keluarStr);
+          if (formatted != '--:--') {
+            _checkOutTime = formatted;
             _isCheckedOut = true;
           }
         } else {
@@ -70,27 +87,19 @@ class AttendanceBloc extends ChangeNotifier {
         notifyListeners();
       } else if (type == 'check_in') {
         final masukStr = payload['absen_masuk'] as String?;
-        if (masukStr != null) {
-          final dt = DateTime.tryParse(masukStr);
-          if (dt != null) {
-            _checkInTime =
-                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
-            _isCheckedIn = true;
-            // AutoAttendanceService.instance
-            //     .triggerSuccessNotificationIfInitialNull();
-            notifyListeners();
-          }
+        final formatted = parseTime(masukStr);
+        if (formatted != '--:--') {
+          _checkInTime = formatted;
+          _isCheckedIn = true;
+          notifyListeners();
         }
       } else if (type == 'check_out') {
         final keluarStr = payload['absen_keluar'] as String?;
-        if (keluarStr != null) {
-          final dt = DateTime.tryParse(keluarStr);
-          if (dt != null) {
-            _checkOutTime =
-                "${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}";
-            _isCheckedOut = true;
-            notifyListeners();
-          }
+        final formatted = parseTime(keluarStr);
+        if (formatted != '--:--') {
+          _checkOutTime = formatted;
+          _isCheckedOut = true;
+          notifyListeners();
         }
       }
     });
@@ -179,37 +188,62 @@ class AttendanceBloc extends ChangeNotifier {
 
   void markCheckedInToday([String? time]) {
     _isCheckedIn = true;
-    final now = DateTime.now();
-    final currentTimeStr =
-        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-
-    if (time != null && time.isNotEmpty && time != 'Terverifikasi') {
-      _checkInTime = time;
-    } else if (_checkInTime == '--:--' || _checkInTime == 'Terverifikasi') {
-      _checkInTime = currentTimeStr;
-    }
     _hasAttemptedAutoCheckIn = true;
-    notifyListeners();
+    fetchAttendanceHistory();
   }
 
   AttendanceBloc() {
     _initRealTimeIpAndGpsTracking();
     AutoAttendanceService.onAttendanceUpdated = () {
-      markCheckedInToday();
       fetchAttendanceHistory();
     };
+  }
+
+  Timer? _autoCheckInRetryTimer;
+
+  void _scheduleNextMinuteAutoCheckInRetry() {
+    _autoCheckInRetryTimer?.cancel();
+    _autoCheckInRetryTimer = Timer(const Duration(minutes: 1), () async {
+      if (!_isCheckedIn) {
+        debugPrint("[Auto Check-In Retry] Retrying auto check-in evaluation next minute...");
+        _isAutoCheckInEvaluating = true;
+        _hasAttemptedAutoCheckIn = false;
+        notifyListeners();
+        final success = await evaluateAndTriggerAutoCheckIn();
+        if (!success && !_isCheckedIn) {
+          _scheduleNextMinuteAutoCheckInRetry();
+        }
+      }
+    });
   }
 
   void updateLoginState(bool loggedIn) {
     _isLoggedIn = loggedIn;
     if (loggedIn) {
-      fetchAttendanceHistory();
+      fetchAttendanceHistory().then((_) {
+        if (!_isCheckedIn) {
+          _isAutoCheckInEvaluating = true;
+          notifyListeners();
+          evaluateAndTriggerAutoCheckIn().then((success) {
+            if (!success && !_isCheckedIn) {
+              _scheduleNextMinuteAutoCheckInRetry();
+            }
+          });
+        }
+      });
     } else {
       _hasAttemptedAutoCheckIn = false;
+      _isAutoCheckInEvaluating = true;
+      notifyListeners();
+      _scheduleNextMinuteAutoCheckInRetry();
     }
   }
 
   Future<void> refreshAttendanceState() async {
+    _isAutoCheckInEvaluating = true;
+    _hasAttemptedAutoCheckIn = false;
+    notifyListeners();
+
     final session = await SsoHelper.getSession();
     if (session != null) {
       final nip = session['nip'] as String? ?? '';
@@ -220,6 +254,12 @@ class AttendanceBloc extends ChangeNotifier {
       }
     }
     await fetchAttendanceHistory();
+    if (!_isCheckedIn) {
+      final success = await evaluateAndTriggerAutoCheckIn();
+      if (!success && !_isCheckedIn) {
+        _scheduleNextMinuteAutoCheckInRetry();
+      }
+    }
   }
 
   Future<void> fetchAttendanceHistory() async {
@@ -228,8 +268,11 @@ class AttendanceBloc extends ChangeNotifier {
       if (session == null) return;
 
       final nip = session['nip'] as String? ?? '';
-      final role = session['role'] as String? ?? '';
-      final nidn = role == 'Dosen' ? nip : '';
+      var nidn = session['nidn'] as String? ?? '';
+      if (nidn.isEmpty) {
+        nidn = session['sid'] as String? ??
+            (session['role'] == 'Dosen' ? nip : '');
+      }
       if (nip.isNotEmpty || nidn.isNotEmpty) {
         initRealtimeWsListener(nip, nidn);
       }
@@ -242,13 +285,6 @@ class AttendanceBloc extends ChangeNotifier {
         _checkInTime = history.todayCheckInTime!;
         _isCheckedIn = true;
         _hasAttemptedAutoCheckIn = true;
-      } else if (_isCheckedIn) {
-        if (_checkInTime == '--:--' || _checkInTime == 'Terverifikasi') {
-          final now = DateTime.now();
-          _checkInTime =
-              "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-        }
-        _hasAttemptedAutoCheckIn = true;
       } else {
         _checkInTime = '--:--';
         _isCheckedIn = false;
@@ -257,12 +293,6 @@ class AttendanceBloc extends ChangeNotifier {
       if (history.todayCheckOutTime != null) {
         _checkOutTime = history.todayCheckOutTime!;
         _isCheckedOut = true;
-      } else if (_isCheckedOut) {
-        if (_checkOutTime == '--:--') {
-          final now = DateTime.now();
-          _checkOutTime =
-              "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-        }
       } else {
         _checkOutTime = '--:--';
         _isCheckedOut = false;
@@ -417,7 +447,6 @@ class AttendanceBloc extends ChangeNotifier {
 
     if (success) {
       _isCheckedIn = true;
-      _checkInTime = time;
       bool isInside = _locationStrategy.isWithinCampus(lat, lon);
       String noteLabel = isInside ? 'Di Dalam Kampus' : 'Di Luar Radius Kampus';
 
@@ -511,7 +540,21 @@ class AttendanceBloc extends ChangeNotifier {
   }
 
   Future<bool> evaluateAndTriggerAutoCheckIn() async {
-    if (!_isLoggedIn || _isCheckedIn || _hasAttemptedAutoCheckIn) return false;
+    _isAutoCheckInEvaluating = true;
+    notifyListeners();
+
+    if (!_isLoggedIn) {
+      _isAutoCheckInEvaluating = false;
+      notifyListeners();
+      _scheduleNextMinuteAutoCheckInRetry();
+      return false;
+    }
+    await fetchAttendanceHistory();
+    if (_isCheckedIn) {
+      _isAutoCheckInEvaluating = false;
+      notifyListeners();
+      return false;
+    }
 
     String currentIp = _useRealNetworkAndGps ? _realIp : _simulatedIp;
     double currentLat =
@@ -550,8 +593,14 @@ class AttendanceBloc extends ChangeNotifier {
       final timeStr =
           "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
       await doCheckIn(timeStr);
+      _isAutoCheckInEvaluating = false;
+      notifyListeners();
       return true;
     }
+
+    _scheduleNextMinuteAutoCheckInRetry();
+    _isAutoCheckInEvaluating = false;
+    notifyListeners();
     return false;
   }
 
