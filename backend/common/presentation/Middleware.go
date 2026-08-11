@@ -420,10 +420,7 @@ func injectRequestValues(c *fiber.Ctx, claims jwt.MapClaims, tokenStr string) er
 		// Keycloak SSO Token
 		employeeId, _ := claims["employeeid"].(string)
 		if employeeId == "" {
-			employeeId, _ = claims["preferred_username"].(string)
-		}
-		if employeeId == "" {
-			return fiber.NewError(400, "employeeid and preferred_username missing in sso token")
+			return fiber.NewError(400, "employeeid is missing in sso token")
 		}
 		c.Request().PostArgs().Set("sid", employeeId)
 
@@ -466,9 +463,6 @@ func accountFromToken(tokenStr string) *Account {
 	source, _ := claims["source"].(string)
 	if sid == "" {
 		sid, _ = claims["employeeid"].(string)
-		if sid == "" {
-			sid, _ = claims["preferred_username"].(string)
-		}
 	}
 	if source == "" {
 		source = "simpeg"

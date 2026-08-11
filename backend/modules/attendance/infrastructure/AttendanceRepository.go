@@ -44,9 +44,9 @@ func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, 
 	if nip != "" && nidn != "" {
 		query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
 	} else if nip != "" {
-		query = query.Where("(nip = ? OR nidn = ?)", nip, nip)
+		query = query.Where("(nip = ?)", nip)
 	} else if nidn != "" {
-		query = query.Where("(nip = ? OR nidn = ?)", nidn, nidn)
+		query = query.Where("(nidn = ?)", nidn)
 	}
 
 	if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {

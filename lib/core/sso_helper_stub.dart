@@ -92,8 +92,6 @@ class SsoHelper {
         final decoded = _decodeJwt(idToken ?? accessToken);
         final name = decoded['name'] ?? "User";
         final email = decoded['email'] ?? "";
-        final preferredUsername =
-            decoded['preferred_username']?.toString() ?? "";
         final employeeId = decoded['employeeid']?.toString() ?? "";
         final groups = (decoded['group'] as List?) ?? [];
 
@@ -112,9 +110,7 @@ class SsoHelper {
           nip = employeeId.isNotEmpty ? employeeId : "-";
         }
 
-        final usernameStr = employeeId.isNotEmpty
-            ? employeeId
-            : (preferredUsername.isNotEmpty ? preferredUsername : "-");
+        final usernameStr = employeeId.isNotEmpty ? employeeId : "-";
 
         await saveSession(
           username: usernameStr,
