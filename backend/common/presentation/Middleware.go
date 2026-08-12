@@ -379,6 +379,15 @@ func extractBearerToken(c *fiber.Ctx) (string, error) {
 }
 
 func parseJWT(tokenStr string) (*jwt.Token, error) {
+	if tokenStr == "" || tokenStr == "undefined" || tokenStr == "null" {
+		return nil, fiber.NewError(400, "token authorization header missing or empty")
+	}
+
+	parts := strings.Split(tokenStr, ".")
+	if len(parts) != 3 {
+		return nil, fiber.NewError(400, "token format invalid: expected JWT with 3 segments")
+	}
+
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("invalid signing method")
@@ -460,47 +469,88 @@ func accountFromToken(tokenStr string) *Account {
 	}
 
 	iss, _ := claims["iss"].(string)
-	var sid string
-	if strings.Contains(iss, "gerbang.unpak.ac.id") {
-		sid, _ = claims["employeeid"].(string)
-	} else {
-		sid, _ = claims["sid"].(string)
-	}
-
+	sid, _ := claims["sid"].(string)
 	source, _ := claims["source"].(string)
-	if source == "" {
+	employeeId, _ := claims["employeeid"].(string)
+	name, _ := claims["name"].(string)
+	level, _ := claims["level"].(string)
+	role, _ := claims["role"].(string)
+
+	isKeycloak := strings.Contains(iss, "gerbang.unpak.ac.id") || employeeId != ""
+
+	if isKeycloak {
+		if employeeId != "" {
+			sid = employeeId
+		}
 		source = "simpeg"
+		role = "tendik"
+		level = "tendik"
+
+		var allGroups []string
 		if groupRaw, ok := claims["group"].([]interface{}); ok {
 			for _, g := range groupRaw {
-				if gStr, ok := g.(string); ok && strings.ToLower(gStr) == "dosen" {
+				if gStr, ok := g.(string); ok {
+					allGroups = append(allGroups, strings.ToLower(gStr))
+				}
+			}
+		}
+		if realmAccess, ok := claims["realm_access"].(map[string]interface{}); ok {
+			if rolesRaw, ok := realmAccess["roles"].([]interface{}); ok {
+				for _, r := range rolesRaw {
+					if rStr, ok := r.(string); ok {
+						allGroups = append(allGroups, strings.ToLower(rStr))
+					}
+				}
+			}
+		}
+
+		for _, g := range allGroups {
+			if g == "sdm" || g == "baum" || g == "adm_hr" || g == "inherit_sdm" || g == "inherit_baum" || g == "adm_pusat" {
+				role = "sdm"
+				level = "sdm"
+				break
+			}
+		}
+		if role != "sdm" {
+			for _, g := range allGroups {
+				if g == "dosen" {
 					source = "simak"
+					role = "dosen"
+					level = "dosen"
 					break
 				}
 			}
 		}
+	} else {
+		// Local login token: e.g. {"sid":"10","source":"local"}
+		if source == "" {
+			source = "local"
+		}
+		if role == "" {
+			role = "sdm"
+		}
+		if level == "" {
+			level = "sdm"
+		}
+		if name == "" {
+			name = "sdm"
+		}
 	}
 
-	role := "dosen"
-	if strings.ToLower(source) == "simpeg" {
-		role = "tendik"
-	}
-
-	nip := ""
+	nip := sid
 	nidn := ""
 	if strings.ToLower(source) == "simak" {
 		nidn = sid
-	} else {
-		nip = sid
 	}
 
 	return &Account{
 		SID:    sid,
 		Source: source,
 		Role:   role,
-		Level:  role,
+		Level:  level,
 		NIP:    nip,
 		NIDN:   nidn,
-		Name:   sid,
+		Name:   name,
 	}
 }
 
@@ -511,11 +561,12 @@ func RBACMiddleware() fiber.Handler {
 		}
 		whoamiURL := os.Getenv("WHOAMI_URL")
 		if whoamiURL == "" {
-			host := c.Hostname()
-			if host == "" {
-				host = "localhost:3000"
-			}
-			whoamiURL = c.Protocol() + "://" + host + "/api/v2/account/whoami"
+			whoamiURL = "https://hrportal.unpak.ac.id/api/v2/account/whoami"
+		}
+
+		whoamiv2URL := os.Getenv("WHOAMIV2_URL")
+		if whoamiv2URL == "" {
+			whoamiv2URL = "https://hrportal.unpak.ac.id/api/v2/account/whoamiv2"
 		}
 
 		token, err := extractBearerToken(c)
@@ -523,9 +574,35 @@ func RBACMiddleware() fiber.Handler {
 			return badRequest(c, err)
 		}
 
-		user := accountFromToken(token)
+		var user *Account
+		jwtToken, parseErr := parseJWT(token)
+		if parseErr == nil && jwtToken != nil {
+			if claims, claimErr := validateClaims(jwtToken); claimErr == nil && claims != nil {
+				iss, _ := claims["iss"].(string)
+				if strings.Contains(iss, "gerbang.unpak.ac.id") {
+					// Keycloak SSO Token: fetchWhoAmIV2 using employeeid and source
+					sid, _ := claims["employeeid"].(string)
+					source := "simpeg"
+					if groupRaw, ok := claims["group"].([]interface{}); ok {
+						for _, g := range groupRaw {
+							if gStr, ok := g.(string); ok && strings.ToLower(gStr) == "dosen" {
+								source = "simak"
+								break
+							}
+						}
+					}
+					if sid != "" {
+						user, _ = fetchWhoAmIV2(sid, source, token, whoamiv2URL, c)
+					}
+				} else {
+					user, _ = fetchWhoAmI(token, whoamiURL, c)
+				}
+			}
+		}
+
 		if user == nil {
-			user, _ = fetchWhoAmI(token, whoamiURL, c)
+			// Fallback decode directly from token
+			user = accountFromToken(token)
 		}
 
 		if user == nil {
@@ -545,19 +622,13 @@ func RBACMiddleware() fiber.Handler {
 		c.Request().PostArgs().Set("source", user.Source)
 		c.Request().PostArgs().Set("nama", user.Name)
 
-		if isAdmin(user) {
-			log.Println("[RBAC] User is admin, access granted")
+		if isAdmin(user) || isSdm(user) || isBaum(user) {
+			log.Println("[RBAC] User is Admin/SDM/BAUM, access granted")
 			return c.Next()
 		}
 
 		if isDosen(user) || isTendik(user) {
 			log.Println("[RBAC] User is Dosen/Tendik, access granted")
-			log.Println("[RBAC] Middleware passed, continue to handler")
-			return c.Next()
-		}
-
-		if isSdm(user) || isBaum(user) {
-			log.Println("[RBAC] User is SDM/BAUM, access granted")
 			log.Println("[RBAC] Middleware passed, continue to handler")
 			return c.Next()
 		}
@@ -610,6 +681,19 @@ func fetchWhoAmI(token, whoamiURL string, c *fiber.Ctx) (*Account, error) {
 	return &user, nil
 }
 
+func fetchWhoAmIV2(sid, source, token, whoamiURL string, c *fiber.Ctx) (*Account, error) {
+	if sid == "" {
+		return nil, errors.New("sid is empty")
+	}
+	targetURL := whoamiURL
+	if strings.Contains(targetURL, "?") {
+		targetURL = fmt.Sprintf("%s&sid=%s&source=%s", targetURL, url.QueryEscape(sid), url.QueryEscape(source))
+	} else {
+		targetURL = fmt.Sprintf("%s?sid=%s&source=%s", targetURL, url.QueryEscape(sid), url.QueryEscape(source))
+	}
+	return fetchWhoAmI(token, targetURL, c)
+}
+
 func handleWhoAmIError(body []byte, c *fiber.Ctx) error {
 	var errResp struct {
 		Code    string `json:"code"`
@@ -636,10 +720,10 @@ func isAdmin(user *Account) bool {
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
 
-	return role == "adm_pusat" || role == "adm_hr" || (lvl == "admin" && src == "local")
+	return role == "adm_pusat" || role == "adm_hr" || role == "admin" || (lvl == "admin" && src == "local") || role == "inherit_sdm" || role == "inherit_baum"
 }
 
-func isDosen(user *Account) bool { //[pr]
+func isDosen(user *Account) bool {
 	role := strings.ToLower(user.Role)
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
@@ -657,14 +741,15 @@ func isSdm(user *Account) bool {
 	role := strings.ToLower(user.Role)
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
-	return role == "sdm" || (src == "local" && lvl == "sdm")
+	name := strings.ToLower(user.Name)
+	return role == "sdm" || lvl == "sdm" || role == "adm_hr" || role == "inherit_sdm" || role == "adm_pusat" || (src == "local" && (lvl == "sdm" || user.SID == "10" || name == "sdm"))
 }
 
 func isBaum(user *Account) bool {
 	role := strings.ToLower(user.Role)
 	src := strings.ToLower(user.Source)
 	lvl := strings.ToLower(user.Level)
-	return role == "baum" || (src == "local" && lvl == "baum")
+	return role == "baum" || lvl == "baum" || role == "inherit_baum" || (src == "local" && lvl == "baum")
 }
 
 func WSError(conn *websocket.Conn, code string, msg string) error {

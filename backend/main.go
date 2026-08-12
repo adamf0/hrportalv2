@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/websocket/v2"
 	"github.com/joho/godotenv"
 	"github.com/mehdihadeli/go-mediatr"
 	"gorm.io/driver/mysql"
@@ -22,14 +23,16 @@ import (
 	commoninfra "hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
 
+	accountInfrastructure "hrportal_backend/modules/account/infrastructure"
+	accountPresentation "hrportal_backend/modules/account/presentation"
 	attendanceInfrastructure "hrportal_backend/modules/attendance/infrastructure"
 	attendancePresentation "hrportal_backend/modules/attendance/presentation"
 
 	leaveInfrastructure "hrportal_backend/modules/leave/infrastructure"
 	leavePresentation "hrportal_backend/modules/leave/presentation"
 
-	// masterdataInfrastructure "hrportal_backend/modules/masterdata/infrastructure"
-	// masterdataPresentation "hrportal_backend/modules/masterdata/presentation"
+	masterdataInfrastructure "hrportal_backend/modules/masterdata/infrastructure"
+	masterdataPresentation "hrportal_backend/modules/masterdata/presentation"
 
 	reportInfrastructure "hrportal_backend/modules/report/infrastructure"
 	reportPresentation "hrportal_backend/modules/report/presentation"
@@ -269,13 +272,22 @@ func main() {
 		return holidayInfrastructure.RegisterModuleHoliday(db)
 	})
 
+	mustStart("Account Module", func() error {
+		return accountInfrastructure.RegisterModuleAccount(db, nil, nil)
+	})
+
+	mustStart("MasterData Module", func() error {
+		return masterdataInfrastructure.RegisterModuleMasterData(db)
+	})
+
 	if len(startupErrors) > 0 {
 		log.Printf("Startup warnings/errors encountered: %v", startupErrors)
 	}
 
+	accountPresentation.ModuleAccount(app)
 	attendancePresentation.ModuleAttendance(app)
 	leavePresentation.ModuleLeave(app)
-	// masterdataPresentation.ModuleMasterData(app)
+	masterdataPresentation.ModuleMasterData(app)
 	sppdPresentation.ModuleSppd(app)
 	izinPresentation.ModuleIzin(app)
 	ceremonyAttendancePresentation.ModuleCeremonyAttendance(app)
@@ -283,6 +295,19 @@ func main() {
 	reportPresentation.ModuleReport(app)
 	holidayPresentation.ModuleHoliday(app, db)
 	notificationPresentation.ModuleNotification(app)
+
+	// WebSocket Real-time Feed for SDM Dashboard (Live Izin, Cuti, SPPD updates)
+	app.Get("/ws/sdm", websocket.New(func(c *websocket.Conn) {
+		commonhelper.GlobalSdmWsHub.Register(c)
+		defer commonhelper.GlobalSdmWsHub.Unregister(c)
+
+		for {
+			_, _, err := c.ReadMessage()
+			if err != nil {
+				break
+			}
+		}
+	}))
 
 	// Note: Background Jobs (SDM Auto-Verify, Holiday Sync, Export Worker) are separated into standalone binaries in /cmd
 	app.Get("/health", func(c *fiber.Ctx) error {

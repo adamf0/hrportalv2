@@ -68,6 +68,7 @@ func ModuleLeave(app *fiber.App) {
 		// Trigger FCM Notification for Submit Cuti
 		if res.Value != nil {
 			cutiData := res.Value
+			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "cuti_updated", "module": "leave", "data": cutiData})
 			if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
 				targets := []string{*cutiData.Verifikasi}
 				title := "Pengajuan Cuti Baru"
@@ -159,6 +160,8 @@ func ModuleLeave(app *fiber.App) {
 					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Cuti", "Pengajuan Cuti NIP "+cutiData.Nip+" ditolak oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
 				}
 			}
+
+			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "cuti_updated", "module": "leave", "data": cutiData})
 		}
 
 		return c.JSON(res.Value)

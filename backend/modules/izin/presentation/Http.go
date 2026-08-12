@@ -68,6 +68,7 @@ func ModuleIzin(app *fiber.App) {
 		// Trigger FCM Notification for Create Izin
 		if res.Value != nil {
 			iz := res.Value
+			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "izin_updated", "module": "izin", "data": iz})
 			if iz.Verifikasi != nil && *iz.Verifikasi != "" {
 				targets := []string{*iz.Verifikasi}
 				title := "Pengajuan Izin Baru"
@@ -155,6 +156,8 @@ func ModuleIzin(app *fiber.App) {
 					helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Izin", "Pengajuan Izin NIP "+iz.Nip+" ditolak oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
 				}
 			}
+
+			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "izin_updated", "module": "izin", "data": iz})
 		}
 
 		return c.JSON(res.Value)

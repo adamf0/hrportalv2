@@ -1,9 +1,12 @@
 package domain
 
 type Fakultas struct {
-	ID   uint   `gorm:"primaryKey;column:id" json:"id"`
-	Kode string `gorm:"column:kode" json:"kode"`
-	Nama string `gorm:"column:nama" json:"nama"`
+	KodeFakultas string `gorm:"primaryKey;column:kode_fakultas" json:"kode_fakultas"`
+	NamaFakultas string `gorm:"column:nama_fakultas" json:"nama_fakultas"`
+
+	ID   string `gorm:"-" json:"id"`
+	Kode string `gorm:"-" json:"kode"`
+	Nama string `gorm:"-" json:"nama"`
 }
 
 func (Fakultas) TableName() string {
@@ -11,10 +14,15 @@ func (Fakultas) TableName() string {
 }
 
 type Prodi struct {
-	ID         uint   `gorm:"primaryKey;column:id" json:"id"`
-	FakultasID uint   `gorm:"column:fakultas_id" json:"fakultas_id"`
-	Kode       string `gorm:"column:kode" json:"kode"`
-	Nama       string `gorm:"column:nama" json:"nama"`
+	KodeProdi    string `gorm:"primaryKey;column:kode_prodi" json:"kode_prodi"`
+	NamaProdi    string `gorm:"column:nama_prodi" json:"nama_prodi"`
+	KodeFakultas string `gorm:"column:kode_fakultas" json:"kode_fakultas"`
+	NamaFakultas string `gorm:"column:nama_fakultas" json:"nama_fakultas"`
+
+	ID         string `gorm:"-" json:"id"`
+	FakultasID string `gorm:"-" json:"fakultas_id"`
+	Kode       string `gorm:"-" json:"kode"`
+	Nama       string `gorm:"-" json:"nama"`
 }
 
 func (Prodi) TableName() string {

@@ -37,7 +37,7 @@ func RegisterModuleAccount(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB) err
 	GlobalRepoSimak = NewSimakRepository(dbSimak, dbSimpeg)
 	GlobalRepoSimpeg = NewSimpegRepository(dbSimpeg)
 
-	mediatr.ClearRequestRegistrations()
+	// Do not clear mediatr registrations for other modules
 
 	_ = mediatr.RegisterRequestHandler[
 		*who.WhoamiQuery,

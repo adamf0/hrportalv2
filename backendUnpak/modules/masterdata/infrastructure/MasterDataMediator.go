@@ -54,12 +54,5 @@ func RegisterModuleMasterData(db *gorm.DB) error {
 		return err
 	}
 
-	err = mediatr.RegisterRequestHandler[*query.GetAllPeopleQuery, common.ResultValue[[]domain.Verifikator]](
-		query.NewGetAllPeopleQueryHandler(repo),
-	)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }

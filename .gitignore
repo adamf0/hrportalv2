@@ -65,3 +65,9 @@ mariadb/
 .env
 *.env
 backend/.env
+
+# Node & Frontend dependencies/build
+node_modules/
+dist/
+frontend/node_modules/
+frontend/dist/

@@ -114,6 +114,36 @@ func WhoAmIHandler(c *fiber.Ctx) error {
 }
 
 // =======================================================
+// GET /whoamiv2
+// =======================================================
+func WhoAmIV2Handler(c *fiber.Ctx) error {
+	sid := c.Query("sid")
+	source := c.Query("source")
+
+	query := who.WhoamiQuery{
+		Sid:    sid,
+		Source: source,
+	}
+
+	ctx := c.UserContext()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	handler := who.NewWhoamiQueryHandler(
+		accountInfrastructure.GlobalRepoLocal,
+		accountInfrastructure.GlobalRepoSimak,
+		accountInfrastructure.GlobalRepoSimpeg,
+	)
+	result, err := handler.Handle(ctx, &query)
+	if err != nil {
+		return commoninfra.HandleError(c, err)
+	}
+
+	return c.JSON(result.Value)
+}
+
+// =======================================================
 // POST /refresh-token
 // =======================================================
 func RefreshTokenHandler(c *fiber.Ctx) error {
@@ -194,4 +224,6 @@ func ModuleAccount(app *fiber.App) {
 
 	app.Get("/api/account/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
 	app.Get("/api/v2/account/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
+	app.Get("/api/account/whoamiv2", commonpresentation.JWTMiddleware(), WhoAmIHandler)
+	app.Get("/api/v2/account/whoamiv2", commonpresentation.JWTMiddleware(), WhoAmIHandler)
 }

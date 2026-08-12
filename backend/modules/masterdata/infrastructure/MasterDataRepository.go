@@ -19,13 +19,30 @@ func NewMasterDataRepository(db *gorm.DB) domain.IMasterDataRepository {
 func (r *MasterDataRepository) GetAllFakultas(ctx context.Context) ([]domain.Fakultas, error) {
 	var list []domain.Fakultas
 	err := r.db.WithContext(ctx).Find(&list).Error
-	return list, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		list[i].ID = list[i].KodeFakultas
+		list[i].Kode = list[i].KodeFakultas
+		list[i].Nama = list[i].NamaFakultas
+	}
+	return list, nil
 }
 
 func (r *MasterDataRepository) GetAllProdi(ctx context.Context) ([]domain.Prodi, error) {
 	var list []domain.Prodi
 	err := r.db.WithContext(ctx).Find(&list).Error
-	return list, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range list {
+		list[i].ID = list[i].KodeProdi
+		list[i].FakultasID = list[i].KodeFakultas
+		list[i].Kode = list[i].KodeProdi
+		list[i].Nama = list[i].NamaProdi
+	}
+	return list, nil
 }
 
 func (r *MasterDataRepository) GetAllJenisCuti(ctx context.Context) ([]domain.JenisCuti, error) {

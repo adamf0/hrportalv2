@@ -7,7 +7,9 @@ import (
 	"hrportal_backend_unpak/modules/masterdata/domain"
 )
 
-type GetAllVerifikatorQuery struct{}
+type GetAllVerifikatorQuery struct {
+	Type string
+}
 
 type GetAllVerifikatorQueryHandler struct {
 	repo domain.IMasterDataRepository
@@ -18,7 +20,7 @@ func NewGetAllVerifikatorQueryHandler(repo domain.IMasterDataRepository) *GetAll
 }
 
 func (h *GetAllVerifikatorQueryHandler) Handle(ctx context.Context, query *GetAllVerifikatorQuery) (common.ResultValue[[]domain.Verifikator], error) {
-	list, err := h.repo.GetVerifikators(ctx)
+	list, err := h.repo.GetVerifikators(ctx, query.Type)
 	if err != nil {
 		return common.FailureValue[[]domain.Verifikator](common.FailureError("MasterData.VerifikatorFailed", err.Error())), nil
 	}
