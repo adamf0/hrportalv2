@@ -75,8 +75,12 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 }
 
 func (r *SimakRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
+	if r == nil || r.dbSimak == nil {
+		return nil, errors.New("database SIMAK connection not available")
+	}
+
 	var simakU struct {
-		Nama  string  `gorm:"column:nama"`
+		Userid string  `gorm:"column:userid"`
 		Email *string `gorm:"column:email"`
 	}
 	err := r.dbSimak.WithContext(ctx).Table("user").Where("userid = ?", sid).First(&simakU).Error
@@ -106,13 +110,14 @@ func (r *SimakRepository) GetInfo(ctx context.Context, sid string) (*domain.User
 	var ePribadi struct {
 		Nip *string `gorm:"column:nip"`
 	}
-	_ = r.dbSimpeg.WithContext(ctx).Table("e_pribadi").Where("nidn = ?", sid).First(&ePribadi)
-
 	var unitKerja string
-	if ePribadi.Nip != nil {
-		_ = r.dbSimpeg.WithContext(ctx).Table("n_pengangkatan").
-			Where("nip = ?", *ePribadi.Nip).
-			Pluck("unit_kerja", &unitKerja)
+	if r.dbSimpeg != nil {
+		_ = r.dbSimpeg.WithContext(ctx).Table("e_pribadi").Where("nidn = ?", sid).First(&ePribadi)
+		if ePribadi.Nip != nil {
+			_ = r.dbSimpeg.WithContext(ctx).Table("n_pengangkatan").
+				Where("nip = ?", *ePribadi.Nip).
+				Pluck("unit_kerja", &unitKerja)
+		}
 	}
 
 	return &domain.UserInfo{

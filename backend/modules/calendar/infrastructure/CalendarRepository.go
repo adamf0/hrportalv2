@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	commonhelper "hrportal_backend/common/helper"
 	attendanceDomain "hrportal_backend/modules/attendance/domain"
 	"hrportal_backend/modules/calendar/domain"
 	izinDomain "hrportal_backend/modules/izin/domain"
@@ -22,7 +23,22 @@ func NewCalendarRepository(db *gorm.DB) domain.ICalendarRepository {
 	return &CalendarRepository{db: db}
 }
 
+func (r *CalendarRepository) getDB() *gorm.DB {
+	if r != nil && r.db != nil {
+		return r.db
+	}
+	if fcmDb := commonhelper.GlobalFcmManager.GetDB(); fcmDb != nil {
+		return fcmDb
+	}
+	return nil
+}
+
 func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, nidn string, startDate string, endDate string) ([]domain.CalendarItem, error) {
+	db := r.getDB()
+	if db == nil {
+		return []domain.CalendarItem{}, nil
+	}
+
 	var (
 		wg      sync.WaitGroup
 		absens  []attendanceDomain.Absen
@@ -38,8 +54,11 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 	// 1. Fetch Absen
 	go func() {
 		defer wg.Done()
+		if db == nil {
+			return
+		}
 		var list []attendanceDomain.Absen
-		query := r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}).Where("absen_masuk IS NOT NULL")
+		query := db.WithContext(ctx).Model(&attendanceDomain.Absen{}).Where("absen_masuk IS NOT NULL")
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal >= ? AND tanggal <= ?", startDate, endDate)
 		}
@@ -59,8 +78,11 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 	// 2. Fetch Izin
 	go func() {
 		defer wg.Done()
+		if db == nil {
+			return
+		}
 		var list []izinDomain.Izin
-		query := r.db.WithContext(ctx).Model(&izinDomain.Izin{})
+		query := db.WithContext(ctx).Model(&izinDomain.Izin{})
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ?", startDate, endDate)
 		}
@@ -80,8 +102,11 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 	// 3. Fetch Cuti (Leave)
 	go func() {
 		defer wg.Done()
+		if db == nil {
+			return
+		}
 		var list []leaveDomain.Cuti
-		query := r.db.WithContext(ctx).Model(&leaveDomain.Cuti{})
+		query := db.WithContext(ctx).Model(&leaveDomain.Cuti{})
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal_mulai >= ? AND tanggal_mulai <= ?", startDate, endDate)
 		}
@@ -101,8 +126,11 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 	// 4. Fetch Sppd
 	go func() {
 		defer wg.Done()
+		if db == nil {
+			return
+		}
 		var list []sppdDomain.Sppd
-		query := r.db.WithContext(ctx).Model(&sppdDomain.Sppd{})
+		query := db.WithContext(ctx).Model(&sppdDomain.Sppd{})
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal_berangkat >= ? AND tanggal_berangkat <= ?", startDate, endDate)
 		}

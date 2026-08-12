@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
 
@@ -17,9 +18,23 @@ func NewAttendanceRepository(db *gorm.DB) domain.IAttendanceRepository {
 	return &AttendanceRepository{db: db}
 }
 
+func (r *AttendanceRepository) getDB() *gorm.DB {
+	if r != nil && r.db != nil {
+		return r.db
+	}
+	if fcmDb := commonhelper.GlobalFcmManager.GetDB(); fcmDb != nil {
+		return fcmDb
+	}
+	return nil
+}
+
 func (r *AttendanceRepository) FindByNipAndTanggal(ctx context.Context, nip string, nidn string, tanggal string) (*domain.Absen, error) {
+	db := r.getDB()
+	if db == nil {
+		return nil, nil
+	}
 	var absen domain.Absen
-	err := r.db.WithContext(ctx).
+	err := db.WithContext(ctx).
 		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, nidn, tanggal).
 		First(&absen).Error
 	if err != nil {
@@ -29,17 +44,29 @@ func (r *AttendanceRepository) FindByNipAndTanggal(ctx context.Context, nip stri
 }
 
 func (r *AttendanceRepository) CreateAbsen(ctx context.Context, absen *domain.Absen) error {
-	return commoninfra.GetTx(ctx, r.db).Create(absen).Error
+	db := r.getDB()
+	if db == nil {
+		return nil
+	}
+	return commoninfra.GetTx(ctx, db).Create(absen).Error
 }
 
 func (r *AttendanceRepository) UpdateAbsen(ctx context.Context, absen *domain.Absen) error {
-	return commoninfra.GetTx(ctx, r.db).Save(absen).Error
+	db := r.getDB()
+	if db == nil {
+		return nil
+	}
+	return commoninfra.GetTx(ctx, db).Save(absen).Error
 }
 
 func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Absen, error) {
+	db := r.getDB()
+	if db == nil {
+		return []domain.Absen{}, nil
+	}
 	var items []domain.Absen
 
-	query := r.db.WithContext(ctx).Model(&domain.Absen{})
+	query := db.WithContext(ctx).Model(&domain.Absen{})
 
 	if nip != "" && nidn != "" {
 		query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
@@ -61,12 +88,20 @@ func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, 
 }
 
 func (r *AttendanceRepository) CreateKlaim(ctx context.Context, klaim *domain.KlaimAbsen) error {
-	return commoninfra.GetTx(ctx, r.db).Create(klaim).Error
+	db := r.getDB()
+	if db == nil {
+		return nil
+	}
+	return commoninfra.GetTx(ctx, db).Create(klaim).Error
 }
 
 func (r *AttendanceRepository) FindByNipAndTanggalUpacara(ctx context.Context, nip string, nidn string, tanggal string) (*domain.AbsenUpacara, error) {
+	db := r.getDB()
+	if db == nil {
+		return nil, nil
+	}
 	var upacara domain.AbsenUpacara
-	err := r.db.WithContext(ctx).
+	err := db.WithContext(ctx).
 		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, nidn, tanggal).
 		First(&upacara).Error
 	if err != nil {
@@ -76,11 +111,19 @@ func (r *AttendanceRepository) FindByNipAndTanggalUpacara(ctx context.Context, n
 }
 
 func (r *AttendanceRepository) CreateAbsenUpacara(ctx context.Context, upacara *domain.AbsenUpacara) error {
-	return commoninfra.GetTx(ctx, r.db).Create(upacara).Error
+	db := r.getDB()
+	if db == nil {
+		return nil
+	}
+	return commoninfra.GetTx(ctx, db).Create(upacara).Error
 }
 
 func (r *AttendanceRepository) DeleteEmptyAbsen(ctx context.Context) (int64, error) {
-	res := r.db.WithContext(ctx).
+	db := r.getDB()
+	if db == nil {
+		return 0, nil
+	}
+	res := db.WithContext(ctx).
 		Where("absen_masuk IS NULL OR TRIM(absen_masuk) = '' OR absen_masuk = '0000-00-00 00:00:00'").
 		Delete(&domain.Absen{})
 	return res.RowsAffected, res.Error

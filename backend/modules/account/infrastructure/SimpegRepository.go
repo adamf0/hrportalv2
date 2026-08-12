@@ -103,6 +103,10 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 }
 
 func (r *SimpegRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
+	if r == nil || r.dbSimpeg == nil {
+		return nil, errors.New("database SIMPEG connection not available")
+	}
+
 	cleanSid := strings.TrimSpace(sid)
 
 	// Query e_pribadi (Dosen)

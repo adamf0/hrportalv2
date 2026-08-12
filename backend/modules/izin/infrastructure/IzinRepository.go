@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/izin/domain"
 
@@ -16,21 +17,47 @@ func NewIzinRepository(db *gorm.DB) domain.IIzinRepository {
 	return &IzinRepository{db: db}
 }
 
+func (r *IzinRepository) getDB() *gorm.DB {
+	if r != nil && r.db != nil {
+		return r.db
+	}
+	if fcmDb := commonhelper.GlobalFcmManager.GetDB(); fcmDb != nil {
+		return fcmDb
+	}
+	return nil
+}
+
 func (r *IzinRepository) Create(ctx context.Context, izin *domain.Izin) error {
-	return commoninfra.GetTx(ctx, r.db).Create(izin).Error
+	db := r.getDB()
+	if db == nil {
+		return nil
+	}
+	return commoninfra.GetTx(ctx, db).Create(izin).Error
 }
 
 func (r *IzinRepository) Update(ctx context.Context, izin *domain.Izin) error {
-	return commoninfra.GetTx(ctx, r.db).Save(izin).Error
+	db := r.getDB()
+	if db == nil {
+		return nil
+	}
+	return commoninfra.GetTx(ctx, db).Save(izin).Error
 }
 
 func (r *IzinRepository) Delete(ctx context.Context, id uint) error {
-	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Izin{}, id).Error
+	db := r.getDB()
+	if db == nil {
+		return nil
+	}
+	return commoninfra.GetTx(ctx, db).Delete(&domain.Izin{}, id).Error
 }
 
 func (r *IzinRepository) GetByID(ctx context.Context, id uint) (*domain.Izin, error) {
+	db := r.getDB()
+	if db == nil {
+		return nil, nil
+	}
 	var izin domain.Izin
-	err := commoninfra.GetTx(ctx, r.db).First(&izin, id).Error
+	err := commoninfra.GetTx(ctx, db).First(&izin, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -38,8 +65,12 @@ func (r *IzinRepository) GetByID(ctx context.Context, id uint) (*domain.Izin, er
 }
 
 func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, verifikasi bool, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Izin, error) {
+	db := r.getDB()
+	if db == nil {
+		return []domain.Izin{}, nil
+	}
 	var izins []domain.Izin
-	query := commoninfra.GetTx(ctx, r.db).Model(&domain.Izin{})
+	query := commoninfra.GetTx(ctx, db).Model(&domain.Izin{})
 
 	if isSdm && tanggal_mulai != nil && tanggal_akhir != nil {
 		query = query.Where("tanggal_pengajuan between ? and ?", tanggal_mulai, tanggal_akhir)
@@ -65,6 +96,9 @@ func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, ve
 		}
 	}
 
-	err := query.Order("created_at desc").Find(&izins).Error
-	return izins, err
+	err := query.Order("tanggal_pengajuan desc").Find(&izins).Error
+	if err != nil {
+		return nil, err
+	}
+	return izins, nil
 }

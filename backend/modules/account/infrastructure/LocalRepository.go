@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
+	commonhelper "hrportal_backend/common/helper"
 	"hrportal_backend/modules/account/domain"
 
 	"golang.org/x/crypto/bcrypt"
@@ -20,13 +21,28 @@ func NewLocalRepository(db *gorm.DB) domain.ILocalRepository {
 	return &LocalRepository{db: db}
 }
 
+func (r *LocalRepository) getDB() *gorm.DB {
+	if r != nil && r.db != nil {
+		return r.db
+	}
+	if fcmDb := commonhelper.GlobalFcmManager.GetDB(); fcmDb != nil {
+		return fcmDb
+	}
+	return nil
+}
+
 func (r *LocalRepository) Authenticate(ctx context.Context, username, password string) (*domain.AuthResult, error) {
+	db := r.getDB()
+	if db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
 	var localUsers []struct {
 		ID       uint   `gorm:"column:id"`
 		Username string `gorm:"column:username"`
 		Password string `gorm:"column:password"`
 	}
-	_ = r.db.WithContext(ctx).Table("users").Where("username = ?", username).Find(&localUsers)
+	_ = db.WithContext(ctx).Table("users").Where("username = ?", username).Find(&localUsers)
 
 	var matchedIDs []uint
 	for _, lu := range localUsers {
@@ -50,6 +66,11 @@ func (r *LocalRepository) Authenticate(ctx context.Context, username, password s
 }
 
 func (r *LocalRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
+	db := r.getDB()
+	if db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
 	id, err := strconv.Atoi(sid)
 	if err != nil {
 		return nil, errors.New("invalid sid format")
@@ -61,7 +82,7 @@ func (r *LocalRepository) GetInfo(ctx context.Context, sid string) (*domain.User
 		Email    string `gorm:"column:email"`
 	}
 
-	err = r.db.WithContext(ctx).Table("users").Where("id = ?", id).First(&u).Error
+	err = db.WithContext(ctx).Table("users").Where("id = ?", id).First(&u).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("data local tidak ditemukan")
