@@ -2,11 +2,13 @@ package infrastructure
 
 import (
 	"context"
+	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	commonhelper "hrportal_backend/common/helper"
 	accountDomain "hrportal_backend/modules/account/domain"
 	attendanceDomain "hrportal_backend/modules/attendance/domain"
 	permissionDomain "hrportal_backend/modules/izin/domain"
@@ -26,8 +28,18 @@ func NewReportRepository(db *gorm.DB) domain.IReportRepository {
 	return &ReportRepository{db: db}
 }
 
+func (r *ReportRepository) getDB() *gorm.DB {
+	if r != nil && r.db != nil {
+		return r.db
+	}
+	if fcmDb := commonhelper.GlobalFcmManager.GetDB(); fcmDb != nil {
+		return fcmDb
+	}
+	return nil
+}
+
 func (r *ReportRepository) GetDB() *gorm.DB {
-	return r.db
+	return r.getDB()
 }
 
 func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, periodeType domain.PeriodeType, periodeKey string) (*domain.RekapLaporanBulanan, error) {
@@ -224,6 +236,15 @@ func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, per
 }
 
 func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai string, tanggalAkhir string, nip string, nidn string) (map[string]interface{}, error) {
+	db := r.getDB()
+	if db == nil {
+		log.Println("[ReportRepository] Error: Database connection is nil in GetAllLaporanAbsen")
+		return map[string]interface{}{
+			"versi_1_calendar": map[string]interface{}{"start": "", "end": "", "list_data": []domain.RekapLaporanBulanan{}},
+			"versi_2_cutoff":   map[string]interface{}{"start": "", "end": "", "list_data": []domain.RekapLaporanBulanan{}},
+		}, nil
+	}
+
 	now := time.Now()
 
 	// 1. Versi 1 (Calendar Month)
@@ -232,7 +253,7 @@ func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai 
 	v1Key := v1Start.Format("2006-01")
 
 	var rekapsV1 []domain.RekapLaporanBulanan
-	q1 := r.db.WithContext(ctx).Model(&domain.RekapLaporanBulanan{}).
+	q1 := db.WithContext(ctx).Model(&domain.RekapLaporanBulanan{}).
 		Where("periode_type = ? AND periode_key = ?", domain.PeriodeCalendar, v1Key)
 	if nip != "" {
 		q1 = q1.Where("nip = ?", nip)
@@ -248,7 +269,7 @@ func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai 
 	v2Key := now.Format("2006-01")
 
 	var rekapsV2 []domain.RekapLaporanBulanan
-	q2 := r.db.WithContext(ctx).Model(&domain.RekapLaporanBulanan{}).
+	q2 := db.WithContext(ctx).Model(&domain.RekapLaporanBulanan{}).
 		Where("periode_type = ? AND periode_key = ?", domain.PeriodeCutoff, v2Key)
 	if nip != "" {
 		q2 = q2.Where("nip = ?", nip)
@@ -273,6 +294,12 @@ func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai 
 }
 
 func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggalMulai string, tanggalAkhir string, nip string, nidn string, userType string) ([]domain.LaporanPenggunaMerged, error) {
+	db := r.getDB()
+	if db == nil {
+		log.Println("[ReportRepository] Error: Database connection is nil in GetLaporanMergedParallel")
+		return []domain.LaporanPenggunaMerged{}, nil
+	}
+
 	if tanggalMulai == "" {
 		tanggalMulai = time.Now().Format("2006-01") + "-01"
 	}
@@ -296,7 +323,10 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	// Query 1: Absen Masuk
 	go func() {
 		defer wg.Done()
-		q := r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}).
+		if db == nil {
+			return
+		}
+		q := db.WithContext(ctx).Model(&attendanceDomain.Absen{}).
 			Where("tanggal >= ? AND tanggal <= ? AND absen_masuk IS NOT NULL", tanggalMulai, tanggalAkhir)
 		if nip != "" {
 			q = q.Where("nip = ?", nip)
@@ -310,7 +340,10 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	// Query 2: Izin
 	go func() {
 		defer wg.Done()
-		q := r.db.WithContext(ctx).Model(&permissionDomain.Izin{}).
+		if db == nil {
+			return
+		}
+		q := db.WithContext(ctx).Model(&permissionDomain.Izin{}).
 			Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalMulai, tanggalAkhir)
 		if nip != "" {
 			q = q.Where("nip = ?", nip)
@@ -324,7 +357,10 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	// Query 3: Cuti
 	go func() {
 		defer wg.Done()
-		q := r.db.WithContext(ctx).Model(&leaveDomain.Cuti{}).
+		if db == nil {
+			return
+		}
+		q := db.WithContext(ctx).Model(&leaveDomain.Cuti{}).
 			Where("tanggal_mulai <= ? AND tanggal_akhir >= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
 		if nip != "" {
 			q = q.Where("nip = ?", nip)
@@ -338,7 +374,10 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	// Query 4: SPPD
 	go func() {
 		defer wg.Done()
-		q := r.db.WithContext(ctx).Model(&sppdDomain.Sppd{}).
+		if db == nil {
+			return
+		}
+		q := db.WithContext(ctx).Model(&sppdDomain.Sppd{}).
 			Where("tanggal_berangkat <= ? AND tanggal_kembali >= ? AND (status IS NULL OR status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
 		if nip != "" {
 			q = q.Where("nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
@@ -352,7 +391,10 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	// Query 5: SPPD Anggota
 	go func() {
 		defer wg.Done()
-		qSa := r.db.WithContext(ctx).Model(&sppdDomain.SppdAnggota{}).
+		if db == nil {
+			return
+		}
+		qSa := db.WithContext(ctx).Model(&sppdDomain.SppdAnggota{}).
 			Joins("JOIN sppd ON sppd.id = sppd_anggota.id_sppd").
 			Where("sppd.tanggal_berangkat <= ? AND sppd.tanggal_kembali >= ? AND (sppd.status IS NULL OR sppd.status NOT IN ('Tolak Atasan', 'Tolak SDM', 'tolak atasan', 'tolak sdm'))", tanggalAkhir, tanggalMulai)
 		if nip != "" {
@@ -367,7 +409,10 @@ func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggal
 	// Query 6: Absen Upacara
 	go func() {
 		defer wg.Done()
-		qu := r.db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{}).
+		if db == nil {
+			return
+		}
+		qu := db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{}).
 			Where("tanggal >= ? AND tanggal <= ?", tanggalMulai, tanggalAkhir)
 		if nip != "" {
 			qu = qu.Where("nip = ?", nip)
