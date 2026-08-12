@@ -171,9 +171,9 @@ func HeaderSecurityMiddleware(cfg *HeaderSecurityConfig) fiber.Handler {
 					return badRequest(c, err)
 				}
 
-				if err := validateHostHeader(name, decoded, cfg); err != nil {
-					return badRequest(c, err)
-				}
+				// if err := validateHostHeader(name, decoded, cfg); err != nil {
+				// 	return badRequest(c, err)
+				// }
 			}
 		}
 

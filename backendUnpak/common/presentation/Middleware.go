@@ -171,9 +171,9 @@ func HeaderSecurityMiddleware(cfg *HeaderSecurityConfig) fiber.Handler {
 					return badRequest(c, err)
 				}
 
-				if err := validateHostHeader(name, decoded, cfg); err != nil {
-					return badRequest(c, err)
-				}
+				// if err := validateHostHeader(name, decoded, cfg); err != nil {
+				// 	return badRequest(c, err)
+				// }
 			}
 		}
 
@@ -266,16 +266,16 @@ func resolveAndCheckIP(host string, timeout time.Duration, blocked []*net.IPNet)
 	return nil
 }
 
-func validateHostHeader(name, decoded string, cfg *HeaderSecurityConfig) error {
-	if strings.ToLower(name) != "host" {
-		return nil
-	}
+// func validateHostHeader(name, decoded string, cfg *HeaderSecurityConfig) error {
+// 	if strings.ToLower(name) != "host" {
+// 		return nil
+// 	}
 
-	if !domainAllowed(decoded, cfg.AllowDomains) {
-		return commoninfra.NewResponseError("common.check[A+8]", "host header spoof: "+decoded)
-	}
-	return nil
-}
+// 	if !domainAllowed(decoded, cfg.AllowDomains) {
+// 		return commoninfra.NewResponseError("common.check[A+8]", "host header spoof: "+decoded)
+// 	}
+// 	return nil
+// }
 
 func validateEmbeddedDomains(c *fiber.Ctx, cfg *HeaderSecurityConfig) error {
 
