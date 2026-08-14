@@ -2,14 +2,18 @@ package CheckIn
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	common "hrportal_backend/common/domain"
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gorm.io/gorm"
 )
 
 type CheckInCommand struct {
@@ -25,9 +29,12 @@ type CheckInCommand struct {
 }
 
 func (c CheckInCommand) Validate() error {
-	return validation.ValidateStruct(&c,
-		validation.Field(&c.Nip, validation.Required),
-	)
+	if strings.TrimSpace(c.Nip) == "" && strings.TrimSpace(c.Nidn) == "" {
+		return validation.Errors{
+			"nip": errors.New("nip or nidn is required"),
+		}
+	}
+	return nil
 }
 
 type CheckInCommandHandler struct {
@@ -46,62 +53,38 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 	}
 
 	now := time.Now()
-	repo := reportInfra.GetReportRepository()
-	if repo != nil {
-		db := repo.GetDB()
-		tx := db.Begin()
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-			}
-		}()
-		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
-
-		if existing == nil {
-			absen := &domain.Absen{
-				Nip:            cmd.Nip,
-				Nidn:           cmd.Nidn,
-				NamaPegawai:    cmd.NamaPegawai,
-				Unit:           cmd.Unit,
-				Fakultas:       cmd.Fakultas,
-				Prodi:          cmd.Prodi,
-				Tanggal:        today,
-				AbsenMasuk:     &now,
-				Note:           cmd.Note,
-				OtomatisKeluar: false,
-				CreatedAt:      &now,
-				UpdatedAt:      &now,
-				IsCreated:      true,
-			}
-			if err := h.attendanceRepo.CreateAbsen(ctxTx, absen); err != nil {
-				tx.Rollback()
-				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
-			}
-			if err := tx.Commit().Error; err != nil {
-				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
-			}
-			return common.SuccessValue(absen), nil
-		}
-
-		existing.AbsenMasuk = &now
-		existing.Note = cmd.Note
-		existing.UpdatedAt = &now
-		existing.IsCreated = false
-		if err := h.attendanceRepo.UpdateAbsen(ctxTx, existing); err != nil {
-			tx.Rollback()
-			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
-		}
-		if err := tx.Commit().Error; err != nil {
-			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
-		}
-		return common.SuccessValue(existing), nil
+	var db *gorm.DB
+	if repo := reportInfra.GetReportRepository(); repo != nil {
+		db = repo.GetDB()
+	}
+	if db == nil {
+		db = commonhelper.GlobalFcmManager.GetDB()
 	}
 
-	// Fallback if report repository is nil (should not happen in production)
+	ctxTx := ctx
+	var tx *gorm.DB
+	if db != nil {
+		tx = db.Begin()
+		if tx != nil && tx.Error == nil {
+			defer func() {
+				if r := recover(); r != nil {
+					tx.Rollback()
+				}
+			}()
+			ctxTx = context.WithValue(ctx, commoninfra.TxKey, tx)
+		} else {
+			tx = nil
+		}
+	}
+
 	if existing == nil {
 		absen := &domain.Absen{
 			Nip:            cmd.Nip,
 			Nidn:           cmd.Nidn,
+			NamaPegawai:    cmd.NamaPegawai,
+			Unit:           cmd.Unit,
+			Fakultas:       cmd.Fakultas,
+			Prodi:          cmd.Prodi,
 			Tanggal:        today,
 			AbsenMasuk:     &now,
 			Note:           cmd.Note,
@@ -110,17 +93,34 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 			UpdatedAt:      &now,
 			IsCreated:      true,
 		}
-		if err := h.attendanceRepo.CreateAbsen(ctx, absen); err != nil {
+		if err := h.attendanceRepo.CreateAbsen(ctxTx, absen); err != nil {
+			if tx != nil {
+				tx.Rollback()
+			}
 			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+		}
+		if tx != nil {
+			if err := tx.Commit().Error; err != nil {
+				return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+			}
 		}
 		return common.SuccessValue(absen), nil
 	}
 
 	existing.AbsenMasuk = &now
+	existing.Note = cmd.Note
 	existing.UpdatedAt = &now
 	existing.IsCreated = false
-	if err := h.attendanceRepo.UpdateAbsen(ctx, existing); err != nil {
+	if err := h.attendanceRepo.UpdateAbsen(ctxTx, existing); err != nil {
+		if tx != nil {
+			tx.Rollback()
+		}
 		return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+	}
+	if tx != nil {
+		if err := tx.Commit().Error; err != nil {
+			return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+		}
 	}
 	return common.SuccessValue(existing), nil
 }

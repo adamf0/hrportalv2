@@ -5,12 +5,13 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
-	"hrportal_backend/common/infrastructure"
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gorm.io/gorm"
 )
 
 type SppdAnggotaInput struct {
@@ -71,13 +72,9 @@ func NewUpdateSppdCommandHandler(sppdRepo domain.ISppdRepository) *UpdateSppdCom
 }
 
 func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCommand) (common.ResultValue[*domain.Sppd], error) {
-	if err := cmd.Validate(); err != nil {
-		return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.InvalidInput", err.Error())), nil
-	}
-
 	sppd, err := h.sppdRepo.FindByID(ctx, cmd.ID)
 	if err != nil {
-		return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
+		return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.NotFound", "SPPD tidak ditemukan")), nil
 	}
 
 	now := time.Now()
@@ -102,23 +99,18 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	if cmd.Tujuan != "" {
 		sppd.Tujuan = cmd.Tujuan
 	}
-	if cmd.JenisSppdID > 0 {
+	if cmd.JenisSppdID != 0 {
 		sppd.JenisSppdID = cmd.JenisSppdID
 	}
 	if cmd.TanggalBerangkat != "" {
 		sppd.TanggalBerangkat = common.FormatDateOnly(cmd.TanggalBerangkat)
-	} else {
-		sppd.TanggalBerangkat = common.FormatDateOnly(sppd.TanggalBerangkat)
 	}
 	if cmd.TanggalKembali != "" {
 		sppd.TanggalKembali = common.FormatDateOnly(cmd.TanggalKembali)
-	} else {
-		sppd.TanggalKembali = common.FormatDateOnly(sppd.TanggalKembali)
 	}
 	if cmd.Keterangan != "" {
 		sppd.Keterangan = cmd.Keterangan
 	}
-
 	if cmd.SaranaTransportasi != nil {
 		sppd.SaranaTransportasi = cmd.SaranaTransportasi
 	}
@@ -154,29 +146,22 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	}
 	sppd.UpdatedAt = &now
 
-	// Map Anggota
 	var dbAnggota []domain.SppdAnggota
 	for _, a := range cmd.Anggota {
-		nama := a.Nama
-		unit := a.Unit
-		fakultas := a.Fakultas
-		prodi := a.Prodi
-
 		dbAnggota = append(dbAnggota, domain.SppdAnggota{
 			SppdID:    sppd.ID,
 			Nip:       a.Nip,
 			Nidn:      a.Nidn,
-			Nama:      nama,
-			Unit:      unit,
-			Fakultas:  fakultas,
-			Prodi:     prodi,
+			Nama:      a.Nama,
+			Unit:      a.Unit,
+			Fakultas:  a.Fakultas,
+			Prodi:     a.Prodi,
 			CreatedAt: &now,
 			UpdatedAt: &now,
 		})
 	}
 	sppd.Anggota = dbAnggota
 
-	// Map Files
 	var dbFiles []domain.SppdFileLaporan
 	for _, f := range cmd.Files {
 		dbFiles = append(dbFiles, domain.SppdFileLaporan{
@@ -189,28 +174,40 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	}
 	sppd.Files = dbFiles
 
-	repo := reportInfra.GetReportRepository()
-	if repo != nil {
-		db := repo.GetDB()
-		tx := db.Begin()
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-			}
-		}()
-		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+	var db *gorm.DB
+	if repo := reportInfra.GetReportRepository(); repo != nil {
+		db = repo.GetDB()
+	}
+	if db == nil {
+		db = commonhelper.GlobalFcmManager.GetDB()
+	}
 
-		if err := h.sppdRepo.UpdateSppd(ctxTx, sppd); err != nil {
-			tx.Rollback()
-			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed", err.Error())), nil
+	ctxTx := ctx
+	var tx *gorm.DB
+	if db != nil {
+		tx = db.Begin()
+		if tx != nil && tx.Error == nil {
+			defer func() {
+				if r := recover(); r != nil {
+					tx.Rollback()
+				}
+			}()
+			ctxTx = context.WithValue(ctx, commoninfra.TxKey, tx)
+		} else {
+			tx = nil
 		}
+	}
 
+	if err := h.sppdRepo.UpdateSppd(ctxTx, sppd); err != nil {
+		if tx != nil {
+			tx.Rollback()
+		}
+		return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed", err.Error())), nil
+	}
+
+	if tx != nil {
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.CommitFailed", err.Error())), nil
-		}
-	} else {
-		if err := h.sppdRepo.UpdateSppd(ctx, sppd); err != nil {
-			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.UpdateFailed", err.Error())), nil
 		}
 	}
 
@@ -218,7 +215,7 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 }
 
 func init() {
-	infrastructure.RegisterValidation(func(cmd UpdateSppdCommand) error {
+	commoninfra.RegisterValidation(func(cmd UpdateSppdCommand) error {
 		return cmd.Validate()
 	}, "Sppd.UpdateSppd.Validation")
 }

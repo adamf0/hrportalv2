@@ -3,12 +3,14 @@ package UpdateIzin
 import (
 	"context"
 	common "hrportal_backend/common/domain"
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/izin/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gorm.io/gorm"
 )
 
 type UpdateIzinCommand struct {
@@ -47,7 +49,7 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 
 	izin, err := h.Repo.GetByID(ctx, cmd.ID)
 	if err != nil {
-		return common.FailureValue[*domain.Izin](domain.EmptyData()), nil
+		return common.FailureValue[*domain.Izin](common.FailureError("Izin.NotFound", "Izin tidak ditemukan")), nil
 	}
 
 	now := time.Now()
@@ -63,11 +65,11 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	if cmd.Prodi != "" {
 		izin.Prodi = cmd.Prodi
 	}
-	if cmd.JenisIzinID > 0 {
+	if cmd.JenisIzinID != 0 {
 		izin.JenisIzinID = int(cmd.JenisIzinID)
 	}
 	if cmd.TanggalPengajuan != "" {
-		izin.TanggalPengajuan = cmd.TanggalPengajuan
+		izin.TanggalPengajuan = common.FormatDateOnly(cmd.TanggalPengajuan)
 	}
 	if cmd.Tujuan != "" {
 		izin.Tujuan = cmd.Tujuan
@@ -83,28 +85,40 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	}
 	izin.UpdatedAt = &now
 
-	repo := reportInfra.GetReportRepository()
-	if repo != nil {
-		db := repo.GetDB()
-		tx := db.Begin()
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-			}
-		}()
-		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+	var db *gorm.DB
+	if repo := reportInfra.GetReportRepository(); repo != nil {
+		db = repo.GetDB()
+	}
+	if db == nil {
+		db = commonhelper.GlobalFcmManager.GetDB()
+	}
 
-		if err := h.Repo.Update(ctxTx, izin); err != nil {
-			tx.Rollback()
-			return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed", err.Error())), nil
+	ctxTx := ctx
+	var tx *gorm.DB
+	if db != nil {
+		tx = db.Begin()
+		if tx != nil && tx.Error == nil {
+			defer func() {
+				if r := recover(); r != nil {
+					tx.Rollback()
+				}
+			}()
+			ctxTx = context.WithValue(ctx, commoninfra.TxKey, tx)
+		} else {
+			tx = nil
 		}
+	}
 
+	if err := h.Repo.Update(ctxTx, izin); err != nil {
+		if tx != nil {
+			tx.Rollback()
+		}
+		return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed", err.Error())), nil
+	}
+
+	if tx != nil {
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Izin](common.FailureError("Izin.CommitFailed", err.Error())), nil
-		}
-	} else {
-		if err := h.Repo.Update(ctx, izin); err != nil {
-			return common.FailureValue[*domain.Izin](common.FailureError("Izin.UpdateFailed", err.Error())), nil
 		}
 	}
 

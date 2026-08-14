@@ -3,12 +3,14 @@ package UpdateCuti
 import (
 	"context"
 	common "hrportal_backend/common/domain"
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/leave/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gorm.io/gorm"
 )
 
 type UpdateCutiCommand struct {
@@ -43,13 +45,9 @@ func NewUpdateCutiCommandHandler(leaveRepo domain.ILeaveRepository) *UpdateCutiC
 }
 
 func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCommand) (common.ResultValue[*domain.Cuti], error) {
-	if err := cmd.Validate(); err != nil {
-		return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.InvalidInput", err.Error())), nil
-	}
-
 	cuti, err := h.leaveRepo.FindByID(ctx, cmd.ID)
 	if err != nil {
-		return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), nil
+		return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.NotFound", "Cuti tidak ditemukan")), nil
 	}
 
 	now := time.Now()
@@ -65,18 +63,14 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 	if cmd.Prodi != "" {
 		cuti.Prodi = cmd.Prodi
 	}
-	if cmd.JenisCutiID > 0 {
+	if cmd.JenisCutiID != 0 {
 		cuti.JenisCutiID = cmd.JenisCutiID
 	}
 	if cmd.TanggalMulai != "" {
 		cuti.TanggalMulai = common.FormatDateOnly(cmd.TanggalMulai)
-	} else {
-		cuti.TanggalMulai = common.FormatDateOnly(cuti.TanggalMulai)
 	}
 	if cmd.TanggalSelesai != "" {
 		cuti.TanggalSelesai = common.FormatDateOnly(cmd.TanggalSelesai)
-	} else {
-		cuti.TanggalSelesai = common.FormatDateOnly(cuti.TanggalSelesai)
 	}
 	if cmd.JumlahHari > 0 {
 		cuti.JumlahHari = cmd.JumlahHari
@@ -95,28 +89,40 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 	}
 	cuti.UpdatedAt = &now
 
-	repo := reportInfra.GetReportRepository()
-	if repo != nil {
-		db := repo.GetDB()
-		tx := db.Begin()
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-			}
-		}()
-		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+	var db *gorm.DB
+	if repo := reportInfra.GetReportRepository(); repo != nil {
+		db = repo.GetDB()
+	}
+	if db == nil {
+		db = commonhelper.GlobalFcmManager.GetDB()
+	}
 
-		if err := h.leaveRepo.UpdateCuti(ctxTx, cuti); err != nil {
-			tx.Rollback()
-			return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed", err.Error())), nil
+	ctxTx := ctx
+	var tx *gorm.DB
+	if db != nil {
+		tx = db.Begin()
+		if tx != nil && tx.Error == nil {
+			defer func() {
+				if r := recover(); r != nil {
+					tx.Rollback()
+				}
+			}()
+			ctxTx = context.WithValue(ctx, commoninfra.TxKey, tx)
+		} else {
+			tx = nil
 		}
+	}
 
+	if err := h.leaveRepo.UpdateCuti(ctxTx, cuti); err != nil {
+		if tx != nil {
+			tx.Rollback()
+		}
+		return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed", err.Error())), nil
+	}
+
+	if tx != nil {
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.CommitFailed", err.Error())), nil
-		}
-	} else {
-		if err := h.leaveRepo.UpdateCuti(ctx, cuti); err != nil {
-			return common.FailureValue[*domain.Cuti](common.FailureError("Cuti.UpdateFailed", err.Error())), nil
 		}
 	}
 

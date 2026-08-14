@@ -5,11 +5,13 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/leave/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"gorm.io/gorm"
 )
 
 type SubmitCutiCommand struct {
@@ -67,32 +69,41 @@ func (h *SubmitCutiCommandHandler) Handle(ctx context.Context, cmd *SubmitCutiCo
 		UpdatedAt:      &now,
 	}
 
-	repo := reportInfra.GetReportRepository()
-	if repo != nil {
-		db := repo.GetDB()
-		tx := db.Begin()
-		defer func() {
-			if r := recover(); r != nil {
-				tx.Rollback()
-			}
-		}()
-		ctxTx := context.WithValue(ctx, commoninfra.TxKey, tx)
+	var db *gorm.DB
+	if repo := reportInfra.GetReportRepository(); repo != nil {
+		db = repo.GetDB()
+	}
+	if db == nil {
+		db = commonhelper.GlobalFcmManager.GetDB()
+	}
 
-		if err := h.leaveRepo.CreateCuti(ctxTx, cuti); err != nil {
-			tx.Rollback()
-			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
+	ctxTx := ctx
+	var tx *gorm.DB
+	if db != nil {
+		tx = db.Begin()
+		if tx != nil && tx.Error == nil {
+			defer func() {
+				if r := recover(); r != nil {
+					tx.Rollback()
+				}
+			}()
+			ctxTx = context.WithValue(ctx, commoninfra.TxKey, tx)
+		} else {
+			tx = nil
 		}
+	}
 
+	if err := h.leaveRepo.CreateCuti(ctxTx, cuti); err != nil {
+		if tx != nil {
+			tx.Rollback()
+		}
+		return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
+	}
+
+	if tx != nil {
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
 		}
-
-		return common.SuccessValue(cuti), nil
-	}
-
-	// Fallback if report repository is nil (should not happen in production)
-	if err := h.leaveRepo.CreateCuti(ctx, cuti); err != nil {
-		return common.FailureValue[*domain.Cuti](domain.LeaveNotFound()), err
 	}
 
 	return common.SuccessValue(cuti), nil

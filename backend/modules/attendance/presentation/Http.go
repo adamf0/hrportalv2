@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"strconv"
+	"strings"
 	"time"
 
 	common "hrportal_backend/common/domain"
@@ -170,9 +171,17 @@ func ModuleAttendance(app *fiber.App) {
 		lat, _ := strconv.ParseFloat(c.FormValue("latitude"), 64)
 		lon, _ := strconv.ParseFloat(c.FormValue("longitude"), 64)
 
+		nip := strings.TrimSpace(c.FormValue("nip"))
+		nidn := strings.TrimSpace(c.FormValue("nidn"))
+		if nip == "" && nidn != "" {
+			nip = nidn
+		} else if nidn == "" && nip != "" {
+			nidn = nip
+		}
+
 		command := CheckIn.CheckInCommand{
-			Nip:         c.FormValue("nip"),
-			Nidn:        c.FormValue("nidn"),
+			Nip:         nip,
+			Nidn:        nidn,
 			NamaPegawai: c.FormValue("nama"),
 			Unit:        c.FormValue("unit"),
 			Fakultas:    c.FormValue("fakultas"),
@@ -194,13 +203,22 @@ func ModuleAttendance(app *fiber.App) {
 		// Trigger FCM Notification & WebSocket Broadcast for Check-In Success (Only when CREATED, not updated)
 		if res.Value != nil && res.Value.IsCreated {
 			absenData := res.Value
-			helper.GlobalFcmManager.DispatchNotification(
-				[]string{absenData.Nip},
-				"Presensi Otomatis Berhasil",
-				"Sistem sudah melakukan absensi otomatis",
-				"attendance",
-				map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
-			)
+			targetNips := []string{}
+			if absenData.Nip != "" {
+				targetNips = append(targetNips, absenData.Nip)
+			}
+			if absenData.Nidn != "" && absenData.Nidn != absenData.Nip {
+				targetNips = append(targetNips, absenData.Nidn)
+			}
+			if len(targetNips) > 0 {
+				helper.GlobalFcmManager.DispatchNotification(
+					targetNips,
+					"Presensi Otomatis Berhasil",
+					"Sistem sudah melakukan absensi otomatis",
+					"attendance",
+					map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
+				)
+			}
 
 			masukStr := ""
 			if absenData.AbsenMasuk != nil {
@@ -219,9 +237,17 @@ func ModuleAttendance(app *fiber.App) {
 	})
 
 	group.Post("/check-out", func(c *fiber.Ctx) error {
+		nip := strings.TrimSpace(c.FormValue("nip"))
+		nidn := strings.TrimSpace(c.FormValue("nidn"))
+		if nip == "" && nidn != "" {
+			nip = nidn
+		} else if nidn == "" && nip != "" {
+			nidn = nip
+		}
+
 		command := CheckOut.CheckOutCommand{
-			Nip:  c.FormValue("nip"),
-			Nidn: c.FormValue("nidn"),
+			Nip:  nip,
+			Nidn: nidn,
 		}
 
 		res, err := mediatr.Send[*CheckOut.CheckOutCommand, common.ResultValue[*domain.Absen]](c.UserContext(), &command)
@@ -236,13 +262,22 @@ func ModuleAttendance(app *fiber.App) {
 		// Trigger FCM Notification & WebSocket Broadcast for Check-Out Success (Only when CREATED, not updated)
 		if res.Value != nil && res.Value.IsCreated {
 			absenData := res.Value
-			helper.GlobalFcmManager.DispatchNotification(
-				[]string{absenData.Nip},
-				"Presensi Pulang Berhasil",
-				"Sistem sudah mencatat jam pulang presensi Anda.",
-				"attendance",
-				map[string]string{"type": "check-out", "id": strconv.Itoa(int(absenData.ID))},
-			)
+			targetNips := []string{}
+			if absenData.Nip != "" {
+				targetNips = append(targetNips, absenData.Nip)
+			}
+			if absenData.Nidn != "" && absenData.Nidn != absenData.Nip {
+				targetNips = append(targetNips, absenData.Nidn)
+			}
+			if len(targetNips) > 0 {
+				helper.GlobalFcmManager.DispatchNotification(
+					targetNips,
+					"Presensi Keluar Berhasil",
+					"Sistem sudah mencatat absen keluar Anda",
+					"attendance",
+					map[string]string{"type": "check-out", "id": strconv.Itoa(int(absenData.ID))},
+				)
+			}
 
 			keluarStr := ""
 			if absenData.AbsenKeluar != nil {
