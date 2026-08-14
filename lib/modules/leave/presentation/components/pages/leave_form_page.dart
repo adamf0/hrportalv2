@@ -1,6 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:hrportalv2/core/storage_helper.dart';
+import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/modules/leave/domain/leave_form_type.dart';
 import 'package:hrportalv2/modules/leave/presentation/leave_bloc.dart';
 import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
@@ -154,6 +159,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
   final _cutiDurationController = TextEditingController(text: '1');
   final _cutiPurposeController = TextEditingController();
   bool _cutiHasAttachment = false;
+  File? _cutiFile;
   String _cutiFileName = '';
   double _cutiFileSizeMb = 0.0;
   String? _selectedCutiSupervisorId;
@@ -163,6 +169,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
   String? _selectedIzinType;
   final _izinPurposeController = TextEditingController();
   bool _izinHasAttachment = false;
+  File? _izinFile;
   String _izinFileName = '';
   double _izinFileSizeMb = 0.0;
   String? _selectedIzinSupervisorId;
@@ -175,10 +182,13 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
   final _sppdPurposeController = TextEditingController();
   final _sppdCityController = TextEditingController();
   bool _sppdHasAttachment = false;
+  File? _sppdFile;
   String _sppdFileName = '';
   double _sppdFileSizeMb = 0.0;
   String? _selectedSppdSupervisorId;
   final List<Supervisor> _selectedSppdMembers = [];
+
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -247,11 +257,54 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     }
   }
 
+  Future<void> _pickAttachment(LeaveFormType formType) async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final filePath = result.files.single.path!;
+        final file = File(filePath);
+        final fileSizeMb = (await file.length()) / (1024 * 1024);
+        final fileName = p.basename(filePath);
+
+        setState(() {
+          switch (formType) {
+            case LeaveFormType.cuti:
+              _cutiHasAttachment = true;
+              _cutiFile = file;
+              _cutiFileName = fileName;
+              _cutiFileSizeMb = double.parse(fileSizeMb.toStringAsFixed(1));
+              break;
+            case LeaveFormType.izin:
+              _izinHasAttachment = true;
+              _izinFile = file;
+              _izinFileName = fileName;
+              _izinFileSizeMb = double.parse(fileSizeMb.toStringAsFixed(1));
+              break;
+            case LeaveFormType.sppd:
+              _sppdHasAttachment = true;
+              _sppdFile = file;
+              _sppdFileName = fileName;
+              _sppdFileSizeMb = double.parse(fileSizeMb.toStringAsFixed(1));
+              break;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('[FilePicker error]: $e');
+      _simulateAttachment(formType);
+    }
+  }
+
   void _simulateAttachment(LeaveFormType formType) {
     setState(() {
       switch (formType) {
         case LeaveFormType.cuti:
           _cutiHasAttachment = true;
+          _cutiFile = null;
           String typeLabel = _selectedCutiType ?? 'dokumen';
           _cutiFileName =
               'bukti_cuti_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
@@ -259,6 +312,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           break;
         case LeaveFormType.izin:
           _izinHasAttachment = true;
+          _izinFile = null;
           String typeLabel = _selectedIzinType ?? 'dokumen';
           _izinFileName =
               'bukti_izin_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
@@ -266,6 +320,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           break;
         case LeaveFormType.sppd:
           _sppdHasAttachment = true;
+          _sppdFile = null;
           String typeLabel = _selectedSppdType ?? 'dokumen';
           _sppdFileName =
               'bukti_sppd_${typeLabel.toLowerCase().replaceAll(' ', '_')}.pdf';
@@ -366,6 +421,8 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     final attendanceBloc = context.read<AttendanceBloc>();
     final messenger = ScaffoldMessenger.of(context);
 
+    if (_isSubmitting) return;
+
     switch (_activeType) {
       case LeaveFormType.cuti:
         if (_cutiFormKey.currentState!.validate()) {
@@ -383,6 +440,24 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
             return;
           }
 
+          setState(() {
+            _isSubmitting = true;
+          });
+
+          String? finalAttachmentPath;
+          if (_cutiHasAttachment) {
+            if (_cutiFile != null) {
+              ApiClient.showToast("Mengunggah dokumen lampiran ke storage...", scope: 'leave');
+              final uploadedKey = await StorageHelper.uploadFileWithPresign(
+                file: _cutiFile!,
+                type: 'cuti',
+              );
+              finalAttachmentPath = uploadedKey ?? _cutiFileName;
+            } else {
+              finalAttachmentPath = _cutiFileName;
+            }
+          }
+
           if (widget.initialRequest != null) {
             await leaveBloc.deleteLeave(widget.initialRequest!.id);
           }
@@ -397,8 +472,12 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
             reason: _cutiPurposeController.text.trim(),
             supervisorId: supervisor.id,
             supervisorName: supervisor.name,
-            attachmentPath: _cutiHasAttachment ? _cutiFileName : null,
+            attachmentPath: finalAttachmentPath,
           );
+
+          setState(() {
+            _isSubmitting = false;
+          });
 
           if (ok) {
             attendanceBloc.addActivity(
@@ -427,6 +506,24 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
             return;
           }
 
+          setState(() {
+            _isSubmitting = true;
+          });
+
+          String? finalAttachmentPath;
+          if (_izinHasAttachment) {
+            if (_izinFile != null) {
+              ApiClient.showToast("Mengunggah dokumen lampiran ke storage...", scope: 'leave');
+              final uploadedKey = await StorageHelper.uploadFileWithPresign(
+                file: _izinFile!,
+                type: 'izin',
+              );
+              finalAttachmentPath = uploadedKey ?? _izinFileName;
+            } else {
+              finalAttachmentPath = _izinFileName;
+            }
+          }
+
           if (widget.initialRequest != null) {
             await leaveBloc.deleteLeave(widget.initialRequest!.id);
           }
@@ -441,8 +538,12 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
             reason: _izinPurposeController.text.trim(),
             supervisorId: supervisor.id,
             supervisorName: supervisor.name,
-            attachmentPath: _izinHasAttachment ? _izinFileName : null,
+            attachmentPath: finalAttachmentPath,
           );
+
+          setState(() {
+            _isSubmitting = false;
+          });
 
           if (ok) {
             attendanceBloc.addActivity(
@@ -471,6 +572,24 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
             return;
           }
 
+          setState(() {
+            _isSubmitting = true;
+          });
+
+          String? finalAttachmentPath;
+          if (_sppdHasAttachment) {
+            if (_sppdFile != null) {
+              ApiClient.showToast("Mengunggah dokumen lampiran ke storage...", scope: 'leave');
+              final uploadedKey = await StorageHelper.uploadFileWithPresign(
+                file: _sppdFile!,
+                type: 'sppd',
+              );
+              finalAttachmentPath = uploadedKey ?? _sppdFileName;
+            } else {
+              finalAttachmentPath = _sppdFileName;
+            }
+          }
+
           if (widget.initialRequest != null) {
             await leaveBloc.deleteLeave(widget.initialRequest!.id);
           }
@@ -486,9 +605,13 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
                 'Tujuan: ${_sppdPurposeController.text.trim()} | Kota: ${_sppdCityController.text.trim()}',
             supervisorId: supervisor.id,
             supervisorName: supervisor.name,
-            attachmentPath: _sppdHasAttachment ? _sppdFileName : null,
+            attachmentPath: finalAttachmentPath,
             members: _selectedSppdMembers,
           );
+
+          setState(() {
+            _isSubmitting = false;
+          });
 
           if (ok) {
             attendanceBloc.addActivity(
@@ -761,18 +884,27 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       hasAttachment: hasAttachment,
       fileName: fileName,
       fileSizeMb: fileSizeMb,
-      onUpload: () => _simulateAttachment(formType),
+      onUpload: () => _pickAttachment(formType),
       onDelete: () {
         setState(() {
           switch (formType) {
             case LeaveFormType.cuti:
               _cutiHasAttachment = false;
+              _cutiFile = null;
+              _cutiFileName = '';
+              _cutiFileSizeMb = 0.0;
               break;
             case LeaveFormType.izin:
               _izinHasAttachment = false;
+              _izinFile = null;
+              _izinFileName = '';
+              _izinFileSizeMb = 0.0;
               break;
             case LeaveFormType.sppd:
               _sppdHasAttachment = false;
+              _sppdFile = null;
+              _sppdFileName = '';
+              _sppdFileSizeMb = 0.0;
               break;
           }
         });

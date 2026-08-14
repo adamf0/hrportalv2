@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hrportalv2/modules/leave/domain/leave.dart';
 import 'package:hrportalv2/modules/leave/domain/leave_status.dart';
+import 'package:hrportalv2/core/storage_helper.dart';
 
 class RequestCard extends StatelessWidget {
   final LeaveRequest req;
@@ -267,6 +268,52 @@ class RequestCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ],
+
+                  if (req.attachmentPath != null && req.attachmentPath!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: () {
+                        final typeLower = req.type.toLowerCase();
+                        final storageType = typeLower.contains('sppd')
+                            ? 'sppd'
+                            : (typeLower.contains('izin') ? 'izin' : 'cuti');
+                        StorageHelper.openPrivateAttachment(
+                          context: context,
+                          type: storageType,
+                          objectKey: req.attachmentPath!,
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.blue[200]!),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.attachment_rounded, size: 16, color: Colors.blue[800]),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Buka Lampiran Dokumen (${req.attachmentPath!.split('/').last})',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue[900],
+                                  decoration: TextDecoration.underline,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ],

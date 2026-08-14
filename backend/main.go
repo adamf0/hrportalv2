@@ -53,6 +53,7 @@ import (
 	holidayPresentation "hrportal_backend/modules/holiday/presentation"
 
 	notificationPresentation "hrportal_backend/modules/notification/presentation"
+	storagePresentation "hrportal_backend/modules/storage/presentation"
 )
 
 var startupErrors []fiber.Map
@@ -295,6 +296,7 @@ func main() {
 	reportPresentation.ModuleReport(app)
 	holidayPresentation.ModuleHoliday(app, db)
 	notificationPresentation.ModuleNotification(app)
+	storagePresentation.ModuleStorage(app)
 
 	// WebSocket Real-time Feed for SDM Dashboard (Live Izin, Cuti, SPPD updates)
 	app.Get("/ws/sdm", websocket.New(func(c *websocket.Conn) {
