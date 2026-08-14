@@ -355,9 +355,11 @@ export const ReportPage = () => {
           if (res.status === 'completed') {
             clearInterval(interval);
             setIsExporting(false);
-            showToast('File Excel selesai dibuat, mulai mengunduh...', 'success');
-            const downloadUrl = `/api/laporan/export/download/${taskId}`;
-            window.open(downloadUrl, '_blank');
+            showToast('File laporan selesai dibuat, mengunduh...', 'success');
+            const { startStr, endStr } = getPeriodDates();
+            const filename = `Laporan_Presensi_${startStr}_sd_${endStr}.csv`;
+            await apiClient.downloadBlob(`/api/laporan/export/download/${taskId}`, filename);
+            showToast('File Laporan Presensi berhasil diunduh!', 'success');
           } else if (res.status === 'failed') {
             clearInterval(interval);
             setIsExporting(false);
@@ -367,6 +369,7 @@ export const ReportPage = () => {
       } catch (e) {
         clearInterval(interval);
         setIsExporting(false);
+        showToast(e.message || 'Gagal mengunduh file laporan', 'error');
       }
     }, 2000);
   };
