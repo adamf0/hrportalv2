@@ -151,7 +151,7 @@ export const AuthProvider = ({ children }) => {
 
   const loginRegular = async (usernameInput, passwordInput) => {
     try {
-      const res = await apiClient.post('/api/v2/account/login', {
+      const res = await apiClient.postForm('/api/v2/account/login', {
         username: usernameInput,
         password: passwordInput,
       });

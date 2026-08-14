@@ -97,7 +97,7 @@ export const MasterLiburPage = () => {
     }
 
     try {
-      await apiClient.post('/api/holiday', {
+      await apiClient.postForm('/api/holiday', {
         nama: formData.nama.trim(),
         tanggal: formData.tanggal,
         type: formData.type,
@@ -116,7 +116,7 @@ export const MasterLiburPage = () => {
     if (!selectedHoliday) return;
 
     try {
-      await apiClient.put(`/api/holiday/${selectedHoliday.id}`, {
+      await apiClient.putForm(`/api/holiday/${selectedHoliday.id}`, {
         nama: formData.nama.trim(),
         tanggal: formData.tanggal,
         type: formData.type,
