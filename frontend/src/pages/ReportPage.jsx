@@ -271,29 +271,97 @@ export const ReportPage = () => {
     });
   }, [rawEmployees, searchQuery, selectedFakultas, selectedProdi, selectedUnit]);
 
-  const handleExportExcel = async () => {
+  const handleExportExcel = () => {
     if (mainReportTab === 'presensi') {
-      const { startStr, endStr } = getPeriodDates();
-      setIsExporting(true);
-      setExportProgress(10);
-      try {
-        const res = await apiClient.get('/api/laporan/export/request', {
-          tanggal_mulai: startStr,
-          tanggal_akhir: endStr,
-        });
-
-        if (res && res.task_id) {
-          showToast('Proses export Excel dimulai...', 'info');
-          pollExportTask(res.task_id);
-        } else {
-          throw new Error('Gagal membuat tugas export');
-        }
-      } catch (err) {
-        setIsExporting(false);
-        showToast(err.message || 'Gagal memproses export Excel', 'error');
-      }
+      exportPresensiCSV();
     } else {
       exportCeremonyYearlyCSV();
+    }
+  };
+
+  const exportPresensiCSV = () => {
+    try {
+      const dates = getDatesList();
+      const monthName = BULAN_LIST.find((b) => b.value === selectedMonth)?.name || selectedMonth;
+      const periodLabel = periodType === 'calendar' ? 'Bulan_Penuh' : 'Cutoff_Payroll';
+
+      const dateHeaders = dates.map((d) => {
+        const day = d.getDate();
+        const m = d.getMonth() + 1;
+        return `${day}/${m}`;
+      });
+
+      const headers = [
+        'No',
+        'NIP',
+        'Nama Pegawai',
+        'Unit Kerja',
+        'Fakultas',
+        'Prodi',
+        'Total Hadir',
+        ...dateHeaders,
+      ];
+
+      const rows = filteredEmployees.map((item, idx) => {
+        const p = item.pengguna || {};
+        const nip = p.nip || item.kode || '';
+        const nama = p.nama || `Pegawai ${nip}`;
+        const unit = p.unit_kerja || p.unit || '';
+        const fak = p.fakultas || '';
+        const prd = p.prodi || '';
+        const records = item.records || [];
+
+        const totalHadir = records.filter((r) => r.type === 'absen' && r.info?.masuk).length;
+
+        const dayValues = dates.map((d) => {
+          const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          const isSunday = d.getDay() === 0;
+          const isHoliday = holidays.has(dKey);
+
+          const rec = getRecordForDate(records, dKey);
+          if (rec) {
+            if (rec.type === 'absen') {
+              return `"${formatJamMasuk(rec.info?.masuk) || 'Hadir'}"`;
+            } else if (rec.type === 'izin') {
+              return '"Izin"';
+            } else if (rec.type === 'cuti') {
+              return '"Cuti"';
+            } else if (rec.type === 'sppd') {
+              return '"SPPD"';
+            }
+          }
+
+          if (isSunday || isHoliday) {
+            return '"Libur"';
+          }
+
+          return '"-"';
+        });
+
+        return [
+          idx + 1,
+          `"${nip}"`,
+          `"${nama.replace(/"/g, '""')}"`,
+          `"${unit.replace(/"/g, '""')}"`,
+          `"${fak.replace(/"/g, '""')}"`,
+          `"${prd.replace(/"/g, '""')}"`,
+          totalHadir,
+          ...dayValues,
+        ].join(',');
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Laporan_Presensi_${monthName}_${selectedYear}_${periodLabel}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast(`File Laporan Presensi ${monthName} ${selectedYear} berhasil diunduh!`, 'success');
+    } catch (e) {
+      console.error(e);
+      showToast('Gagal mengunduh file laporan presensi', 'error');
     }
   };
 
@@ -323,16 +391,16 @@ export const ReportPage = () => {
         return [
           idx + 1,
           `"${nip}"`,
-          `"${nama}"`,
-          `"${unit}"`,
-          `"${fak}"`,
-          `"${prd}"`,
+          `"${nama.replace(/"/g, '""')}"`,
+          `"${unit.replace(/"/g, '""')}"`,
+          `"${fak.replace(/"/g, '""')}"`,
+          `"${prd.replace(/"/g, '""')}"`,
           totalUpacara,
           ...monthCounts,
         ].join(',');
       });
 
-      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows].join('\n');
+      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement('a');
       link.setAttribute('href', encodedUri);
@@ -344,34 +412,6 @@ export const ReportPage = () => {
     } catch (e) {
       showToast('Gagal mengunduh file laporan upacara', 'error');
     }
-  };
-
-  const pollExportTask = (taskId) => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await apiClient.get(`/api/laporan/export/status/${taskId}`);
-        if (res) {
-          setExportProgress(res.progress || 50);
-          if (res.status === 'completed') {
-            clearInterval(interval);
-            setIsExporting(false);
-            showToast('File laporan selesai dibuat, mengunduh...', 'success');
-            const { startStr, endStr } = getPeriodDates();
-            const filename = `Laporan_Presensi_${startStr}_sd_${endStr}.csv`;
-            await apiClient.downloadBlob(`/api/laporan/export/download/${taskId}`, filename);
-            showToast('File Laporan Presensi berhasil diunduh!', 'success');
-          } else if (res.status === 'failed') {
-            clearInterval(interval);
-            setIsExporting(false);
-            showToast(res.error_message || 'Gagal mengekspor laporan', 'error');
-          }
-        }
-      } catch (e) {
-        clearInterval(interval);
-        setIsExporting(false);
-        showToast(e.message || 'Gagal mengunduh file laporan', 'error');
-      }
-    }, 2000);
   };
 
   const totalItems = filteredEmployees.length;

@@ -358,10 +358,9 @@ func JWTMiddleware() fiber.Handler {
 
 func extractBearerToken(c *fiber.Ctx) (string, error) {
 	authHeader := c.Get("Authorization")
+	log.Printf("Authorization header: %s", authHeader)
+
 	if authHeader == "" {
-		if tokenQuery := c.Query("token"); tokenQuery != "" && tokenQuery != "undefined" && tokenQuery != "null" {
-			return tokenQuery, nil
-		}
 		log.Println("Authorization header missing")
 		return "", c.Status(400).
 			JSON(commoninfra.NewResponseError(logCommonRbac, "authorization header missing"))
