@@ -1,14 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/core/app_theme.dart';
-import 'package:hrportalv2/core/sso_helper.dart';
 import 'package:hrportalv2/modules/auth/presentation/auth_bloc.dart';
 import 'package:hrportalv2/modules/auth/presentation/components/pages/login_page.dart';
 import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
@@ -90,163 +89,174 @@ class _SdmReportPageState extends State<SdmReportPage> {
     return "${dt.year}-${_twoDigits(dt.month)}-${_twoDigits(dt.day)}";
   }
 
-  /// Request Background Export Job (Hangfire Architecture with UUIDv4 Queue)
+  /// Export Presensi / Presensi Upacara langsung ke file Excel CSV
   Future<void> _triggerExportExcel(ReportPeriodFilter filter) async {
-    final startStr = _formatDateKey(filter.startDate);
-    final endStr = _formatDateKey(filter.endDate);
-
     setState(() {
       _isExporting = true;
-      _exportProgress = 5;
+      _exportProgress = 20;
     });
 
     try {
-      final res = await ApiClient.get(
-        Uri.parse(
-            "${ApiClient.baseUrl}/api/laporan/export/request?tanggal_mulai=$startStr&tanggal_akhir=$endStr"),
+      final reportBloc = context.read<ReportBloc>();
+      final isAnnual = filter.periodType == ReportPeriodType.annual;
+      final dateList = filter.dateList;
+      final dateStrList = dateList.map(_formatDateKey).toList();
+      
+      // Filter list berdasarkan query pencarian saat ini
+      final rawEmployees = reportBloc.employees;
+      final employees = rawEmployees.where((emp) {
+        if (_searchQuery.trim().isEmpty) return true;
+        final tokens = _searchQuery
+            .toLowerCase()
+            .split(RegExp(r'[,;]|\s+'))
+            .where((s) => s.isNotEmpty);
+        for (var token in tokens) {
+          final nameMatch = emp.nama.toLowerCase().contains(token);
+          final nipMatch = emp.nip.toLowerCase().contains(token);
+          final nidnMatch = emp.nidn.toLowerCase().contains(token);
+          if (nameMatch || nipMatch || nidnMatch) {
+            return true;
+          }
+        }
+        return false;
+      }).toList();
+
+      final matrix = reportBloc.matrix;
+      final totalPresensi = reportBloc.totalPresensi;
+      final holidays = reportBloc.holidays;
+
+      final monthName = _monthNames[filter.month - 1];
+      final year = filter.year;
+      final periodLabel = isAnnual
+          ? "Presensi_Upacara"
+          : (filter.periodType == ReportPeriodType.calendar
+              ? "Bulan_Penuh_01_31"
+              : "Cutoff_Payroll_16_15");
+
+      setState(() {
+        _exportProgress = 50;
+      });
+
+      final dateHeaders = dateList.map((dt) {
+        if (isAnnual) {
+          return _monthNames[dt.month - 1];
+        } else {
+          return "${_twoDigits(dt.day)}/${_twoDigits(dt.month)}";
+        }
+      }).toList();
+
+      final headers = [
+        'No',
+        'NIP',
+        'NIDN',
+        'Nama Pegawai',
+        'Unit Kerja',
+        'Fakultas',
+        'Prodi',
+        isAnnual ? 'Total Upacara' : 'Total Hadir',
+        ...dateHeaders,
+      ];
+
+      final rows = <String>[];
+      for (int i = 0; i < employees.length; i++) {
+        final emp = employees[i];
+        final empKey = emp.nip.isNotEmpty ? emp.nip : (emp.nidn.isNotEmpty ? emp.nidn : emp.id);
+        final empMatrix = matrix[empKey] ?? {};
+        final total = totalPresensi[empKey] ?? 0;
+
+        final dayValues = <String>[];
+        for (int d = 0; d < dateList.length; d++) {
+          final dt = dateList[d];
+          final dateStr = dateStrList[d];
+          final cell = empMatrix[dateStr];
+          final isSunday = dt.weekday == DateTime.sunday;
+          final isHoliday = holidays.contains(dateStr);
+
+          if (isAnnual) {
+            final count = cell?.text ?? '0';
+            dayValues.add(count);
+          } else {
+            if (cell != null && cell.text.isNotEmpty && cell.text != '-') {
+              dayValues.add('"${cell.text.replaceAll('"', '""')}"');
+            } else if (isSunday || isHoliday) {
+              dayValues.add('"Libur"');
+            } else {
+              dayValues.add('"-"');
+            }
+          }
+        }
+
+        final nip = emp.nip.isNotEmpty ? emp.nip : '-';
+        final nidn = emp.nidn.isNotEmpty ? emp.nidn : '-';
+        final nama = emp.nama;
+        final unit = emp.unitKerja;
+        final fak = emp.fakultas;
+        final prd = emp.prodi;
+
+        rows.add([
+          (i + 1).toString(),
+          '"$nip"',
+          '"$nidn"',
+          '"${nama.replaceAll('"', '""')}"',
+          '"${unit.replaceAll('"', '""')}"',
+          '"${fak.replaceAll('"', '""')}"',
+          '"${prd.replaceAll('"', '""')}"',
+          total.toString(),
+          ...dayValues,
+        ].join(','));
+      }
+
+      setState(() {
+        _exportProgress = 80;
+      });
+
+      final csvContent = '\uFEFF${[headers.join(','), ...rows].join('\n')}';
+
+      Directory? dir;
+      try {
+        dir = await getTemporaryDirectory();
+      } catch (_) {
+        dir = await getApplicationDocumentsDirectory();
+      }
+
+      final fileName = isAnnual
+          ? 'Laporan_Presensi_Upacara_$year.csv'
+          : 'Laporan_Presensi_${monthName}_${year}_$periodLabel.csv';
+      final filePath = '${dir.path}/$fileName';
+      final file = File(filePath);
+      await file.writeAsString(csvContent, encoding: utf8);
+
+      setState(() {
+        _exportProgress = 100;
+        _isExporting = false;
+      });
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '[Laporan SDM] File Excel berhasil di-export ($fileName)!',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          backgroundColor: Colors.green[800],
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'BUKA FILE',
+            textColor: Colors.white,
+            onPressed: () {
+              _openExportedFile(filePath);
+            },
+          ),
+        ),
       );
 
-      if (res is Map<String, dynamic> && res['task_id'] != null) {
-        final taskId = res['task_id'].toString();
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.cloud_upload_outlined,
-                    color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '[Laporan SDM] Task Export #${taskId.substring(0, 8)} dimasukkan ke antrean background.',
-                    style: GoogleFonts.inter(
-                        fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: Colors.blue[800],
-            duration: const Duration(seconds: 4),
-          ),
-        );
-
-        // Start background polling loop
-        _pollExportStatus(taskId);
-      } else {
-        throw Exception("Gagal memulai task background export");
-      }
+      _openExportedFile(filePath);
     } catch (e) {
       setState(() {
         _isExporting = false;
       });
       ApiClient.showToast("Export Gagal: ${e.toString()}", scope: 'sdm_report');
-    }
-  }
-
-  void _pollExportStatus(String taskId) {
-    Timer.periodic(const Duration(seconds: 2), (timer) async {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-
-      try {
-        final res = await ApiClient.get(
-          Uri.parse("${ApiClient.baseUrl}/api/laporan/export/status/$taskId"),
-        );
-
-        if (res is Map<String, dynamic>) {
-          final status = res['status']?.toString() ?? 'pending';
-          final progress = (res['progress'] as num?)?.toInt() ?? 0;
-
-          setState(() {
-            _exportProgress = progress;
-          });
-
-          if (status == 'completed') {
-            timer.cancel();
-            setState(() {
-              _isExporting = false;
-            });
-
-            final downloadUrl = "${ApiClient.baseUrl}${res['download_url']}";
-            _downloadAndOpenFile(downloadUrl, taskId);
-          } else if (status == 'failed') {
-            timer.cancel();
-            setState(() {
-              _isExporting = false;
-            });
-            final err = res['error_message']?.toString() ??
-                'Gagal memproses file export';
-            ApiClient.showToast("Gagal memproses export: $err",
-                scope: 'sdm_report');
-          }
-        }
-      } catch (e) {
-        timer.cancel();
-        setState(() {
-          _isExporting = false;
-        });
-      }
-    });
-  }
-
-  Future<void> _downloadAndOpenFile(String downloadUrl, String taskId) async {
-    try {
-      final session = await SsoHelper.getSession();
-      final headers = <String, String>{};
-      if (session != null && session['token'] != null) {
-        final token = session['token'].toString();
-        if (token.isNotEmpty) {
-          headers['Authorization'] = 'Bearer $token';
-        }
-      }
-
-      final response = await http.get(Uri.parse(downloadUrl), headers: headers);
-      if (response.statusCode == 200) {
-        Directory? dir;
-        try {
-          dir = await getTemporaryDirectory();
-        } catch (_) {
-          dir = await getApplicationDocumentsDirectory();
-        }
-
-        final shortId = taskId.length >= 8 ? taskId.substring(0, 8) : taskId;
-        final filePath = '${dir.path}/Laporan_Presensi_$shortId.csv';
-        final file = File(filePath);
-        await file.writeAsBytes(response.bodyBytes);
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '[Laporan SDM] File Excel berhasil di-download!',
-              style:
-                  GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
-            ),
-            backgroundColor: Colors.green[800],
-            duration: const Duration(seconds: 6),
-            action: SnackBarAction(
-              label: 'BUKA FILE',
-              textColor: Colors.white,
-              onPressed: () {
-                _openExportedFile(filePath);
-              },
-            ),
-          ),
-        );
-
-        _openExportedFile(filePath);
-      } else {
-        throw Exception("Server status ${response.statusCode}");
-      }
-    } catch (e) {
-      if (mounted) {
-        ApiClient.showToast("Gagal men-download file export: $e",
-            scope: 'sdm_report');
-      }
     }
   }
 
