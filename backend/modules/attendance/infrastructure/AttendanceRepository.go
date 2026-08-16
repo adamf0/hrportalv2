@@ -22,7 +22,7 @@ func (r *AttendanceRepository) FindByNipAndTanggal(ctx context.Context, nip stri
 		return nil, nil
 	}
 	var absen domain.Absen
-	err := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).Debug().
 		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, nidn, tanggal).
 		First(&absen).Error
 	if err != nil {
@@ -51,7 +51,7 @@ func (r *AttendanceRepository) GetHistoryByNip(ctx context.Context, nip string, 
 	}
 	var items []domain.Absen
 
-	query := r.db.WithContext(ctx).Model(&domain.Absen{})
+	query := r.db.WithContext(ctx).Debug().Model(&domain.Absen{})
 
 	if nip != "" && nidn != "" {
 		query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
@@ -84,7 +84,7 @@ func (r *AttendanceRepository) FindByNipAndTanggalUpacara(ctx context.Context, n
 		return nil, nil
 	}
 	var upacara domain.AbsenUpacara
-	err := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).Debug().
 		Where("(nip = ? OR nidn = ? ) AND tanggal = ?", nip, nidn, tanggal).
 		First(&upacara).Error
 	if err != nil {
@@ -104,7 +104,7 @@ func (r *AttendanceRepository) DeleteEmptyAbsen(ctx context.Context) (int64, err
 	if r == nil || r.db == nil {
 		return 0, nil
 	}
-	res := r.db.WithContext(ctx).
+	res := r.db.WithContext(ctx).Debug().
 		Where("absen_masuk IS NULL OR TRIM(absen_masuk) = '' OR absen_masuk = '0000-00-00 00:00:00'").
 		Delete(&domain.Absen{})
 	return res.RowsAffected, res.Error

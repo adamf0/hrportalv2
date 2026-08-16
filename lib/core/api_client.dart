@@ -86,11 +86,11 @@ class ApiClient {
     //     return 'http://10.0.2.2:3000';
     //   }
     // } catch (_) {}
-    return 'http://10.0.2.2:3000';
+    return 'http://217.216.75.192:3000';
   }
 
   static String get baseUrlUnpak {
-    return 'http://10.0.2.2:4000/api/v2';
+    return 'https://hrportal.unpak.ac.id/api/v2';
   }
 
   /// Global key for displaying Toast/SnackBar for API notifications
@@ -131,7 +131,8 @@ class ApiClient {
     final pageContext = scope ?? _activeScope;
     final pageTitle = _scopeToPageTitle(pageContext);
     final formattedMsg = '[$pageTitle] $message';
-    debugPrint('[API Toast Notification - ${type.name.toUpperCase()}]: $formattedMsg');
+    debugPrint(
+        '[API Toast Notification - ${type.name.toUpperCase()}]: $formattedMsg');
 
     // Deduplicate: Don't show exact same toast within 5 seconds
     final now = DateTime.now();

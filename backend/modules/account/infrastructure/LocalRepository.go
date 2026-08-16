@@ -30,7 +30,7 @@ func (r *LocalRepository) Authenticate(ctx context.Context, username, password s
 		Username string `gorm:"column:username"`
 		Password string `gorm:"column:password"`
 	}
-	_ = r.db.WithContext(ctx).Table("users").Where("username = ?", username).Find(&localUsers)
+	_ = r.db.WithContext(ctx).Debug().Table("users").Where("username = ?", username).Find(&localUsers)
 
 	var matchedIDs []uint
 	for _, lu := range localUsers {
@@ -69,7 +69,7 @@ func (r *LocalRepository) GetInfo(ctx context.Context, sid string) (*domain.User
 		Email    string `gorm:"column:email"`
 	}
 
-	err = r.db.WithContext(ctx).Table("users").Where("id = ?", id).First(&u).Error
+	err = r.db.WithContext(ctx).Debug().Table("users").Where("id = ?", id).First(&u).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("data local tidak ditemukan")

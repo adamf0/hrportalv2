@@ -29,7 +29,7 @@ func (r *LeaveRepository) FindByID(ctx context.Context, id uint) (*domain.Cuti, 
 		return nil, nil
 	}
 	var cuti domain.Cuti
-	err := r.db.WithContext(ctx).First(&cuti, id).Error
+	err := r.db.WithContext(ctx).Debug().First(&cuti, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn 
 		return []domain.Cuti{}, nil
 	}
 	var items []domain.Cuti
-	query := r.db.WithContext(ctx).Model(&domain.Cuti{})
+	query := r.db.WithContext(ctx).Debug().Model(&domain.Cuti{})
 
 	if isSdm {
 		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
@@ -96,7 +96,7 @@ func (r *LeaveRepository) GetAllJenisCuti(ctx context.Context) ([]domain.JenisCu
 		return nil, nil
 	}
 	var list []domain.JenisCuti
-	err := r.db.WithContext(ctx).Find(&list).Error
+	err := r.db.WithContext(ctx).Debug().Find(&list).Error
 	return list, err
 }
 
@@ -105,7 +105,7 @@ func (r *LeaveRepository) GetActiveCutiByNip(ctx context.Context, nip string, ta
 		return []domain.Cuti{}, nil
 	}
 	var items []domain.Cuti
-	err := r.db.WithContext(ctx).
+	err := r.db.WithContext(ctx).Debug().
 		Where("nip = ? AND tanggal_mulai <= ? AND tanggal_akhir >= ?", nip, tanggal, tanggal).
 		Find(&items).Error
 	if err != nil {

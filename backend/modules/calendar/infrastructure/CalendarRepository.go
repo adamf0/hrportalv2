@@ -48,7 +48,7 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 			return
 		}
 		var list []attendanceDomain.Absen
-		query := db.WithContext(ctx).Model(&attendanceDomain.Absen{}).Where("absen_masuk IS NOT NULL")
+		query := db.WithContext(ctx).Debug().Model(&attendanceDomain.Absen{}).Where("absen_masuk IS NOT NULL")
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal >= ? AND tanggal <= ?", startDate, endDate)
 		}
@@ -72,7 +72,7 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 			return
 		}
 		var list []izinDomain.Izin
-		query := db.WithContext(ctx).Model(&izinDomain.Izin{}).Where("LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm', 'acc')")
+		query := db.WithContext(ctx).Debug().Model(&izinDomain.Izin{}).Where("LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm', 'acc')")
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal_pengajuan >= ? AND tanggal_pengajuan <= ?", startDate, endDate)
 		}
@@ -96,7 +96,7 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 			return
 		}
 		var list []leaveDomain.Cuti
-		query := db.WithContext(ctx).Model(&leaveDomain.Cuti{}).Where("LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm', 'acc')")
+		query := db.WithContext(ctx).Debug().Model(&leaveDomain.Cuti{}).Where("LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm', 'acc')")
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal_mulai >= ? AND tanggal_mulai <= ?", startDate, endDate)
 		}
@@ -120,7 +120,7 @@ func (r *CalendarRepository) GetCalendarEvents(ctx context.Context, nip string, 
 			return
 		}
 		var list []sppdDomain.Sppd
-		query := db.WithContext(ctx).Model(&sppdDomain.Sppd{}).Where("LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm', 'acc')")
+		query := db.WithContext(ctx).Debug().Model(&sppdDomain.Sppd{}).Where("LOWER(status) IN ('terima sdm', 'disetujui', 'diterima sdm', 'acc')")
 		if startDate != "" && endDate != "" {
 			query = query.Where("tanggal_berangkat >= ? AND tanggal_berangkat <= ?", startDate, endDate)
 		}

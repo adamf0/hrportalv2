@@ -30,7 +30,7 @@ func (r *SppdRepository) FindByID(ctx context.Context, id uint) (*domain.Sppd, e
 	}
 	var sppd domain.Sppd
 	// Preload Anggota and Files when loading SPPD
-	err := r.db.WithContext(ctx).Preload("Anggota").Preload("Files").First(&sppd, id).Error
+	err := r.db.WithContext(ctx).Debug().Preload("Anggota").Preload("Files").First(&sppd, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +59,7 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 	var items []domain.Sppd
 	var total int64
 
-	query := r.db.WithContext(ctx).Model(&domain.Sppd{})
+	query := r.db.WithContext(ctx).Debug().Model(&domain.Sppd{})
 
 	if isSdm {
 		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {

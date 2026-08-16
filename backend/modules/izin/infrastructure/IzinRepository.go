@@ -43,7 +43,7 @@ func (r *IzinRepository) GetByID(ctx context.Context, id uint) (*domain.Izin, er
 		return nil, nil
 	}
 	var izin domain.Izin
-	err := commoninfra.GetTx(ctx, r.db).First(&izin, id).Error
+	err := commoninfra.GetTx(ctx, r.db).Debug().First(&izin, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, ve
 		return []domain.Izin{}, nil
 	}
 	var izins []domain.Izin
-	query := commoninfra.GetTx(ctx, r.db).Model(&domain.Izin{})
+	query := commoninfra.GetTx(ctx, r.db).Debug().Model(&domain.Izin{})
 
 	if isSdm {
 		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {

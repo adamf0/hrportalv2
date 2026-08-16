@@ -43,7 +43,7 @@ func (r *CeremonyAttendanceRepository) GetByID(ctx context.Context, id uint) (*d
 		return nil, nil
 	}
 	var upacara domain.AbsenUpacara
-	err := r.db.WithContext(ctx).First(&upacara, id).Error
+	err := r.db.WithContext(ctx).Debug().First(&upacara, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (r *CeremonyAttendanceRepository) GetAll(ctx context.Context, nip string, n
 		return []domain.AbsenUpacara{}, nil
 	}
 	var list []domain.AbsenUpacara
-	query := r.db.WithContext(ctx)
+	query := r.db.WithContext(ctx).Debug()
 	if nip != "" && nidn != "" {
 		query = query.Where("nip = ? OR nidn = ?", nip, nidn)
 	} else if nip != "" {

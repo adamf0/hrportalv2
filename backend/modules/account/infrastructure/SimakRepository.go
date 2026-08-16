@@ -37,14 +37,14 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 		Aktif  string `gorm:"column:aktif"`
 	}
 
-	_ = r.dbSimak.WithContext(ctx).Table("user").
+	_ = r.dbSimak.WithContext(ctx).Debug().Table("user").
 		Where("username = ? AND (password = SHA1(MD5(?)) OR password = SHA1(?) OR password = MD5(?) OR password = ?)",
 			rawUsername, rawPassword, rawPassword, rawPassword, rawPassword).
 		Find(&userSimak)
 
 	if len(userSimak) == 0 {
 		hash1 := r.hashSimak(rawPassword)
-		_ = r.dbSimak.WithContext(ctx).Table("user").
+		_ = r.dbSimak.WithContext(ctx).Debug().Table("user").
 			Where("username = ? AND password = ?", rawUsername, hash1).
 			Find(&userSimak)
 	}
@@ -74,7 +74,7 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 		NamaDosen string `gorm:"column:Nama_Dosen"`
 	}
 
-	errDosen := r.dbSimak.WithContext(ctx).Table("m_dosen").
+	errDosen := r.dbSimak.WithContext(ctx).Debug().Table("m_dosen").
 		Where("NIDN = ?", validUser.Userid).
 		First(&dosen).Error
 
@@ -104,7 +104,7 @@ func (r *SimakRepository) GetInfo(ctx context.Context, sid string) (*domain.User
 		NamaProdi    *string `gorm:"column:nama_prodi"`
 	}
 
-	err := r.dbSimak.WithContext(ctx).Table("m_dosen").
+	err := r.dbSimak.WithContext(ctx).Debug().Table("m_dosen").
 		Select("m_dosen.NIDN, m_dosen.Nama_Dosen, m_dosen.kode_fak, m_fakultas.nama_fakultas, m_dosen.kode_prodi, m_program_studi.nama_prodi").
 		Joins("LEFT JOIN m_fakultas ON m_fakultas.kode_fakultas = m_dosen.kode_fak").
 		Joins("LEFT JOIN m_program_studi ON m_program_studi.kode_prodi = m_dosen.kode_prodi").
@@ -118,7 +118,7 @@ func (r *SimakRepository) GetInfo(ctx context.Context, sid string) (*domain.User
 	var simakU struct {
 		Email *string `gorm:"column:email"`
 	}
-	_ = r.dbSimak.WithContext(ctx).Table("user").
+	_ = r.dbSimak.WithContext(ctx).Debug().Table("user").
 		Where("username = ?", sid).
 		First(&simakU)
 
@@ -138,7 +138,7 @@ func (r *SimakRepository) GetInfo(ctx context.Context, sid string) (*domain.User
 			NamaUnit *string `gorm:"column:nama_unit"`
 		}
 		var ns NSInfo
-		_ = dbTarget.WithContext(ctx).
+		_ = dbTarget.WithContext(ctx).Debug().
 			Table("pegawais p").
 			Select("p.nip, u.nama_unit").
 			Joins("LEFT JOIN pegawai_pekerjaans pp ON pp.pegawai_id = p.id").

@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"hrportal_backend/modules/holiday/domain"
+
 	"gorm.io/gorm"
 )
 
@@ -40,7 +41,7 @@ func (r *HolidayRepository) GetByID(ctx context.Context, id uint) (*domain.Maste
 		return nil, nil
 	}
 	var item domain.MasterLibur
-	if err := r.db.WithContext(ctx).First(&item, "id = ?", id).Error; err != nil {
+	if err := r.db.WithContext(ctx).Debug().First(&item, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &item, nil
@@ -51,7 +52,7 @@ func (r *HolidayRepository) GetHolidays(ctx context.Context, year int) ([]domain
 		return []domain.MasterLibur{}, nil
 	}
 	var list []domain.MasterLibur
-	query := r.db.WithContext(ctx).Model(&domain.MasterLibur{})
+	query := r.db.WithContext(ctx).Debug().Model(&domain.MasterLibur{})
 	if year > 0 {
 		query = query.Where("YEAR(tanggal) = ?", year)
 	}
