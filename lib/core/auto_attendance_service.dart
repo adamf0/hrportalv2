@@ -34,6 +34,14 @@ void onStart(ServiceInstance service) async {
   } catch (_) {}
 
   if (service is AndroidServiceInstance) {
+    try {
+      service.setAsForegroundService();
+      service.setForegroundNotificationInfo(
+        title: "HR Portal • Presensi Latar Belakang Active",
+        content: "Memuat status IP & GPS...",
+      );
+    } catch (_) {}
+
     service.on('setAsForeground').listen((event) {
       try {
         service.setAsForegroundService();
@@ -42,7 +50,7 @@ void onStart(ServiceInstance service) async {
 
     service.on('setAsBackground').listen((event) {
       try {
-        service.setAsBackgroundService();
+        service.setAsForegroundService();
       } catch (_) {}
     });
   }
@@ -56,9 +64,12 @@ void onStart(ServiceInstance service) async {
   // Periodic Foreground Service Timer (Runs continuously even across app kills)
   Timer.periodic(const Duration(seconds: 10), (timer) async {
     try {
+      final hasPermission =
+          await LocationWifiHelper.checkLocationPermissionSafe();
+      if (!hasPermission) return;
+
       final ip = await LocationWifiHelper.getActiveDeviceIp();
       final pos = await LocationWifiHelper.getCurrentLocation();
-      final matchesWifi = LocationWifiHelper.isPakuanIp(ip);
       bool matchesLocation = false;
 
       if (pos != null) {
@@ -66,29 +77,42 @@ void onStart(ServiceInstance service) async {
             pos.latitude, pos.longitude, LocationWifiHelper.polygon1);
         final insidePoly2 = LocationWifiHelper.isPointInPolygon(
             pos.latitude, pos.longitude, LocationWifiHelper.polygon2);
-        // final insidePoly3 = LocationWifiHelper.isPointInPolygon(
-        //     pos.latitude, pos.longitude, LocationWifiHelper.polygon3);
-        // final withinRadius = RadiusValidationStrategy()
-        // .isWithinCampus(pos.latitude, pos.longitude);
         matchesLocation = insidePoly1 || insidePoly2;
       }
 
-      final wifiStatus = matchesWifi ? 'WiFi Pakuan (Kampus)' : 'Jaringan Luar';
-      final campusStatus =
-          matchesLocation ? 'Dalam Area Kampus' : 'Luar Area Kampus';
+      final shortCampusStatus =
+          matchesLocation ? 'Kampus' : 'Luar Kampus';
       final latStr = pos != null ? pos.latitude.toStringAsFixed(5) : 'Unknown';
       final lonStr = pos != null ? pos.longitude.toStringAsFixed(5) : 'Unknown';
 
-      final tokenInfo = SsoHelper.lastTokenRefreshTime;
+      final checkInTimeStr =
+          await AutoAttendanceService.instance.getTodayCheckInTimeFormatted();
 
       if (service is AndroidServiceInstance) {
-        if (await service.isForegroundService()) {
-          service.setForegroundNotificationInfo(
-            title: "HR Portal • Presensi Active",
+        try {
+          if (await service.isForegroundService()) {
+            service.setForegroundNotificationInfo(
+              title: "HR Portal • Presensi Active",
+              content:
+                  "Masuk: $checkInTimeStr | IP: $ip\nGPS: $latStr, $lonStr ($shortCampusStatus)",
+            );
+          }
+        } catch (_) {}
+      }
+
+      // Auto Renew Token Check (Manual & Keycloak SSO)
+      try {
+        final token = await SsoHelper.getValidToken();
+        if (token != null && token.isNotEmpty) {
+          final refreshTimeStr = SsoHelper.lastTokenRefreshTime;
+          await FcmService.showSilentSessionNotification(
+            title: "HR Portal • Sesi Active",
             content:
-                "IP: $ip ($wifiStatus)\nGPS: $latStr, $lonStr ($campusStatus)\nToken Status: Aktif (Update: $tokenInfo)",
+                "Refresh Sesi: $refreshTimeStr\nStatus Sesi: Aktif (Auto Renew)",
           );
         }
+      } catch (e) {
+        debugPrint('[ForegroundService Token Renew Error]: $e');
       }
 
       // Perform background auto attendance check
@@ -117,6 +141,30 @@ class AutoAttendanceService with WidgetsBindingObserver {
   String? _lastNotifiedDate;
   DateTime? _lastAutoAttempt;
 
+  Future<String> getTodayCheckInTimeFormatted() async {
+    try {
+      final repository = AttendanceRepository();
+      final history = await repository.fetchHistory();
+      final todayTime = history.todayCheckInTime;
+      if (todayTime != null && todayTime.isNotEmpty) {
+        final now = DateTime.now();
+        final String todayStr =
+            "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+        if (!todayTime.contains('-') && !todayTime.contains('/')) {
+          return "$todayStr $todayTime";
+        }
+        final clean = todayTime.replaceAll('/', '-');
+        if (clean.length >= 16) {
+          return clean.substring(0, 16);
+        }
+        return clean;
+      }
+      return 'Belum Absen';
+    } catch (_) {
+      return 'Belum Absen';
+    }
+  }
+
   Future<bool> _isAlreadyCheckedInToday() async {
     try {
       final repository = AttendanceRepository();
@@ -139,40 +187,46 @@ class AutoAttendanceService with WidgetsBindingObserver {
     }
   }
 
-  /// Initializes the Auto-Attendance Service, Native Foreground Service, and WorkManager
+  /// Initializes the Auto-Attendance Service, Native Foreground Service, and WorkManager safely without app crash
   void initialize() {
-    WidgetsBinding.instance.addObserver(this);
-    startBackgroundWorker();
-    initWorkmanager();
-    initForegroundService();
+    try {
+      WidgetsBinding.instance.addObserver(this);
+      startBackgroundWorker();
+      initWorkmanager();
+      initForegroundService();
+    } catch (e, stack) {
+      debugPrint('[AutoAttendanceService initialize safe catch]: $e\n$stack');
+    }
   }
 
-  /// Configures & starts native Android/iOS Foreground Service (Sticky ongoing notification across kills)
+  /// Configures & starts native Android/iOS Foreground Service
   Future<void> initForegroundService() async {
     try {
       await FcmService.initLocalNotifications();
       final service = FlutterBackgroundService();
-      final isRunning = await service.isRunning();
-      if (!isRunning) {
-        await service.configure(
-          androidConfiguration: AndroidConfiguration(
-            onStart: onStart,
-            autoStart: false,
-            isForegroundMode: false,
-            notificationChannelId: 'hrportal_ongoing_channel',
-            initialNotificationTitle: 'HR Portal • Presensi Active',
-            initialNotificationContent: 'Memuat status IP & GPS...',
-            foregroundServiceNotificationId: 9999,
-          ),
-          iosConfiguration: IosConfiguration(
-            autoStart: false,
-            onForeground: onStart,
-            onBackground: onIosBackground,
-          ),
-        );
-        await service.startService();
-      }
-      debugPrint('[AutoAttendanceService] Native Background Service started.');
+      await service.configure(
+        androidConfiguration: AndroidConfiguration(
+          onStart: onStart,
+          autoStart: true,
+          autoStartOnBoot: true,
+          isForegroundMode: true,
+          notificationChannelId: 'hrportal_ongoing_channel',
+          initialNotificationTitle: 'HR Portal • Presensi Active',
+          initialNotificationContent: 'Memuat status IP & GPS...',
+          foregroundServiceNotificationId: 9999,
+        ),
+        iosConfiguration: IosConfiguration(
+          autoStart: true,
+          onForeground: onStart,
+          onBackground: onIosBackground,
+        ),
+      );
+      await service.startService();
+      await FcmService.showSilentSessionNotification(
+        title: "HR Portal • Sesi Active",
+        content: "Refresh Sesi: ${SsoHelper.lastTokenRefreshTime}\nStatus Sesi: Aktif (Auto Renew)",
+      );
+      debugPrint('[AutoAttendanceService] Native Foreground Service started & configured to run continuously.');
     } catch (e) {
       debugPrint('[AutoAttendanceService Foreground Service Error]: $e');
     }
@@ -180,11 +234,13 @@ class AutoAttendanceService with WidgetsBindingObserver {
 
   @pragma('vm:entry-point')
   static bool onIosBackground(ServiceInstance service) {
-    WidgetsFlutterBinding.ensureInitialized();
+    try {
+      WidgetsFlutterBinding.ensureInitialized();
+    } catch (_) {}
     return true;
   }
 
-  /// Registers native Android/iOS WorkManager periodic & one-off tasks
+  /// Registers native Android/iOS WorkManager periodic & one-off tasks safely
   void initWorkmanager() {
     try {
       Workmanager().initialize(
@@ -208,7 +264,7 @@ class AutoAttendanceService with WidgetsBindingObserver {
     }
   }
 
-  /// Schedules an immediate 5-second one-off WorkManager background task when app is detached/killed
+  /// Schedules an immediate one-off WorkManager background task safely
   void scheduleImmediateKilledTask() {
     try {
       Workmanager().registerOneOffTask(
@@ -229,73 +285,95 @@ class AutoAttendanceService with WidgetsBindingObserver {
 
   /// Sets active user session for background auto-attendance
   void updateUserSession(String nip, String nidn) {
-    if (nip.isNotEmpty) {
-      _cachedNip = nip;
-      _cachedNidn = nidn;
-      debugPrint('[AutoAttendanceService] Session updated for NIP: $nip');
-      runAutoAttendanceCheck(isExplicit: true);
+    try {
+      if (nip.isNotEmpty) {
+        _cachedNip = nip;
+        _cachedNidn = nidn;
+        debugPrint('[AutoAttendanceService] Session updated for NIP: $nip');
+        runAutoAttendanceCheck(isExplicit: true);
+      }
+    } catch (e) {
+      debugPrint('[AutoAttendanceService updateUserSession Error]: $e');
     }
   }
 
   /// Starts the periodic active timer (15s interval)
   void startBackgroundWorker() {
-    _bgTimer?.cancel();
-    _bgTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
-      runAutoAttendanceCheck();
-    });
-    debugPrint(
-        '[AutoAttendanceService] Background worker timer started (15s interval).');
+    try {
+      _bgTimer?.cancel();
+      _bgTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+        runAutoAttendanceCheck();
+      });
+      debugPrint(
+          '[AutoAttendanceService] Background worker timer started (15s interval).');
+    } catch (e) {
+      debugPrint('[AutoAttendanceService startBackgroundWorker Error]: $e');
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-    debugPrint('[AutoAttendanceService] App lifecycle state changed: $state');
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.resumed) {
-      runAutoAttendanceCheck();
-    } else if (state == AppLifecycleState.detached) {
-      scheduleImmediateKilledTask();
+    try {
+      super.didChangeAppLifecycleState(state);
+      debugPrint('[AutoAttendanceService] App lifecycle state changed: $state');
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.resumed) {
+        runAutoAttendanceCheck();
+      } else if (state == AppLifecycleState.detached) {
+        scheduleImmediateKilledTask();
+      }
+    } catch (e) {
+      debugPrint(
+          '[AutoAttendanceService didChangeAppLifecycleState Error]: $e');
     }
   }
 
   /// Executes auto-attendance and auto-ceremony-attendance evaluation
   Future<void> runAutoAttendanceCheck(
       {bool isExplicit = false, bool isWorkmanager = false}) async {
-    final now = DateTime.now();
-    final todayStr = "${now.year}-${now.month}-${now.day}";
-    if (_lastNotifiedDate != todayStr) {
-      _lastNotifiedDate = todayStr;
-      _hasNotifiedSuccessToday = false;
-      _hasNotifiedFailToday = false;
-    }
-
-    if (_cachedNip == null || _cachedNip!.isEmpty) {
-      final session = await SsoHelper.getSession();
-      if (session != null && session['nip'] != null) {
-        _cachedNip = session['nip'] as String?;
-        _cachedNidn = session['role'] == 'Dosen' ? _cachedNip : '';
-      }
-    }
-
-    if (_cachedNip == null || _cachedNip!.isEmpty) {
-      return;
-    }
-
-    if (_isAutoAttendanceRunning) return;
-
-    if (_lastAutoAttempt != null &&
-        DateTime.now().difference(_lastAutoAttempt!) <
-            const Duration(seconds: 10) &&
-        !isExplicit) {
-      return;
-    }
-
-    _isAutoAttendanceRunning = true;
-    _lastAutoAttempt = DateTime.now();
-
     try {
+      // Check location permission safely before attempting auto-attendance
+      final hasLocPermission =
+          await LocationWifiHelper.checkLocationPermissionSafe();
+      if (!hasLocPermission) {
+        debugPrint(
+            '[AutoAttendanceService] Location permission not granted yet. Skipping auto-check safely.');
+        return;
+      }
+
+      final now = DateTime.now();
+      final todayStr = "${now.year}-${now.month}-${now.day}";
+      if (_lastNotifiedDate != todayStr) {
+        _lastNotifiedDate = todayStr;
+        _hasNotifiedSuccessToday = false;
+        _hasNotifiedFailToday = false;
+      }
+
+      if (_cachedNip == null || _cachedNip!.isEmpty) {
+        final session = await SsoHelper.getSession();
+        if (session != null && session['nip'] != null) {
+          _cachedNip = session['nip'] as String?;
+          _cachedNidn = session['role'] == 'Dosen' ? _cachedNip : '';
+        }
+      }
+
+      if (_cachedNip == null || _cachedNip!.isEmpty) {
+        return;
+      }
+
+      if (_isAutoAttendanceRunning) return;
+
+      if (_lastAutoAttempt != null &&
+          DateTime.now().difference(_lastAutoAttempt!) <
+              const Duration(seconds: 10) &&
+          !isExplicit) {
+        return;
+      }
+
+      _isAutoAttendanceRunning = true;
+      _lastAutoAttempt = DateTime.now();
+
       if (await _isAlreadyCheckedInToday()) {
         debugPrint(
             '[AutoAttendanceService] User has ALREADY checked in today. Skipping auto check-in request.');
@@ -320,14 +398,6 @@ class AutoAttendanceService with WidgetsBindingObserver {
               '[AutoAttendanceService] Auto-attendance check-in SUCCESS.');
           onAttendanceUpdated?.call();
         }
-
-        // Auto-upacara check-in disabled from foreground as requested
-        // final successUpacara =
-        //     await _performAutoUpacaraCheckIn(_cachedNip!, _cachedNidn!);
-        // if (successUpacara) {
-        //   debugPrint(
-        //       '[AutoAttendanceService] Auto-ceremony-attendance check-in SUCCESS.');
-        // }
       } else {
         debugPrint(
             '[AutoAttendanceService] User is OUTSIDE campus radius or disconnected.');
@@ -358,23 +428,21 @@ class AutoAttendanceService with WidgetsBindingObserver {
             pos.latitude, pos.longitude, LocationWifiHelper.polygon1);
         final insidePoly2 = LocationWifiHelper.isPointInPolygon(
             pos.latitude, pos.longitude, LocationWifiHelper.polygon2);
-        // final insidePoly3 = LocationWifiHelper.isPointInPolygon(
-        //     pos.latitude, pos.longitude, LocationWifiHelper.polygon3);
-        // final withinRadius = RadiusValidationStrategy()
-        // .isWithinCampus(pos.latitude, pos.longitude);
         matchesLocation = insidePoly1 || insidePoly2;
       }
 
       debugPrint(
           '[AutoAttendanceService] Evaluation -> IP: $ip (WifiMatch: $matchesWifi), GPS: ${pos?.latitude}, ${pos?.longitude} (LocationMatch: $matchesLocation)');
 
-      await FcmService.showOngoingStatusNotification(
-        ip: ip,
-        lat: pos?.latitude ?? 0.0,
-        lon: pos?.longitude ?? 0.0,
-        isInsideCampus: matchesLocation,
-        isPakuanWifi: matchesWifi,
-      );
+      try {
+        await FcmService.showOngoingStatusNotification(
+          ip: ip,
+          lat: pos?.latitude ?? 0.0,
+          lon: pos?.longitude ?? 0.0,
+          isInsideCampus: matchesLocation,
+          isPakuanWifi: matchesWifi,
+        );
+      } catch (_) {}
 
       return matchesWifi || matchesLocation;
     } catch (e) {
@@ -407,39 +475,6 @@ class AutoAttendanceService with WidgetsBindingObserver {
     return false;
   }
 
-  // /// Performs Auto Ceremony Check-In API call (Disabled)
-  // Future<bool> _performAutoUpacaraCheckIn(String nip, String nidn) async {
-  //   try {
-  //     final session = await SsoHelper.getSession();
-  //     final name = session?['name'] ?? session?['nama'] ?? '';
-  //     final unit = session?['unit'] ?? '';
-  //     final fakultas = session?['fakultas'] ?? '';
-  //     final prodi = session?['prodi'] ?? '';
-  // 
-  //     final now = DateTime.now();
-  //     final todayStr =
-  //         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-  //     final responseData = await ApiClient.post(
-  //       Uri.parse('${ApiClient.baseUrl}/api/ceremony-attendance'),
-  //       body: {
-  //         'nip': nip,
-  //         'nidn': nidn,
-  //         'nama': name,
-  //         'unit': unit,
-  //         'fakultas': fakultas,
-  //         'prodi': prodi,
-  //         'tanggal': todayStr,
-  //         'note': 'Auto Ceremony Attendance',
-  //       },
-  //     );
-  // 
-  //     return responseData != null;
-  //   } catch (e) {
-  //     debugPrint('[AutoAttendanceService] Upacara API failed: $e');
-  //   }
-  //   return false;
-  // }
-
   /// Triggers notification when user is outside radius / disconnected
   Future<void> _notifyAutoAttendanceFailed(String nip) async {
     try {
@@ -459,25 +494,31 @@ class AutoAttendanceService with WidgetsBindingObserver {
 
   /// Stops background timer, Foreground Service, and cancels WorkManager background tasks upon user logout
   Future<void> stopServiceAndCancelWorkmanager() async {
-    _bgTimer?.cancel();
-    _cachedNip = null;
-    _cachedNidn = null;
-    await FcmService.cancelOngoingNotification();
     try {
-      final service = FlutterBackgroundService();
-      service.invoke('stopService');
-    } catch (_) {}
-    try {
-      await Workmanager().cancelAll();
-      debugPrint(
-          '[AutoAttendanceService] All WorkManager tasks and Foreground Service stopped upon logout.');
+      _bgTimer?.cancel();
+      _cachedNip = null;
+      _cachedNidn = null;
+      await FcmService.cancelOngoingNotification();
+      try {
+        final service = FlutterBackgroundService();
+        service.invoke('stopService');
+      } catch (_) {}
+      try {
+        await Workmanager().cancelAll();
+        debugPrint(
+            '[AutoAttendanceService] All WorkManager tasks and Foreground Service stopped upon logout.');
+      } catch (e) {
+        debugPrint('[AutoAttendanceService Logout Error]: $e');
+      }
     } catch (e) {
-      debugPrint('[AutoAttendanceService Logout Error]: $e');
+      debugPrint('[AutoAttendanceService stopService Error]: $e');
     }
   }
 
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _bgTimer?.cancel();
+    try {
+      WidgetsBinding.instance.removeObserver(this);
+      _bgTimer?.cancel();
+    } catch (_) {}
   }
 }

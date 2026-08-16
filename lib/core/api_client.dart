@@ -34,6 +34,13 @@ class ApiCancelledException implements Exception {
 /// - Non 200/204/304 Statuses: Checks if JSON -> Extracts `message` field, else uses common error
 /// - Catches network/timeout/unpredicted exceptions -> Logs full details & displays Toast/SnackBar
 /// - Supports Page Scope cancellation (cancels/blocks requests when switching pages, except whoami/auth)
+enum ToastType {
+  success,
+  network,
+  error,
+  info,
+}
+
 class ApiClient {
   static const String _defaultCommonError = 'Terjadi kesalahan pada server.';
 
@@ -42,6 +49,9 @@ class ApiClient {
 
   static String get activeScope => _activeScope;
   static int get currentScopeId => _currentScopeId;
+
+  static String? _lastToastMessage;
+  static DateTime? _lastToastTime;
 
   /// Set active page scope. Cancels/blocks requests from previous page scopes!
   static void setActivePageScope(String scope) {
@@ -76,11 +86,11 @@ class ApiClient {
     //     return 'http://10.0.2.2:3000';
     //   }
     // } catch (_) {}
-    return 'http://217.216.75.192:3000';
+    return 'http://10.0.2.2:3000';
   }
 
   static String get baseUrlUnpak {
-    return 'https://hrportal.unpak.ac.id/api/v2';
+    return 'http://10.0.2.2:4000/api/v2';
   }
 
   /// Global key for displaying Toast/SnackBar for API notifications
@@ -108,15 +118,20 @@ class ApiClient {
     }
   }
 
-  static String? _lastToastMessage;
-  static DateTime? _lastToastTime;
-
-  /// Display a Toast SnackBar for API errors
-  static void showToast(String message, {String? scope}) {
+  /// Display a Toast SnackBar for API feedback with custom colors per ToastType:
+  /// - Success: Green (#2E7D32)
+  /// - Network Issue: Yellow/Amber (#F57C00)
+  /// - Server/App Error: Red (#D32F2F)
+  /// - Info: Blue (#1976D2)
+  static void showToast(
+    String message, {
+    String? scope,
+    ToastType type = ToastType.error,
+  }) {
     final pageContext = scope ?? _activeScope;
     final pageTitle = _scopeToPageTitle(pageContext);
     final formattedMsg = '[$pageTitle] $message';
-    debugPrint('[API Toast Notification]: $formattedMsg');
+    debugPrint('[API Toast Notification - ${type.name.toUpperCase()}]: $formattedMsg');
 
     // Deduplicate: Don't show exact same toast within 5 seconds
     final now = DateTime.now();
@@ -128,12 +143,35 @@ class ApiClient {
     _lastToastMessage = formattedMsg;
     _lastToastTime = now;
 
+    Color bgColor;
+    IconData iconData;
+
+    switch (type) {
+      case ToastType.success:
+        bgColor = const Color(0xFF2E7D32);
+        iconData = Icons.check_circle_outline;
+        break;
+      case ToastType.network:
+        bgColor = const Color(0xFFF57C00);
+        iconData = Icons.wifi_off_outlined;
+        break;
+      case ToastType.info:
+        bgColor = const Color(0xFF1976D2);
+        iconData = Icons.info_outline;
+        break;
+      case ToastType.error:
+      default:
+        bgColor = AppTheme.error;
+        iconData = Icons.error_outline;
+        break;
+    }
+
     scaffoldMessengerKey.currentState?.hideCurrentSnackBar();
     scaffoldMessengerKey.currentState?.showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            Icon(iconData, color: Colors.white, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -146,13 +184,25 @@ class ApiClient {
             ),
           ],
         ),
-        backgroundColor: AppTheme.error,
+        backgroundColor: bgColor,
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
   }
+
+  static void showSuccessToast(String message, {String? scope}) =>
+      showToast(message, scope: scope, type: ToastType.success);
+
+  static void showNetworkToast(String message, {String? scope}) =>
+      showToast(message, scope: scope, type: ToastType.network);
+
+  static void showErrorToast(String message, {String? scope}) =>
+      showToast(message, scope: scope, type: ToastType.error);
+
+  static void showInfoToast(String message, {String? scope}) =>
+      showToast(message, scope: scope, type: ToastType.info);
 
   /// Process HTTP Response according to status rules
   static dynamic processResponse(http.Response response) {
@@ -304,7 +354,7 @@ class ApiClient {
           '[API Loading State Log] Request: POST $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
       if (!isExempt &&
@@ -316,7 +366,7 @@ class ApiClient {
       const msg =
           'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
       if (!isExempt &&
@@ -405,7 +455,7 @@ class ApiClient {
           '[API Loading State Log] Request: POST MULTIPART $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
       if (!isExempt &&
@@ -417,7 +467,7 @@ class ApiClient {
       const msg =
           'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
       if (!isExempt &&
@@ -494,7 +544,7 @@ class ApiClient {
           '[API Loading State Log] Request: GET $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
       if (!isExempt &&
@@ -506,7 +556,7 @@ class ApiClient {
       const msg =
           'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
       if (!isExempt &&
@@ -585,7 +635,7 @@ class ApiClient {
           '[API Loading State Log] Request: PUT $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
       if (!isExempt &&
@@ -597,7 +647,7 @@ class ApiClient {
       const msg =
           'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
       if (!isExempt &&
@@ -676,7 +726,7 @@ class ApiClient {
           '[API Loading State Log] Request: DELETE $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
       if (!isExempt &&
@@ -688,7 +738,7 @@ class ApiClient {
       const msg =
           'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
-      showToast(msg);
+      showNetworkToast(msg);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
       if (!isExempt &&

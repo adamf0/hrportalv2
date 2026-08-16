@@ -21,6 +21,10 @@ func NewLocalRepository(db *gorm.DB) domain.ILocalRepository {
 }
 
 func (r *LocalRepository) Authenticate(ctx context.Context, username, password string) (*domain.AuthResult, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
 	var localUsers []struct {
 		ID       uint   `gorm:"column:id"`
 		Username string `gorm:"column:username"`
@@ -50,6 +54,10 @@ func (r *LocalRepository) Authenticate(ctx context.Context, username, password s
 }
 
 func (r *LocalRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
+	if r == nil || r.db == nil {
+		return nil, errors.New("database connection is not available")
+	}
+
 	id, err := strconv.Atoi(sid)
 	if err != nil {
 		return nil, errors.New("invalid sid format")

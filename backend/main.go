@@ -18,6 +18,7 @@ import (
 	"github.com/mehdihadeli/go-mediatr"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
@@ -96,17 +97,27 @@ func NewMySQLDB(envVar, defaultDSN string) (*gorm.DB, error) {
 func tryConnectDB(envVar string, dbName string) (*gorm.DB, error) {
 	candidates := []string{}
 	if envDSN := os.Getenv(envVar); envDSN != "" {
-		candidates = append(candidates, envDSN)
+		dsnWithTimeout := envDSN
+		if !strings.Contains(dsnWithTimeout, "timeout=") {
+			if strings.Contains(dsnWithTimeout, "?") {
+				dsnWithTimeout += "&timeout=2s"
+			} else {
+				dsnWithTimeout += "?timeout=2s"
+			}
+		}
+		candidates = append(candidates, dsnWithTimeout)
 	}
 	candidates = append(candidates,
-		fmt.Sprintf("root:@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
-		fmt.Sprintf("root:password@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
-		fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+		fmt.Sprintf("root:@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=2s", dbName),
+		fmt.Sprintf("root:password@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=2s", dbName),
+		fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=2s", dbName),
 	)
 
 	var lastErr error
 	for _, dsn := range candidates {
-		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+			Logger: logger.Default.LogMode(logger.Silent),
+		})
 		if err == nil && db != nil {
 			sqlDB, errSql := db.DB()
 			if errSql == nil {
@@ -115,6 +126,7 @@ func tryConnectDB(envVar string, dbName string) (*gorm.DB, error) {
 				sqlDB.SetConnMaxLifetime(10 * time.Minute)
 				sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 				if errPing := sqlDB.Ping(); errPing == nil {
+					db.Logger = logger.Default.LogMode(logger.Warn)
 					log.Printf("Successfully connected %s using DSN: %s", envVar, dsn)
 					return db, nil
 				} else {
@@ -126,6 +138,22 @@ func tryConnectDB(envVar string, dbName string) (*gorm.DB, error) {
 		}
 	}
 	return nil, lastErr
+}
+
+func isDBConnected(dbs ...*gorm.DB) bool {
+	if len(dbs) == 0 {
+		return false
+	}
+	for _, db := range dbs {
+		if db == nil {
+			return false
+		}
+		sqlDB, err := db.DB()
+		if err != nil || sqlDB.Ping() != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func main() {
@@ -190,7 +218,10 @@ func main() {
 	mediatr.RegisterRequestPipelineBehaviors(NewValidationBehavior())
 
 	var (
-		db *gorm.DB
+		db          *gorm.DB
+		dbSimak     *gorm.DB
+		dbSimpeg    *gorm.DB
+		dbSimpegNew *gorm.DB
 	)
 	mustStart("Database", func() error {
 		var err error
@@ -207,39 +238,20 @@ func main() {
 		log.Printf("[WARNING] MySQL Database is not connected or nil. Endpoints requiring DB will return errors.")
 	}
 
-	// mustStart("Database SIMAK", func() error {
-	// 	dsn := os.Getenv("DB_SIMAK")
-	// 	if dsn == "" {
-	// 		return errors.New("DB_SIMAK environment variable is required")
-	// 	}
-	// 	var err error
-	// 	dbSimak, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	// 	if err == nil && dbSimak != nil {
-	// 		sqlDB, _ := dbSimak.DB()
-	// 		sqlDB.SetMaxOpenConns(100)
-	// 		sqlDB.SetMaxIdleConns(100)
-	// 		sqlDB.SetConnMaxLifetime(10 * time.Minute)
-	// 		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-	// 	}
-	// 	return err
-	// })
+	mustStart("Database SIMAK", func() error {
+		dbSimak, _ = tryConnectDB("DB_SIMAK", "unpak_simak")
+		return nil
+	})
 
-	// mustStart("Database SIMPEG", func() error {
-	// 	dsn := os.Getenv("DB_SIMPEG")
-	// 	if dsn == "" {
-	// 		return errors.New("DB_SIMPEG environment variable is required")
-	// 	}
-	// 	var err error
-	// 	dbSimpeg, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	// 	if err == nil && dbSimpeg != nil {
-	// 		sqlDB, _ := dbSimpeg.DB()
-	// 		sqlDB.SetMaxOpenConns(100)
-	// 		sqlDB.SetMaxIdleConns(100)
-	// 		sqlDB.SetConnMaxLifetime(10 * time.Minute)
-	// 		sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-	// 	}
-	// 	return err
-	// })
+	mustStart("Database SIMPEG (Legacy unpak_simpeg)", func() error {
+		dbSimpeg, _ = tryConnectDB("DB_SIMPEG", "unpak_simpeg")
+		return nil
+	})
+
+	mustStart("Database SIMPEG NEW (unpak_newsimpeg)", func() error {
+		dbSimpegNew, _ = tryConnectDB("DB_SIMPEG_NEW", "unpak_newsimpeg")
+		return nil
+	})
 
 	mustStart("Report Module", func() error {
 		return reportInfrastructure.RegisterModuleReport(db)
@@ -274,7 +286,7 @@ func main() {
 	})
 
 	mustStart("Account Module", func() error {
-		return accountInfrastructure.RegisterModuleAccount(db, nil, nil)
+		return accountInfrastructure.RegisterModuleAccount(db, dbSimak, dbSimpeg, dbSimpegNew)
 	})
 
 	mustStart("MasterData Module", func() error {
@@ -300,6 +312,16 @@ func main() {
 
 	// WebSocket Real-time Feed for SDM Dashboard (Live Izin, Cuti, SPPD updates)
 	app.Get("/ws/sdm", websocket.New(func(c *websocket.Conn) {
+		// Menunggu hingga semua koneksi DB terhubung dan aktif
+		for !isDBConnected(db) {
+			log.Println("[WebSocket /ws/sdm] Menunggu koneksi database terhubung...")
+			if err := c.WriteMessage(websocket.PingMessage, nil); err != nil {
+				// Keluar jika client menutup koneksi WebSocket saat menunggu
+				return
+			}
+			time.Sleep(1 * time.Second)
+		}
+
 		commonhelper.GlobalSdmWsHub.Register(c)
 		defer commonhelper.GlobalSdmWsHub.Unregister(c)
 

@@ -17,6 +17,9 @@ func NewMasterDataRepository(db *gorm.DB) domain.IMasterDataRepository {
 }
 
 func (r *MasterDataRepository) GetAllFakultas(ctx context.Context) ([]domain.Fakultas, error) {
+	if r == nil || r.db == nil {
+		return []domain.Fakultas{}, nil
+	}
 	var list []domain.Fakultas
 	err := r.db.WithContext(ctx).Find(&list).Error
 	if err != nil {
@@ -31,6 +34,9 @@ func (r *MasterDataRepository) GetAllFakultas(ctx context.Context) ([]domain.Fak
 }
 
 func (r *MasterDataRepository) GetAllProdi(ctx context.Context) ([]domain.Prodi, error) {
+	if r == nil || r.db == nil {
+		return []domain.Prodi{}, nil
+	}
 	var list []domain.Prodi
 	err := r.db.WithContext(ctx).Find(&list).Error
 	if err != nil {
@@ -46,24 +52,36 @@ func (r *MasterDataRepository) GetAllProdi(ctx context.Context) ([]domain.Prodi,
 }
 
 func (r *MasterDataRepository) GetAllJenisCuti(ctx context.Context) ([]domain.JenisCuti, error) {
+	if r == nil || r.db == nil {
+		return []domain.JenisCuti{}, nil
+	}
 	var list []domain.JenisCuti
 	err := r.db.WithContext(ctx).Find(&list).Error
 	return list, err
 }
 
 func (r *MasterDataRepository) GetAllJenisIzin(ctx context.Context) ([]domain.JenisIzin, error) {
+	if r == nil || r.db == nil {
+		return []domain.JenisIzin{}, nil
+	}
 	var list []domain.JenisIzin
 	err := r.db.WithContext(ctx).Find(&list).Error
 	return list, err
 }
 
 func (r *MasterDataRepository) GetAllJenisSppd(ctx context.Context) ([]domain.JenisSppd, error) {
+	if r == nil || r.db == nil {
+		return []domain.JenisSppd{}, nil
+	}
 	var list []domain.JenisSppd
 	err := r.db.WithContext(ctx).Find(&list).Error
 	return list, err
 }
 
 func (r *MasterDataRepository) GetVerifikators(ctx context.Context, verifikatorType string) ([]domain.Verifikator, error) {
+	if r == nil || r.db == nil {
+		return []domain.Verifikator{}, nil
+	}
 	var list []domain.Verifikator
 	query := r.db.WithContext(ctx).Table("connect_payroll_m_pegawai").
 		Where("CHAR_LENGTH(nip) >= 3").

@@ -17,8 +17,7 @@ type CheckOutCommand struct {
 }
 
 func (c CheckOutCommand) Validate() error {
-	return validation.ValidateStruct(&c) // validation.Field(&c.Nip, validation.Required),
-
+	return validation.ValidateStruct(&c)
 }
 
 type CheckOutCommandHandler struct {
@@ -29,9 +28,31 @@ func NewCheckOutCommandHandler(attendanceRepo domain.IAttendanceRepository) *Che
 	return &CheckOutCommandHandler{attendanceRepo: attendanceRepo}
 }
 
+func resolveTargetDate(ctx context.Context, repo domain.IAttendanceRepository, nip, nidn string) string {
+	now := time.Now()
+	todayStr := now.Format("2006-01-02")
+
+	if now.Hour() < 5 {
+		yesterdayStr := now.AddDate(0, 0, -1).Format("2006-01-02")
+		yesterdayRec, _ := repo.FindByNipAndTanggal(ctx, nip, nidn, yesterdayStr)
+		if yesterdayRec != nil && yesterdayRec.AbsenMasuk != nil {
+			return yesterdayStr
+		}
+	}
+
+	return todayStr
+}
+
 func (h *CheckOutCommandHandler) Handle(ctx context.Context, cmd *CheckOutCommand) (common.ResultValue[*domain.Absen], error) {
-	today := time.Now().Format("2006-01-02")
-	existing, _ := h.attendanceRepo.FindByNipAndTanggal(ctx, cmd.Nip, cmd.Nidn, today)
+	targetDate := resolveTargetDate(ctx, h.attendanceRepo, cmd.Nip, cmd.Nidn)
+	existing, _ := h.attendanceRepo.FindByNipAndTanggal(ctx, cmd.Nip, cmd.Nidn, targetDate)
+
+	// Fallback for night shift check-out if targetDate was today but user checked in yesterday or vice versa
+	if existing == nil && time.Now().Hour() < 5 {
+		todayStr := time.Now().Format("2006-01-02")
+		existing, _ = h.attendanceRepo.FindByNipAndTanggal(ctx, cmd.Nip, cmd.Nidn, todayStr)
+	}
+
 	if existing == nil {
 		return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), nil
 	}

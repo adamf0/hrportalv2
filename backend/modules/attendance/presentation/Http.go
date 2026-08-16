@@ -42,6 +42,7 @@ func ModuleAttendance(app *fiber.App) {
 		if err == nil && res.IsSuccess && len(res.Value) > 0 {
 			now := time.Now()
 			todayStr := now.Format("2006-01-02")
+			yesterdayStr := now.AddDate(0, 0, -1).Format("2006-01-02")
 			var selectedRecord *domain.Absen
 
 			for i := range res.Value {
@@ -49,10 +50,10 @@ func ModuleAttendance(app *fiber.App) {
 					selectedRecord = &res.Value[i]
 					break
 				}
-			}
-
-			if selectedRecord == nil && len(res.Value) > 0 {
-				selectedRecord = &res.Value[0]
+				if now.Hour() < 5 && res.Value[i].Tanggal == yesterdayStr && res.Value[i].AbsenMasuk != nil {
+					selectedRecord = &res.Value[i]
+					break
+				}
 			}
 
 			if selectedRecord != nil {
@@ -72,6 +73,15 @@ func ModuleAttendance(app *fiber.App) {
 					Tanggal:     selectedRecord.Tanggal,
 					AbsenMasuk:  masukStr,
 					AbsenKeluar: keluarStr,
+				})
+			} else {
+				_ = c.WriteJSON(RealtimeAttendancePayload{
+					Type:        "initial_state",
+					Nip:         nip,
+					Nidn:        nidn,
+					Tanggal:     todayStr,
+					AbsenMasuk:  "",
+					AbsenKeluar: "",
 				})
 			}
 		}
@@ -203,22 +213,22 @@ func ModuleAttendance(app *fiber.App) {
 		// Trigger FCM Notification & WebSocket Broadcast for Check-In Success (Only when CREATED, not updated)
 		if res.Value != nil && res.Value.IsCreated {
 			absenData := res.Value
-			targetNips := []string{}
-			if absenData.Nip != "" {
-				targetNips = append(targetNips, absenData.Nip)
-			}
-			if absenData.Nidn != "" && absenData.Nidn != absenData.Nip {
-				targetNips = append(targetNips, absenData.Nidn)
-			}
-			if len(targetNips) > 0 {
-				helper.GlobalFcmManager.DispatchNotification(
-					targetNips,
-					"Presensi Otomatis Berhasil",
-					"Sistem sudah melakukan absensi otomatis",
-					"attendance",
-					map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
-				)
-			}
+			// targetNips := []string{}
+			// if absenData.Nip != "" {
+			// 	targetNips = append(targetNips, absenData.Nip)
+			// }
+			// if absenData.Nidn != "" && absenData.Nidn != absenData.Nip {
+			// 	targetNips = append(targetNips, absenData.Nidn)
+			// }
+			// if len(targetNips) > 0 {
+			// 	helper.GlobalFcmManager.DispatchNotification(
+			// 		targetNips,
+			// 		"Presensi Otomatis Berhasil",
+			// 		"Sistem sudah melakukan absensi otomatis",
+			// 		"attendance",
+			// 		map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
+			// 	)
+			// }
 
 			masukStr := ""
 			if absenData.AbsenMasuk != nil {

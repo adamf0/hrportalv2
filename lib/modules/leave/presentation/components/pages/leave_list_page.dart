@@ -362,19 +362,7 @@ class _LeaveListPageState extends State<LeaveListPage> {
                             style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: primaryColor,
                             ),
-                          ),
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: Icon(Icons.notifications_none,
-                                color: onSurface, size: 22),
                           ),
                         ],
                       ),

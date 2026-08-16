@@ -12,7 +12,7 @@ import (
 )
 
 func ModuleMasterData(app *fiber.App) {
-	group := app.Group("/api/masterdata", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	group := app.Group("/api/v2/masterdata", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
 
 	group.Get("/fakultas", func(c *fiber.Ctx) error {
 		q := &query.GetAllFakultasQuery{}

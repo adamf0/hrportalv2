@@ -176,12 +176,6 @@ func (m *FcmManager) SetDB(db *gorm.DB) {
 	}
 }
 
-func (m *FcmManager) GetDB() *gorm.DB {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.db
-}
-
 func (m *FcmManager) LoadServiceAccount(filePath string) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {

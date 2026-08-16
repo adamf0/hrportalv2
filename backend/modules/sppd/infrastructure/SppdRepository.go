@@ -3,7 +3,6 @@ package infrastructure
 import (
 	"context"
 
-	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
 
@@ -18,32 +17,20 @@ func NewSppdRepository(db *gorm.DB) domain.ISppdRepository {
 	return &SppdRepository{db: db}
 }
 
-func (r *SppdRepository) getDB() *gorm.DB {
-	if r != nil && r.db != nil {
-		return r.db
-	}
-	if fcmDb := commonhelper.GlobalFcmManager.GetDB(); fcmDb != nil {
-		return fcmDb
-	}
-	return nil
-}
-
 func (r *SppdRepository) CreateSppd(ctx context.Context, sppd *domain.Sppd) error {
-	db := r.getDB()
-	if db == nil {
+	if r == nil || r.db == nil {
 		return nil
 	}
-	return commoninfra.GetTx(ctx, db).Create(sppd).Error
+	return commoninfra.GetTx(ctx, r.db).Create(sppd).Error
 }
 
 func (r *SppdRepository) FindByID(ctx context.Context, id uint) (*domain.Sppd, error) {
-	db := r.getDB()
-	if db == nil {
+	if r == nil || r.db == nil {
 		return nil, nil
 	}
 	var sppd domain.Sppd
 	// Preload Anggota and Files when loading SPPD
-	err := db.WithContext(ctx).Preload("Anggota").Preload("Files").First(&sppd, id).Error
+	err := r.db.WithContext(ctx).Preload("Anggota").Preload("Files").First(&sppd, id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -51,34 +38,33 @@ func (r *SppdRepository) FindByID(ctx context.Context, id uint) (*domain.Sppd, e
 }
 
 func (r *SppdRepository) UpdateSppd(ctx context.Context, sppd *domain.Sppd) error {
-	db := r.getDB()
-	if db == nil {
+	if r == nil || r.db == nil {
 		return nil
 	}
 	// Full save handles association updates (inserting new ones, updating, etc.)
-	return commoninfra.GetTx(ctx, db).Session(&gorm.Session{FullSaveAssociations: true}).Save(sppd).Error
+	return commoninfra.GetTx(ctx, r.db).Session(&gorm.Session{FullSaveAssociations: true}).Save(sppd).Error
 }
 
 func (r *SppdRepository) DeleteSppd(ctx context.Context, id uint) error {
-	db := r.getDB()
-	if db == nil {
+	if r == nil || r.db == nil {
 		return nil
 	}
-	return commoninfra.GetTx(ctx, db).Delete(&domain.Sppd{}, id).Error
+	return commoninfra.GetTx(ctx, r.db).Delete(&domain.Sppd{}, id).Error
 }
 
 func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn string, verifikasi bool, isSdm bool, tanggal_mulai *string, tanggal_akhir *string) ([]domain.Sppd, error) {
-	db := r.getDB()
-	if db == nil {
+	if r == nil || r.db == nil {
 		return []domain.Sppd{}, nil
 	}
 	var items []domain.Sppd
 	var total int64
 
-	query := db.WithContext(ctx).Model(&domain.Sppd{})
+	query := r.db.WithContext(ctx).Model(&domain.Sppd{})
 
-	if isSdm && tanggal_mulai != nil && tanggal_akhir != nil {
-		query = query.Where("tanggal_berangkat >= ? and ? <= tanggal_kembali", tanggal_mulai, tanggal_akhir)
+	if isSdm {
+		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
+			query = query.Where("tanggal_berangkat >= ? and tanggal_kembali <= ?", *tanggal_mulai, *tanggal_akhir)
+		}
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			if verifikasi {

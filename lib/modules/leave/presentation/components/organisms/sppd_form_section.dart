@@ -285,7 +285,7 @@ class SppdFormSection extends StatelessWidget {
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: (isLoading || isSupervisorError) ? null : onSubmit,
+            onPressed: (isLoading || isMasterDataLoading || isSupervisorError) ? null : onSubmit,
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
               foregroundColor: Colors.white,

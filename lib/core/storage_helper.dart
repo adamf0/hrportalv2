@@ -34,78 +34,111 @@ class StorageHelper {
     }
   }
 
-  /// Upload file ke S3 Object Storage via Presigned PUT URL
-  /// Mengembalikan objectKey (contoh: "2026/08/abc123_surat.pdf")
+  /// Direct S3 Presigned Upload (HTTP PUT via Streaming Request with Progress)
   static Future<String?> uploadFileWithPresign({
     required File file,
-    required String type, // 'cuti', 'izin', atau 'sppd'
-    Function(double progress)? onProgress,
+    required String type,
+    http.Client? httpClient,
+    void Function({
+      required int bytesUploaded,
+      required int totalBytes,
+      required double percentage,
+      required double speedMBps,
+    })? onProgressDetailed,
   }) async {
     try {
-      if (!await file.exists()) {
-        debugPrint('[StorageHelper] File lokal tidak ditemukan: ${file.path}');
-        return null;
-      }
-
       final fileName = p.basename(file.path);
       final mimeType = getMimeType(file.path);
 
-      // 1. Minta Presigned Upload URL ke Backend Go
+      // 1. Request presigned upload URL ke backend Golang port 3000
       final presignUri = Uri.parse(
-        "${ApiClient.baseUrl}/api/storage/presign-upload?type=$type&filename=${Uri.encodeComponent(fileName)}&content_type=${Uri.encodeComponent(mimeType)}",
-      );
+          "${ApiClient.baseUrl}/api/storage/presign-upload?type=$type&filename=${Uri.encodeComponent(fileName)}");
 
-      final res = await ApiClient.get(presignUri);
-      if (res is! Map<String, dynamic> || res['upload_url'] == null) {
-        throw Exception("Gagal mendapatkan presigned upload URL dari server");
+      final presignData = await ApiClient.get(presignUri);
+      if (presignData == null || presignData['upload_url'] == null) {
+        debugPrint('[StorageHelper] Presigned upload URL generation failed');
+        return null;
       }
 
-      final uploadUrl = res['upload_url'].toString();
-      final objectKey = res['object_key']?.toString() ?? res['file_path']?.toString() ?? fileName;
+      final String uploadUrl = presignData['upload_url'];
+      final String objectKey = presignData['object_key'];
 
-      onProgress?.call(0.3);
+      // 2. Perform HTTP PUT stream to S3 with progress calculation
+      final fileLength = await file.length();
+      final uri = Uri.parse(uploadUrl);
+      final request = http.StreamedRequest('PUT', uri);
 
-      // 2. Upload langsung bytes file ke Object Storage via HTTP PUT
-      final fileBytes = await file.readAsBytes();
-      final uploadResponse = await http.put(
-        Uri.parse(uploadUrl),
-        headers: {
-          'Content-Type': mimeType,
+      request.headers['Content-Type'] = mimeType;
+      request.contentLength = fileLength;
+
+      final client = httpClient ?? http.Client();
+
+      int bytesUploaded = 0;
+      final stopwatch = Stopwatch()..start();
+
+      final fileStream = file.openRead();
+      final streamSubscription = fileStream.listen(
+        (chunk) {
+          bytesUploaded += chunk.length;
+          request.sink.add(chunk);
+
+          final elapsedSec = stopwatch.elapsedMilliseconds / 1000.0;
+          final double speedMBps = elapsedSec > 0
+              ? (bytesUploaded / (1024 * 1024)) / elapsedSec
+              : 0.0;
+          final double percentage =
+              fileLength > 0 ? (bytesUploaded / fileLength).clamp(0.0, 1.0) : 0.0;
+
+          if (onProgressDetailed != null) {
+            onProgressDetailed(
+              bytesUploaded: bytesUploaded,
+              totalBytes: fileLength,
+              percentage: percentage,
+              speedMBps: speedMBps,
+            );
+          }
         },
-        body: fileBytes,
+        onDone: () {
+          request.sink.close();
+          stopwatch.stop();
+        },
+        onError: (err) {
+          request.sink.close();
+          stopwatch.stop();
+        },
+        cancelOnError: true,
       );
 
-      onProgress?.call(0.9);
+      final response = await client.send(request);
+      await streamSubscription.asFuture();
 
-      if (uploadResponse.statusCode == 200 || uploadResponse.statusCode == 204) {
-        debugPrint('[StorageHelper] Berhasil upload ke S3: $objectKey (Bucket: $type)');
-        onProgress?.call(1.0);
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        debugPrint(
+            '[StorageHelper] File uploaded successfully to S3: $objectKey');
         return objectKey;
       } else {
-        throw Exception(
-            "S3 Upload failed with status ${uploadResponse.statusCode}: ${uploadResponse.body}");
+        debugPrint(
+            '[StorageHelper] S3 Upload failed with status ${response.statusCode}');
+        return null;
       }
-    } catch (e, stack) {
-      debugPrint('[StorageHelper uploadFileWithPresign error]: $e\n$stack');
+    } catch (e) {
+      debugPrint('[StorageHelper uploadFileWithPresign error]: $e');
       return null;
     }
   }
 
-  /// Mendapatkan URL read private via Presigned GET
+  /// Meminta Presigned Read URL (HTTP GET) dari backend Golang untuk file private
   static Future<String?> getPresignedReadUrl({
-    required String type, // 'cuti', 'izin', atau 'sppd'
+    required String type,
     required String objectKey,
   }) async {
     try {
-      if (objectKey.isEmpty) return null;
+      final uri = Uri.parse(
+          "${ApiClient.baseUrl}/api/storage/presign-read?type=$type&object=${Uri.encodeComponent(objectKey)}");
 
-      final presignUri = Uri.parse(
-        "${ApiClient.baseUrl}/api/storage/presign-read?type=$type&object=${Uri.encodeComponent(objectKey)}",
-      );
-
-      final res = await ApiClient.get(presignUri);
-      if (res is Map<String, dynamic> && (res['read_url'] != null || res['url'] != null)) {
-        return (res['read_url'] ?? res['url']).toString();
+      final data = await ApiClient.get(uri);
+      if (data != null && data['read_url'] != null) {
+        return data['read_url'];
       }
 
       // Fallback ke secure streaming endpoint backend
@@ -116,23 +149,44 @@ class StorageHelper {
     }
   }
 
-  /// Download file private & buka via OpenFilex / URL Launcher
+  /// Download file private & buka via OpenFilex / URL Launcher tanpa toast, dengan browser launcher untuk non-S3
   static Future<void> openPrivateAttachment({
     required BuildContext context,
     required String type,
     required String objectKey,
     String? customFileName,
   }) async {
-    try {
-      ApiClient.showToast("Menyiapkan dokumen lampiran...", scope: 'storage');
+    final lowerKey = objectKey.trim().toLowerCase();
 
-      final readUrl = await getPresignedReadUrl(type: type, objectKey: objectKey);
-      if (readUrl == null || readUrl.isEmpty) {
-        ApiClient.showToast("Gagal memuat link dokumen lampiran.", scope: 'storage');
-        return;
+    // Deteksi jika link non-S3 (domain luar/URL web biasa seperti google.com, http://, https://)
+    bool isExternalUrl = lowerKey.startsWith('http://') ||
+        lowerKey.startsWith('https://') ||
+        lowerKey.startsWith('www.') ||
+        (lowerKey.contains('.') &&
+            !lowerKey.contains('/') &&
+            !lowerKey.endsWith('.pdf') &&
+            !lowerKey.endsWith('.jpg') &&
+            !lowerKey.endsWith('.jpeg') &&
+            !lowerKey.endsWith('.png') &&
+            !lowerKey.endsWith('.doc') &&
+            !lowerKey.endsWith('.docx'));
+
+    if (isExternalUrl) {
+      String url = objectKey.trim();
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://$url';
       }
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return;
+    }
 
-      // Download file ke direktori sementara
+    final readUrl = await getPresignedReadUrl(type: type, objectKey: objectKey);
+    if (readUrl == null || readUrl.isEmpty) return;
+
+    try {
       final response = await http.get(Uri.parse(readUrl));
       if (response.statusCode == 200) {
         Directory? dir;
@@ -150,25 +204,19 @@ class StorageHelper {
 
         final result = await OpenFilex.open(localFilePath);
         if (result.type != ResultType.done) {
-          // Fallback buka via browser
           final uri = Uri.parse(readUrl);
           if (await canLaunchUrl(uri)) {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           }
         }
       } else {
-        // Coba buka langsung URL jika download via app gagal
         final uri = Uri.parse(readUrl);
         if (await canLaunchUrl(uri)) {
           await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } else {
-          ApiClient.showToast("Gagal mengunduh lampiran (status: ${response.statusCode})",
-              scope: 'storage');
         }
       }
     } catch (e) {
-      debugPrint('[StorageHelper openPrivateAttachment error]: $e');
-      ApiClient.showToast("Gagal membuka dokumen: $e", scope: 'storage');
+      debugPrint('[openPrivateAttachment error]: $e');
     }
   }
 }

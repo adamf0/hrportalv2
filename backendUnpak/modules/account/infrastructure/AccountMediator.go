@@ -18,8 +18,8 @@ var (
 
 func init() {
 	GlobalRepoLocal = NewLocalRepository(nil)
-	GlobalRepoSimak = NewSimakRepository(nil, nil)
-	GlobalRepoSimpeg = NewSimpegRepository(nil)
+	GlobalRepoSimak = NewSimakRepository(nil, nil, nil)
+	GlobalRepoSimpeg = NewSimpegRepository(nil, nil)
 
 	_ = mediatr.RegisterRequestHandler[
 		*who.WhoamiQuery,
@@ -32,10 +32,10 @@ func init() {
 	](login.NewLoginCommandHandler(GlobalRepoLocal, GlobalRepoSimak, GlobalRepoSimpeg))
 }
 
-func RegisterModuleAccount(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB) error {
+func RegisterModuleAccount(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB, dbSimpegNew *gorm.DB) error {
 	GlobalRepoLocal = NewLocalRepository(db)
-	GlobalRepoSimak = NewSimakRepository(dbSimak, dbSimpeg)
-	GlobalRepoSimpeg = NewSimpegRepository(dbSimpeg)
+	GlobalRepoSimak = NewSimakRepository(dbSimak, dbSimpeg, dbSimpegNew)
+	GlobalRepoSimpeg = NewSimpegRepository(dbSimpeg, dbSimpegNew)
 
 	// Do not clear mediatr registrations for other modules
 

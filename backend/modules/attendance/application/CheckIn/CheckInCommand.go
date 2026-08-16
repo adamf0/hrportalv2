@@ -7,7 +7,6 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
-	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
@@ -45,9 +44,27 @@ func NewCheckInCommandHandler(repo domain.IAttendanceRepository) *CheckInCommand
 	return &CheckInCommandHandler{attendanceRepo: repo}
 }
 
+// resolveTargetDate determines attendance date considering night shift rules:
+// Case 1 (Under 05:00 AM): If yesterday has check-in, target yesterday. Else, target today.
+// Case 2 (>= 05:00 AM): Normal shift, target today.
+func resolveTargetDate(ctx context.Context, repo domain.IAttendanceRepository, nip, nidn string) string {
+	now := time.Now()
+	todayStr := now.Format("2006-01-02")
+
+	if now.Hour() < 5 {
+		yesterdayStr := now.AddDate(0, 0, -1).Format("2006-01-02")
+		yesterdayRec, _ := repo.FindByNipAndTanggal(ctx, nip, nidn, yesterdayStr)
+		if yesterdayRec != nil && yesterdayRec.AbsenMasuk != nil {
+			return yesterdayStr
+		}
+	}
+
+	return todayStr
+}
+
 func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand) (common.ResultValue[*domain.Absen], error) {
-	today := time.Now().Format("2006-01-02")
-	existing, _ := h.attendanceRepo.FindByNipAndTanggal(ctx, cmd.Nip, cmd.Nidn, today)
+	targetDate := resolveTargetDate(ctx, h.attendanceRepo, cmd.Nip, cmd.Nidn)
+	existing, _ := h.attendanceRepo.FindByNipAndTanggal(ctx, cmd.Nip, cmd.Nidn, targetDate)
 	if existing != nil && existing.AbsenMasuk != nil {
 		return common.FailureValue[*domain.Absen](domain.AlreadyCheckedIn()), nil
 	}
@@ -56,9 +73,6 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 	var db *gorm.DB
 	if repo := reportInfra.GetReportRepository(); repo != nil {
 		db = repo.GetDB()
-	}
-	if db == nil {
-		db = commonhelper.GlobalFcmManager.GetDB()
 	}
 
 	ctxTx := ctx
@@ -85,7 +99,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 			Unit:           cmd.Unit,
 			Fakultas:       cmd.Fakultas,
 			Prodi:          cmd.Prodi,
-			Tanggal:        today,
+			Tanggal:        targetDate,
 			AbsenMasuk:     &now,
 			Note:           cmd.Note,
 			OtomatisKeluar: false,

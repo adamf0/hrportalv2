@@ -161,55 +161,65 @@ class AttendanceRepository implements IAttendanceRepository {
         final now = DateTime.now();
         final String todayStr =
             "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+        final nowYesterday = now.subtract(const Duration(days: 1));
+        final String yesterdayStr =
+            "${nowYesterday.year}-${nowYesterday.month.toString().padLeft(2, '0')}-${nowYesterday.day.toString().padLeft(2, '0')}";
+
+        // Check if user checked in yesterday (for night shift check-out resolution)
+        bool yesterdayHasCheckIn = false;
+        if (now.hour < 5) {
+          for (var item in items) {
+            final tStr = item['tanggal'] as String? ?? '';
+            final mStr = item['absen_masuk'] as String?;
+            if (tStr.contains(yesterdayStr) && mStr != null && mStr.isNotEmpty) {
+              yesterdayHasCheckIn = true;
+              break;
+            }
+          }
+        }
+
+        // Determine target date for today's active shift:
+        // Case 1 (Under 05:00 AM & yesterday check-in exists): target yesterday (absen malam).
+        // Case 2 (>= 05:00 AM or no yesterday check-in): target today.
+        final String targetDateStr = (now.hour < 5 && yesterdayHasCheckIn)
+            ? yesterdayStr
+            : todayStr;
 
         for (var json in items) {
           final tanggalStr = json['tanggal'] as String? ?? '';
           final masukStr = json['absen_masuk'] as String?;
           final keluarStr = json['absen_keluar'] as String?;
 
-          bool isToday = tanggalStr.contains(todayStr);
+          final bool isTargetShift = tanggalStr.contains(targetDateStr);
 
-          if (masukStr != null) {
+          // Format with actual record date for activity log
+          final displayDateStr = tanggalStr.isNotEmpty ? tanggalStr : todayStr;
+
+          if (masukStr != null && masukStr.isNotEmpty) {
             final dt = DateTime.tryParse(masukStr);
             if (dt != null) {
               final localDt = dt.toLocal();
-              if (!isToday) {
-                isToday = (localDt.year == now.year &&
-                        localDt.month == now.month &&
-                        localDt.day == now.day) ||
-                    (dt.year == now.year &&
-                        dt.month == now.month &&
-                        dt.day == now.day);
-              }
               activities.add(ActivityLogItem(
                 title: 'Absen Masuk Berhasil',
-                time: '$todayStr • ${_formatTime(localDt)} AM',
+                time: '$displayDateStr • ${_formatTime(localDt)} AM',
                 isSuccess: true,
               ));
-              if (isToday) {
+              if (isTargetShift) {
                 todayCheckIn = _formatTime(localDt);
               }
             }
           }
 
-          if (keluarStr != null) {
+          if (keluarStr != null && keluarStr.isNotEmpty) {
             final dt = DateTime.tryParse(keluarStr);
             if (dt != null) {
               final localDt = dt.toLocal();
-              if (!isToday) {
-                isToday = (localDt.year == now.year &&
-                        localDt.month == now.month &&
-                        localDt.day == now.day) ||
-                    (dt.year == now.year &&
-                        dt.month == now.month &&
-                        dt.day == now.day);
-              }
               activities.add(ActivityLogItem(
                 title: 'Absen Keluar Berhasil',
-                time: '$todayStr • ${_formatTime(localDt)} PM',
+                time: '$displayDateStr • ${_formatTime(localDt)} PM',
                 isSuccess: true,
               ));
-              if (isToday) {
+              if (isTargetShift) {
                 todayCheckOut = _formatTime(localDt);
               }
             }

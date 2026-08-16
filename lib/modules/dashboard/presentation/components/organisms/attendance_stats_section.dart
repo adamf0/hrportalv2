@@ -10,11 +10,13 @@ class AttendanceStatsSection extends StatefulWidget {
   final bool isLoading;
   final int totalAbsen1To31;
   final int totalIzin1To31;
+  final int totalCuti1To31;
   final int totalSppd1To31;
   final int tidakMasuk1To31;
   final int totalUpacara1To31;
   final int totalAbsen15To15;
   final int totalIzin15To15;
+  final int totalCuti15To15;
   final int totalSppd15To15;
   final int tidakMasuk15To15;
   final int totalUpacara15To15;
@@ -24,11 +26,13 @@ class AttendanceStatsSection extends StatefulWidget {
     this.isLoading = false,
     required this.totalAbsen1To31,
     required this.totalIzin1To31,
+    this.totalCuti1To31 = 0,
     required this.totalSppd1To31,
     required this.tidakMasuk1To31,
     required this.totalUpacara1To31,
     required this.totalAbsen15To15,
     required this.totalIzin15To15,
+    this.totalCuti15To15 = 0,
     required this.totalSppd15To15,
     required this.tidakMasuk15To15,
     required this.totalUpacara15To15,
@@ -68,7 +72,7 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: 5,
+            itemCount: 6,
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: context.isWatch ? 1 : 2,
               mainAxisSpacing: 8,
@@ -89,6 +93,8 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
         _is15To15 ? widget.totalAbsen15To15 : widget.totalAbsen1To31;
     final currentIzin =
         _is15To15 ? widget.totalIzin15To15 : widget.totalIzin1To31;
+    final currentCuti =
+        _is15To15 ? widget.totalCuti15To15 : widget.totalCuti1To31;
     final currentSppd =
         _is15To15 ? widget.totalSppd15To15 : widget.totalSppd1To31;
     final currentTidakMasuk =
@@ -96,7 +102,7 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
     final currentUpacara =
         _is15To15 ? widget.totalUpacara15To15 : widget.totalUpacara1To31;
 
-    final card1 = StatCard(
+    final cardAbsen = StatCard(
       icon: Icons.check_circle_outline,
       iconColor: AppTheme.success,
       circleColor: AppTheme.successContainer,
@@ -104,7 +110,7 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
       label: 'Total Absen',
     );
 
-    final card2 = StatCard(
+    final cardIzin = StatCard(
       icon: Icons.star_outline,
       iconColor: AppTheme.warning,
       circleColor: AppTheme.warningContainer,
@@ -112,7 +118,15 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
       label: 'Total Izin',
     );
 
-    final card3 = StatCard(
+    final cardCuti = StatCard(
+      icon: Icons.event_note_outlined,
+      iconColor: const Color(0xFF00838F),
+      circleColor: const Color(0xFFE0F7FA),
+      value: '$currentCuti',
+      label: 'Total Cuti',
+    );
+
+    final cardTidakMasuk = StatCard(
       icon: Icons.cancel_outlined,
       iconColor: AppTheme.error,
       circleColor: AppTheme.errorContainer,
@@ -120,8 +134,14 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
       label: 'Tidak Masuk',
     );
 
-    final card4 = GestureDetector(
-      onTap: () {
+    final cardUpacara = StatCard(
+      icon: Icons.assistant_photo_outlined,
+      iconColor: primaryColor,
+      circleColor: primaryColor.withOpacity(0.1),
+      value: '$currentUpacara',
+      label: 'Total Upacara',
+      detailText: 'Detail',
+      onDetailTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -129,16 +149,9 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
           ),
         );
       },
-      child: StatCard(
-        icon: Icons.assistant_photo_outlined,
-        iconColor: primaryColor,
-        circleColor: primaryColor.withOpacity(0.1),
-        value: '$currentUpacara',
-        label: 'Total Upacara',
-      ),
     );
 
-    final card5 = StatCard(
+    final cardSppd = StatCard(
       icon: Icons.star_outline,
       iconColor: AppTheme.warning,
       circleColor: AppTheme.warningContainer,
@@ -231,11 +244,12 @@ class _AttendanceStatsSectionState extends State<AttendanceStatsSection> {
           crossAxisSpacing: 8,
           childAspectRatio: 1.35,
           children: [
-            card1,
-            card2,
-            card3,
-            card4,
-            card5,
+            cardAbsen,
+            cardIzin,
+            cardCuti,
+            cardTidakMasuk,
+            cardUpacara,
+            cardSppd,
           ],
         ),
       ],

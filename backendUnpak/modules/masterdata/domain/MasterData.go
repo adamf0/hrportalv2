@@ -30,10 +30,10 @@ func (Prodi) TableName() string {
 }
 
 type JenisCuti struct {
-	ID        uint   `gorm:"primaryKey;column:id" json:"id"`
-	Nama      string `gorm:"column:nama" json:"nama"`
-	MaksHari  int    `gorm:"column:maks_hari" json:"maks_hari"`
-	Deskripsi string `gorm:"column:deskripsi" json:"deskripsi"`
+	ID      uint   `gorm:"primaryKey;column:id" json:"id"`
+	Nama    string `gorm:"column:nama" json:"nama"`
+	MinHari int    `gorm:"column:min" json:"min_hari"`
+	MaxHari int    `gorm:"column:max" json:"max_hari"`
 }
 
 func (JenisCuti) TableName() string {
@@ -67,4 +67,3 @@ type Verifikator struct {
 func (Verifikator) TableName() string {
 	return "connect_payroll_m_pegawai"
 }
-

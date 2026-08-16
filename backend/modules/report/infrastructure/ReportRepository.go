@@ -2,13 +2,13 @@ package infrastructure
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	commonhelper "hrportal_backend/common/helper"
 	accountDomain "hrportal_backend/modules/account/domain"
 	attendanceDomain "hrportal_backend/modules/attendance/domain"
 	permissionDomain "hrportal_backend/modules/izin/domain"
@@ -28,18 +28,11 @@ func NewReportRepository(db *gorm.DB) domain.IReportRepository {
 	return &ReportRepository{db: db}
 }
 
-func (r *ReportRepository) getDB() *gorm.DB {
-	if r != nil && r.db != nil {
-		return r.db
-	}
-	if fcmDb := commonhelper.GlobalFcmManager.GetDB(); fcmDb != nil {
-		return fcmDb
-	}
-	return nil
-}
-
 func (r *ReportRepository) GetDB() *gorm.DB {
-	return r.getDB()
+	if r == nil {
+		return nil
+	}
+	return r.db
 }
 
 func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, periodeType domain.PeriodeType, periodeKey string) (*domain.RekapLaporanBulanan, error) {
@@ -87,9 +80,9 @@ func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, per
 	evalEndStr := evalEnd.Format("2006-01-02")
 
 	var (
-		wg                                            sync.WaitGroup
-		cMasuk, cIzin, cCuti, cSppd, cUpacara, cLibur int64
-		emp                                           accountDomain.Pegawai
+		wg                                                        sync.WaitGroup
+		cMasuk, cIzin, cCuti, cSppd, cUpacara, cLibur, cWorkedOff int64
+		emp                                                       accountDomain.Pegawai
 	)
 
 	wg.Add(7)
@@ -104,13 +97,37 @@ func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, per
 		}
 	}()
 
-	// 2. Absen Masuk (active up to today)
+	// 2. Absen Masuk (active up to today) & count check-ins on off-days (Sundays & holidays)
 	go func() {
 		defer wg.Done()
 		if r.db != nil {
 			buildUserWhere(r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}), targetNip, targetNip).
 				Where("tanggal >= ? AND tanggal <= ? AND absen_masuk IS NOT NULL", startStr, evalEndStr).
 				Count(&cMasuk)
+
+			var dates []string
+			buildUserWhere(r.db.WithContext(ctx).Model(&attendanceDomain.Absen{}), targetNip, targetNip).
+				Where("tanggal >= ? AND tanggal <= ? AND absen_masuk IS NOT NULL", startStr, evalEndStr).
+				Pluck("tanggal", &dates)
+
+			for _, dStr := range dates {
+				cleanDate := strings.Split(dStr, "T")[0]
+				if t, err := time.Parse("2006-01-02", cleanDate); err == nil {
+					isOff := t.Weekday() == time.Sunday
+					if !isOff {
+						var countLibur int64
+						r.db.WithContext(ctx).Table("master_libur").
+							Where("tanggal LIKE ? AND is_national_holiday = 1", cleanDate+"%").
+							Count(&countLibur)
+						if countLibur > 0 {
+							isOff = true
+						}
+					}
+					if isOff {
+						cWorkedOff++
+					}
+				}
+			}
 		}
 	}()
 
@@ -144,12 +161,14 @@ func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, per
 		}
 	}()
 
-	// 6. Absen Upacara (active up to today)
+	// 6. Absen Upacara (Full Year YYYY)
 	go func() {
 		defer wg.Done()
 		if r.db != nil {
+			yearStartStr := fmt.Sprintf("%d-01-01", refDate.Year())
+			yearEndStr := fmt.Sprintf("%d-12-31", refDate.Year())
 			buildUserWhere(r.db.WithContext(ctx).Model(&attendanceDomain.AbsenUpacara{}), targetNip, targetNip).
-				Where("tanggal >= ? AND tanggal <= ?", startStr, evalEndStr).
+				Where("tanggal >= ? AND tanggal <= ?", yearStartStr, yearEndStr).
 				Count(&cUpacara)
 		}
 	}()
@@ -172,7 +191,9 @@ func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, per
 		for d := vStart; !d.After(evalEnd); d = d.AddDate(0, 0, 1) {
 			totalElapsedDays++
 			if d.Weekday() == time.Sunday {
-				sundaysCount++
+				if d.Before(today) {
+					sundaysCount++
+				}
 			}
 		}
 	}
@@ -187,7 +208,12 @@ func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, per
 		elapsedWorkingDays = 0
 	}
 
-	totalTidakMasuk := elapsedWorkingDays - int(cMasuk) - int(cIzin) - int(cCuti) - int(cSppd)
+	regularWorkingMasuk := int(cMasuk) - int(cWorkedOff)
+	if regularWorkingMasuk < 0 {
+		regularWorkingMasuk = 0
+	}
+
+	totalTidakMasuk := elapsedWorkingDays - regularWorkingMasuk - int(cIzin) - int(cCuti) - int(cSppd)
 	if totalTidakMasuk < 0 {
 		totalTidakMasuk = 0
 	}
@@ -236,7 +262,7 @@ func (r *ReportRepository) GetReportSummary(ctx context.Context, nip string, per
 }
 
 func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai string, tanggalAkhir string, nip string, nidn string) (map[string]interface{}, error) {
-	db := r.getDB()
+	db := r.db
 	if db == nil {
 		log.Println("[ReportRepository] Error: Database connection is nil in GetAllLaporanAbsen")
 		return map[string]interface{}{
@@ -294,7 +320,7 @@ func (r *ReportRepository) GetAllLaporanAbsen(ctx context.Context, tanggalMulai 
 }
 
 func (r *ReportRepository) GetLaporanMergedParallel(ctx context.Context, tanggalMulai string, tanggalAkhir string, nip string, nidn string, userType string) ([]domain.LaporanPenggunaMerged, error) {
-	db := r.getDB()
+	db := r.db
 	if db == nil {
 		log.Println("[ReportRepository] Error: Database connection is nil in GetLaporanMergedParallel")
 		return []domain.LaporanPenggunaMerged{}, nil

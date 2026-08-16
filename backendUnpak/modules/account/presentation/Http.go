@@ -116,7 +116,7 @@ func WhoAmIHandler(c *fiber.Ctx) error {
 // =======================================================
 // GET /whoamiv2
 // =======================================================
-func WhoAmIV2Handler(c *fiber.Ctx) error {
+func WhoAmIv2Handler(c *fiber.Ctx) error {
 	sid := c.Query("sid")
 	source := c.Query("source")
 
@@ -224,6 +224,6 @@ func ModuleAccount(app *fiber.App) {
 
 	app.Get("/api/account/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
 	app.Get("/api/v2/account/whoami", commonpresentation.JWTMiddleware(), WhoAmIHandler)
-	app.Get("/api/account/whoamiv2", commonpresentation.JWTMiddleware(), WhoAmIHandler)
-	app.Get("/api/v2/account/whoamiv2", commonpresentation.JWTMiddleware(), WhoAmIHandler)
+	app.Get("/api/account/whoamiv2", commonpresentation.JWTMiddleware(), WhoAmIv2Handler)
+	app.Get("/api/v2/account/whoamiv2", commonpresentation.JWTMiddleware(), WhoAmIv2Handler)
 }

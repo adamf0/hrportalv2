@@ -18,12 +18,17 @@ class SsoHelper {
 
   static const _appAuth = FlutterAppAuth();
 
-  static String lastTokenRefreshTime = "Aktif";
+  static String lastTokenRefreshTime = "Belum Refreshed";
 
   static void updateTokenRefreshTime() {
     final now = DateTime.now();
-    lastTokenRefreshTime =
-        "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}";
+    final year = now.year;
+    final month = now.month.toString().padLeft(2, '0');
+    final day = now.day.toString().padLeft(2, '0');
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+    final second = now.second.toString().padLeft(2, '0');
+    lastTokenRefreshTime = "$year-$month-$day $hour:$minute:$second";
   }
 
   static Future<String?> getLoggedInName() async {
@@ -296,6 +301,7 @@ class SsoHelper {
     await LocalStorageMobile.write('email', email);
     await LocalStorageMobile.write('role', role);
     await LocalStorageMobile.write('groups', jsonEncode(groups));
+    updateTokenRefreshTime();
   }
 
   static Future<Map<String, dynamic>?> getSession() async {

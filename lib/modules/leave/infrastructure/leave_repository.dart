@@ -1,6 +1,4 @@
 import 'dart:convert';
-
-/// LeaveRepository Infrastructure Implementation
 import 'package:flutter/foundation.dart';
 import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/core/sso_helper.dart';
@@ -52,11 +50,7 @@ class LeaveRepository implements ILeaveRepository {
               DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
           final endDate =
               DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
-          final jenisCutiId = json['jenis_cuti_id'] as int? ?? 1;
-          String type = "Cuti Tahunan";
-          if (jenisCutiId == 2) type = "Cuti Sakit";
-          if (jenisCutiId == 3) type = "Cuti Melahirkan";
-          if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
+          final jenisCutiId = json['jenis_cuti_id'] as int? ?? json['id_jenis_cuti'] as int? ?? 1;
 
           final svId =
               json['verifikasi']?.toString() ?? json['nip_atasan']?.toString();
@@ -64,12 +58,13 @@ class LeaveRepository implements ILeaveRepository {
               _parseAttachmentPath(json, ['dokumen', 'file_lampiran', 'file']);
           allRequests.add(LeaveRequest(
             id: "cuti_${json['id']}",
-            type: type,
+            type: "Cuti",
+            idJenisCuti: jenisCutiId,
             status: json['status'] ?? 'Pengajuan',
             dateRange:
                 "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
             details: json['alasan'] ?? '',
-            note: json['catatan_atasan'] ?? 'Menunggu verifikasi',
+            note: json['catatan_atasan'] ?? json['catatan'] ?? 'Menunggu verifikasi',
             startDate: startDate,
             endDate: endDate,
             applicantName: sessionName,
@@ -86,11 +81,7 @@ class LeaveRepository implements ILeaveRepository {
         for (var json in izinData) {
           final dateStr = json['tanggal_pengajuan'] as String? ?? '';
           final date = DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
-          final jenisIzinId = json['id_jenis_izin'] as int? ?? 1;
-          String type = "Izin Sakit";
-          if (jenisIzinId == 2) type = "Izin Sakit Tanpa Dokter";
-          if (jenisIzinId == 3) type = "Izin Melahirkan";
-          if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
+          final jenisIzinId = json['id_jenis_izin'] as int? ?? json['jenis_izin_id'] as int? ?? 1;
 
           final svId = json['verifikasi']?.toString() ??
               json['id_verifikasi']?.toString();
@@ -98,7 +89,8 @@ class LeaveRepository implements ILeaveRepository {
               _parseAttachmentPath(json, ['file_lampiran', 'dokumen', 'file']);
           allRequests.add(LeaveRequest(
             id: "izin_${json['id']}",
-            type: type,
+            type: "Izin",
+            idJenisIzin: jenisIzinId,
             status: json['status'] ?? 'Pengajuan',
             dateRange: "${date.day} ${_getMonthName(date.month)} ${date.year}",
             details: json['tujuan'] ?? '',
@@ -128,9 +120,7 @@ class LeaveRepository implements ILeaveRepository {
         final startDate =
             DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
         final endDate = DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
-        final jenisSppdId = json['jenis_sppd_id'] as int? ?? 1;
-        String type = "SPPD - Dinas Luar";
-        if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";
+        final jenisSppdId = json['jenis_sppd_id'] as int? ?? json['id_jenis_sppd'] as int? ?? 1;
 
         String? svId = json['verifikasi']?.toString();
         if (svId == null || svId.isEmpty) {
@@ -142,9 +132,40 @@ class LeaveRepository implements ILeaveRepository {
 
         final attPath = _parseAttachmentPath(
             json, ['file_sppd_laporan', 'file', 'dokumen']);
+
+        List<SppdMember>? parsedSppdMembers;
+        dynamic rawAnggota = json['anggota'] ?? json['members'];
+        if (rawAnggota != null) {
+          try {
+            if (rawAnggota is String && rawAnggota.trim().startsWith('[')) {
+              rawAnggota = jsonDecode(rawAnggota);
+            }
+            if (rawAnggota is List) {
+              parsedSppdMembers = rawAnggota.map((m) {
+                if (m is Map<String, dynamic>) {
+                  return SppdMember.fromJson(m);
+                } else if (m is Map) {
+                  return SppdMember.fromJson(Map<String, dynamic>.from(m));
+                }
+                return SppdMember(nama: m.toString());
+              }).where((m) => m.nama.isNotEmpty).toList();
+            }
+          } catch (e) {
+            debugPrint('[LeaveRepository parse anggota error]: $e');
+          }
+        }
+
+        final legacyMembers = parsedSppdMembers
+            ?.map((s) => Supervisor(
+                id: s.nip.isNotEmpty ? s.nip : s.nidn,
+                name: s.nama,
+                role: s.unit))
+            .toList();
+
         allRequests.add(LeaveRequest(
           id: "sppd_${json['id']}",
-          type: type,
+          type: "SPPD",
+          idJenisSppd: jenisSppdId,
           status: json['status'] ?? 'Pengajuan',
           dateRange:
               "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
@@ -157,6 +178,8 @@ class LeaveRepository implements ILeaveRepository {
           applicantNidn: sessionNidn,
           supervisorId: svId,
           attachmentPath: attPath,
+          members: legacyMembers,
+          sppdMembers: parsedSppdMembers,
         ));
       }
 
@@ -201,12 +224,13 @@ class LeaveRepository implements ILeaveRepository {
           items = res['data'] as List;
         }
 
+        final isSppd = path.contains("sppd");
+        final isIzin = path.contains("izin");
+        final prefix = isSppd ? "sppd" : (isIzin ? "izin" : "cuti");
+        final typeStr = isSppd ? "SPPD" : (isIzin ? "Izin" : "Cuti");
+
         for (var json in items) {
-          final idStr = path.contains("sppd")
-              ? "sppd_${json['id']}"
-              : (path.contains("izin")
-                  ? "izin_${json['id']}"
-                  : "cuti_${json['id']}");
+          final idStr = "${prefix}_${json['id']}";
 
           if (verificationRequests.any((req) => req.id == idStr)) continue;
 
@@ -217,53 +241,9 @@ class LeaveRepository implements ILeaveRepository {
           final endStr =
               json['tanggal_selesai'] ?? json['tanggal_kembali'] ?? startStr;
           final startDate =
-              DateTime.tryParse(startStr)?.toLocal() ?? DateTime.now();
+              DateTime.tryParse(startStr.toString())?.toLocal() ?? DateTime.now();
           final endDate =
-              DateTime.tryParse(endStr)?.toLocal() ?? DateTime.now();
-
-          String type = "Cuti Tahunan";
-          if (path.contains("sppd")) {
-            final jenisSppdId = json['jenis_sppd_id'] as int? ??
-                json['id_jenis_sppd'] as int? ??
-                1;
-            type = "SPPD - Dinas Luar";
-            if (jenisSppdId == 2) type = "SPPD - Dinas Dalam Kota";
-            if (jenisSppdId == 3) type = "SPPD - Konsultasi / Diklat";
-            if (jenisSppdId == 4) type = "SPPD - Workshop / Seminar";
-            if (jenisSppdId == 5) type = "SPPD - Kerjasama Luar Negeri";
-            if (json['nama_jenis_sppd'] != null &&
-                json['nama_jenis_sppd'].toString().isNotEmpty) {
-              type = json['nama_jenis_sppd'].toString();
-            }
-          } else if (path.contains("izin")) {
-            final jenisIzinId = json['id_jenis_izin'] as int? ??
-                json['jenis_izin_id'] as int? ??
-                1;
-            type = "Izin Sakit";
-            if (jenisIzinId == 2) type = "Izin Sakit Tanpa Dokter";
-            if (jenisIzinId == 3) type = "Izin Melahirkan";
-            if (jenisIzinId == 4) type = "Izin Keperluan Mendesak";
-            if (jenisIzinId == 5) type = "Izin Terlambat Masuk";
-            if (jenisIzinId == 6) type = "Izin Pulang Cepat";
-            if (json['nama_jenis_izin'] != null &&
-                json['nama_jenis_izin'].toString().isNotEmpty) {
-              type = json['nama_jenis_izin'].toString();
-            }
-          } else {
-            final jenisCutiId = json['jenis_cuti_id'] as int? ??
-                json['id_jenis_cuti'] as int? ??
-                1;
-            type = "Cuti Tahunan";
-            if (jenisCutiId == 2) type = "Cuti Sakit";
-            if (jenisCutiId == 3) type = "Cuti Melahirkan";
-            if (jenisCutiId == 4) type = "Cuti Menunaikan Ibadah Haji";
-            if (jenisCutiId == 5) type = "Cuti Besar";
-            if (jenisCutiId == 6) type = "Cuti Alasan Penting";
-            if (json['nama_jenis_cuti'] != null &&
-                json['nama_jenis_cuti'].toString().isNotEmpty) {
-              type = json['nama_jenis_cuti'].toString();
-            }
-          }
+              DateTime.tryParse(endStr.toString())?.toLocal() ?? DateTime.now();
 
           final appName = json['nama'] as String? ??
               json['nama_pegawai'] as String? ??
@@ -274,9 +254,22 @@ class LeaveRepository implements ILeaveRepository {
           final appNidn =
               json['nidn'] as String? ?? json['nidn_pemohon'] as String?;
 
+          final int? idJenisCuti = !isSppd && !isIzin
+              ? (json['jenis_cuti_id'] as int? ?? json['id_jenis_cuti'] as int? ?? 1)
+              : null;
+          final int? idJenisIzin = isIzin
+              ? (json['id_jenis_izin'] as int? ?? json['jenis_izin_id'] as int? ?? 1)
+              : null;
+          final int? idJenisSppd = isSppd
+              ? (json['jenis_sppd_id'] as int? ?? json['id_jenis_sppd'] as int? ?? 1)
+              : null;
+
           verificationRequests.add(LeaveRequest(
             id: idStr,
-            type: type,
+            type: typeStr,
+            idJenisCuti: idJenisCuti,
+            idJenisIzin: idJenisIzin,
+            idJenisSppd: idJenisSppd,
             status: json['status'] ?? 'Pengajuan',
             dateRange:
                 "${startDate.day} - ${endDate.day} ${_getMonthName(startDate.month)} ${startDate.year}",
@@ -322,7 +315,7 @@ class LeaveRepository implements ILeaveRepository {
       final typeLower = request.type.toLowerCase();
 
       if (typeLower.startsWith("izin")) {
-        int jenisIzinId = 1;
+        int jenisIzinId = request.idJenisIzin ?? 1;
         if (typeLower.contains("tanpa dokter")) jenisIzinId = 2;
         if (typeLower.contains("melahirkan")) jenisIzinId = 3;
         if (typeLower.contains("mendesak")) jenisIzinId = 4;
@@ -355,12 +348,12 @@ class LeaveRepository implements ILeaveRepository {
         }
 
         final responseData = await ApiClient.post(
-          Uri.parse("${ApiClient.baseUrl}/api/izin/"),
+          Uri.parse("${ApiClient.baseUrl}/api/izin"),
           body: bodyData,
         );
         return responseData != null;
       } else if (typeLower.startsWith("sppd")) {
-        int jenisSppdId = 1;
+        int jenisSppdId = request.idJenisSppd ?? 1;
         if (typeLower.contains("dalam kota")) jenisSppdId = 2;
 
         final name = session['name'] ?? session['nama'] ?? '';
@@ -415,7 +408,7 @@ class LeaveRepository implements ILeaveRepository {
         );
         return responseData != null;
       } else {
-        int jenisCutiId = 1;
+        int jenisCutiId = request.idJenisCuti ?? 1;
         if (typeLower.contains("sakit")) jenisCutiId = 2;
         if (typeLower.contains("melahirkan")) jenisCutiId = 3;
         if (typeLower.contains("dinas luar")) jenisCutiId = 4;

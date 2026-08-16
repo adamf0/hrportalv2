@@ -41,13 +41,21 @@ func mustStart(name string, fn func() error) {
 func tryConnectDB(envVar string, dbName string) (*gorm.DB, error) {
 	candidates := []string{}
 	if envDSN := os.Getenv(envVar); envDSN != "" {
-		candidates = append(candidates, envDSN)
+		dsnWithTimeout := envDSN
+		if !strings.Contains(dsnWithTimeout, "timeout=") {
+			if strings.Contains(dsnWithTimeout, "?") {
+				dsnWithTimeout += "&timeout=2s"
+			} else {
+				dsnWithTimeout += "?timeout=2s"
+			}
+		}
+		candidates = append(candidates, dsnWithTimeout)
 	}
 	// Candidate fallbacks: empty password, 'password', 'root'
 	candidates = append(candidates,
-		fmt.Sprintf("root:@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
-		fmt.Sprintf("root:password@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
-		fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbName),
+		fmt.Sprintf("root:@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=2s", dbName),
+		fmt.Sprintf("root:password@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=2s", dbName),
+		fmt.Sprintf("root:root@tcp(127.0.0.1:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local&timeout=2s", dbName),
 	)
 
 	var lastErr error
@@ -136,29 +144,30 @@ func main() {
 	mediatr.RegisterRequestPipelineBehaviors(NewValidationBehavior())
 
 	var (
-		db       *gorm.DB
-		dbSimak  *gorm.DB
-		dbSimpeg *gorm.DB
+		db          *gorm.DB
+		dbSimak     *gorm.DB
+		dbSimpeg    *gorm.DB
+		dbSimpegNew *gorm.DB
 	)
 	mustStart("Database", func() error {
 		var err error
 		db, err = tryConnectDB("DB_HRPORTAL", "unpak_hrportal")
-		// if err == nil && db != nil {
-		// 	commonhelper.GlobalFcmManager.SetDB(db)
-		// }
 		return err
 	})
 
 	mustStart("Database SIMAK", func() error {
-		var err error
-		dbSimak, err = tryConnectDB("DB_SIMAK", "unpak_simak")
-		return err
+		dbSimak, _ = tryConnectDB("DB_SIMAK", "unpak_simak")
+		return nil
 	})
 
-	mustStart("Database SIMPEG", func() error {
-		var err error
-		dbSimpeg, err = tryConnectDB("DB_SIMPEG", "unpak_simpeg")
-		return err
+	mustStart("Database SIMPEG (Legacy unpak_simpeg)", func() error {
+		dbSimpeg, _ = tryConnectDB("DB_SIMPEG", "unpak_simpeg")
+		return nil
+	})
+
+	mustStart("Database SIMPEG NEW (unpak_newsimpeg)", func() error {
+		dbSimpegNew, _ = tryConnectDB("DB_SIMPEG_NEW", "unpak_newsimpeg")
+		return nil
 	})
 
 	mustStart("Account Module", func() error {
@@ -168,7 +177,10 @@ func main() {
 		if dbSimpeg == nil {
 			dbSimpeg = db
 		}
-		return accountInfrastructure.RegisterModuleAccount(db, dbSimak, dbSimpeg)
+		if dbSimpegNew == nil {
+			dbSimpegNew = dbSimpeg
+		}
+		return accountInfrastructure.RegisterModuleAccount(db, dbSimak, dbSimpeg, dbSimpegNew)
 	})
 
 	mustStart("MasterData Module", func() error {

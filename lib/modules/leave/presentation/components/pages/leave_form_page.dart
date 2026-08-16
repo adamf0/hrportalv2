@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:hrportalv2/core/storage_helper.dart';
-import 'package:hrportalv2/core/api_client.dart';
 import 'package:hrportalv2/modules/leave/domain/leave_form_type.dart';
 import 'package:hrportalv2/modules/leave/presentation/leave_bloc.dart';
 import 'package:hrportalv2/modules/attendance/presentation/attendance_bloc.dart';
@@ -53,6 +53,17 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
   late LeaveFormType _activeType;
 
   bool _isMasterDataLoading = true;
+
+  // Real-time S3 Upload State
+  bool _isUploading = false;
+  LeaveFormType? _uploadingFormType;
+  double _uploadPercentage = 0.0;
+  int _bytesUploaded = 0;
+  int _totalBytes = 0;
+  double _speedMBps = 0.0;
+  bool _isUploadFailed = false;
+  String? _uploadedObjectKey;
+  http.Client? _uploadHttpClient;
 
   @override
   void initState() {
@@ -257,6 +268,99 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     }
   }
 
+  Future<void> _startUploadAttachment(LeaveFormType formType, File file) async {
+    _uploadHttpClient?.close();
+    _uploadHttpClient = http.Client();
+
+    setState(() {
+      _isUploading = true;
+      _uploadingFormType = formType;
+      _isUploadFailed = false;
+      _uploadPercentage = 0.0;
+      _bytesUploaded = 0;
+      _totalBytes = 0;
+      _speedMBps = 0.0;
+      _uploadedObjectKey = null;
+    });
+
+    final typeStr = formType == LeaveFormType.cuti
+        ? 'cuti'
+        : (formType == LeaveFormType.izin ? 'izin' : 'sppd');
+
+    final key = await StorageHelper.uploadFileWithPresign(
+      file: file,
+      type: typeStr,
+      httpClient: _uploadHttpClient,
+      onProgressDetailed: ({
+        required int bytesUploaded,
+        required int totalBytes,
+        required double percentage,
+        required double speedMBps,
+      }) {
+        if (mounted) {
+          setState(() {
+            _bytesUploaded = bytesUploaded;
+            _totalBytes = totalBytes;
+            _uploadPercentage = percentage;
+            _speedMBps = speedMBps;
+          });
+        }
+      },
+    );
+
+    if (mounted) {
+      setState(() {
+        _isUploading = false;
+        if (key != null) {
+          _uploadedObjectKey = key;
+          _isUploadFailed = false;
+        } else {
+          _isUploadFailed = true;
+        }
+      });
+    }
+  }
+
+  void _cancelUpload() {
+    _uploadHttpClient?.close();
+    _uploadHttpClient = null;
+    setState(() {
+      _isUploading = false;
+      _isUploadFailed = false;
+      if (_uploadingFormType == LeaveFormType.cuti) {
+        _cutiHasAttachment = false;
+        _cutiFile = null;
+        _cutiFileName = '';
+      } else if (_uploadingFormType == LeaveFormType.izin) {
+        _izinHasAttachment = false;
+        _izinFile = null;
+        _izinFileName = '';
+      } else if (_uploadingFormType == LeaveFormType.sppd) {
+        _sppdHasAttachment = false;
+        _sppdFile = null;
+        _sppdFileName = '';
+      }
+    });
+  }
+
+  void _retryUpload(LeaveFormType formType) {
+    File? file;
+    switch (formType) {
+      case LeaveFormType.cuti:
+        file = _cutiFile;
+        break;
+      case LeaveFormType.izin:
+        file = _izinFile;
+        break;
+      case LeaveFormType.sppd:
+        file = _sppdFile;
+        break;
+    }
+    if (file != null) {
+      _startUploadAttachment(formType, file);
+    }
+  }
+
   Future<void> _pickAttachment(LeaveFormType formType) async {
     try {
       final result = await FilePicker.pickFiles(
@@ -292,6 +396,8 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
               break;
           }
         });
+
+        _startUploadAttachment(formType, file);
       }
     } catch (e) {
       debugPrint('[FilePicker error]: $e');
@@ -421,7 +527,12 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     final attendanceBloc = context.read<AttendanceBloc>();
     final messenger = ScaffoldMessenger.of(context);
 
-    if (_isSubmitting) return;
+    if (_isSubmitting ||
+        _isUploading ||
+        _isMasterDataLoading ||
+        LeaveFormData.isLoading ||
+        leaveBloc.isSupervisorsLoading ||
+        leaveBloc.isLoading) return;
 
     switch (_activeType) {
       case LeaveFormType.cuti:
@@ -446,16 +557,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
 
           String? finalAttachmentPath;
           if (_cutiHasAttachment) {
-            if (_cutiFile != null) {
-              ApiClient.showToast("Mengunggah dokumen lampiran ke storage...", scope: 'leave');
-              final uploadedKey = await StorageHelper.uploadFileWithPresign(
-                file: _cutiFile!,
-                type: 'cuti',
-              );
-              finalAttachmentPath = uploadedKey ?? _cutiFileName;
-            } else {
-              finalAttachmentPath = _cutiFileName;
-            }
+            finalAttachmentPath = _uploadedObjectKey ?? _cutiFileName;
           }
 
           if (widget.initialRequest != null) {
@@ -512,16 +614,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
 
           String? finalAttachmentPath;
           if (_izinHasAttachment) {
-            if (_izinFile != null) {
-              ApiClient.showToast("Mengunggah dokumen lampiran ke storage...", scope: 'leave');
-              final uploadedKey = await StorageHelper.uploadFileWithPresign(
-                file: _izinFile!,
-                type: 'izin',
-              );
-              finalAttachmentPath = uploadedKey ?? _izinFileName;
-            } else {
-              finalAttachmentPath = _izinFileName;
-            }
+            finalAttachmentPath = _uploadedObjectKey ?? _izinFileName;
           }
 
           if (widget.initialRequest != null) {
@@ -578,16 +671,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
 
           String? finalAttachmentPath;
           if (_sppdHasAttachment) {
-            if (_sppdFile != null) {
-              ApiClient.showToast("Mengunggah dokumen lampiran ke storage...", scope: 'leave');
-              final uploadedKey = await StorageHelper.uploadFileWithPresign(
-                file: _sppdFile!,
-                type: 'sppd',
-              );
-              finalAttachmentPath = uploadedKey ?? _sppdFileName;
-            } else {
-              finalAttachmentPath = _sppdFileName;
-            }
+            finalAttachmentPath = _uploadedObjectKey ?? _sppdFileName;
           }
 
           if (widget.initialRequest != null) {
@@ -737,7 +821,13 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           );
         },
       ),
-      isLoading: leaveBloc.isLoading,
+      isLoading: leaveBloc.isLoading ||
+          leaveBloc.isSupervisorsLoading ||
+          _isMasterDataLoading ||
+          LeaveFormData.isLoading ||
+          _isSubmitting ||
+          _isUploading ||
+          _isUploadFailed,
       isEditing: widget.initialRequest != null,
       isSupervisorError: leaveBloc.isSupervisorsError,
       isMasterDataLoading: _isMasterDataLoading || LeaveFormData.isLoading,
@@ -785,7 +875,13 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           );
         },
       ),
-      isLoading: leaveBloc.isLoading,
+      isLoading: leaveBloc.isLoading ||
+          leaveBloc.isSupervisorsLoading ||
+          _isMasterDataLoading ||
+          LeaveFormData.isLoading ||
+          _isSubmitting ||
+          _isUploading ||
+          _isUploadFailed,
       isEditing: widget.initialRequest != null,
       isSupervisorError: leaveBloc.isSupervisorsError,
       isMasterDataLoading: _isMasterDataLoading || LeaveFormData.isLoading,
@@ -848,7 +944,13 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           );
         },
       ),
-      isLoading: leaveBloc.isLoading,
+      isLoading: leaveBloc.isLoading ||
+          leaveBloc.isSupervisorsLoading ||
+          _isMasterDataLoading ||
+          LeaveFormData.isLoading ||
+          _isSubmitting ||
+          _isUploading ||
+          _isUploadFailed,
       isEditing: widget.initialRequest != null,
       isSupervisorError: leaveBloc.isSupervisorsError,
       isMasterDataLoading: _isMasterDataLoading || LeaveFormData.isLoading,
@@ -886,7 +988,11 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       fileSizeMb: fileSizeMb,
       onUpload: () => _pickAttachment(formType),
       onDelete: () {
+        _uploadHttpClient?.close();
         setState(() {
+          _isUploading = false;
+          _isUploadFailed = false;
+          _uploadedObjectKey = null;
           switch (formType) {
             case LeaveFormType.cuti:
               _cutiHasAttachment = false;
@@ -917,6 +1023,14 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       fileSizeMb: strategy.fileSizeMb,
       onUpload: strategy.onUpload,
       onDelete: strategy.onDelete,
+      isUploading: _isUploading && _uploadingFormType == formType,
+      uploadPercentage: _uploadPercentage,
+      bytesUploaded: _bytesUploaded,
+      totalBytes: _totalBytes,
+      speedMBps: _speedMBps,
+      isUploadFailed: _isUploadFailed && _uploadingFormType == formType,
+      onCancelUpload: _cancelUpload,
+      onRetryUpload: () => _retryUpload(formType),
     );
   }
 }

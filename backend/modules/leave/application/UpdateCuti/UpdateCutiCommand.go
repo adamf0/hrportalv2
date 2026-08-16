@@ -3,7 +3,6 @@ package UpdateCuti
 import (
 	"context"
 	common "hrportal_backend/common/domain"
-	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/leave/domain"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
@@ -92,9 +91,6 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 	var db *gorm.DB
 	if repo := reportInfra.GetReportRepository(); repo != nil {
 		db = repo.GetDB()
-	}
-	if db == nil {
-		db = commonhelper.GlobalFcmManager.GetDB()
 	}
 
 	ctxTx := ctx

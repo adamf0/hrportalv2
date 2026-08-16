@@ -61,26 +61,44 @@ class AttendanceBloc extends ChangeNotifier {
       }
 
       if (type == 'initial_state') {
-        final masukStr = payload['absen_masuk'] as String?;
-        if (masukStr != null && masukStr.isNotEmpty) {
-          final formatted = parseTime(masukStr);
-          if (formatted != '--:--') {
-            _checkInTime = formatted;
-            _isCheckedIn = true;
+        final tanggalStr = payload['tanggal'] as String? ?? '';
+        final now = DateTime.now();
+        final todayStr =
+            "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+        final yesterday = now.subtract(const Duration(days: 1));
+        final yesterdayStr =
+            "${yesterday.year}-${yesterday.month.toString().padLeft(2, '0')}-${yesterday.day.toString().padLeft(2, '0')}";
+
+        final isTargetDate = tanggalStr == todayStr ||
+            (now.hour < 5 && tanggalStr == yesterdayStr);
+
+        if (isTargetDate) {
+          final masukStr = payload['absen_masuk'] as String?;
+          if (masukStr != null && masukStr.isNotEmpty) {
+            final formatted = parseTime(masukStr);
+            if (formatted != '--:--') {
+              _checkInTime = formatted;
+              _isCheckedIn = true;
+            }
+          } else {
+            _checkInTime = '--:--';
+            _isCheckedIn = false;
+          }
+
+          final keluarStr = payload['absen_keluar'] as String?;
+          if (keluarStr != null && keluarStr.isNotEmpty) {
+            final formatted = parseTime(keluarStr);
+            if (formatted != '--:--') {
+              _checkOutTime = formatted;
+              _isCheckedOut = true;
+            }
+          } else {
+            _checkOutTime = '--:--';
+            _isCheckedOut = false;
           }
         } else {
           _checkInTime = '--:--';
           _isCheckedIn = false;
-        }
-
-        final keluarStr = payload['absen_keluar'] as String?;
-        if (keluarStr != null && keluarStr.isNotEmpty) {
-          final formatted = parseTime(keluarStr);
-          if (formatted != '--:--') {
-            _checkOutTime = formatted;
-            _isCheckedOut = true;
-          }
-        } else {
           _checkOutTime = '--:--';
           _isCheckedOut = false;
         }
@@ -153,6 +171,9 @@ class AttendanceBloc extends ChangeNotifier {
 
   final List<AbsenUpacaraData> _ceremonyAttendances = [];
   List<AbsenUpacaraData> get ceremonyAttendances => _ceremonyAttendances;
+
+  bool _isCeremonyLoading = false;
+  bool get isCeremonyLoading => _isCeremonyLoading;
 
   StreamSubscription<Position>? _gpsSubscription;
   Timer? _ipCheckTimer;
@@ -307,6 +328,8 @@ class AttendanceBloc extends ChangeNotifier {
   }
 
   Future<void> fetchCeremonyAttendances() async {
+    _isCeremonyLoading = true;
+    notifyListeners();
     try {
       final responseData = await ApiClient.get(
         Uri.parse("${ApiClient.baseUrl}/api/ceremony-attendance"),
@@ -336,10 +359,12 @@ class AttendanceBloc extends ChangeNotifier {
         }
         _isUpacaraCheckedIn = upacaraToday;
         _upacaraTime = upacaraTimeStr;
-        notifyListeners();
       }
     } catch (e) {
       debugPrint('[AttendanceBloc fetchCeremonyAttendances error]: $e');
+    } finally {
+      _isCeremonyLoading = false;
+      notifyListeners();
     }
   }
 
@@ -675,50 +700,60 @@ class AttendanceBloc extends ChangeNotifier {
         notifyListeners();
       }
 
-      _isAutoCheckInEvaluating = false;
-      notifyListeners();
+      if (_isAutoCheckInEvaluating) {
+        _isAutoCheckInEvaluating = false;
+        notifyListeners();
+      }
 
-      // Periodic timer to guarantee 1-second interval updates
-      _gpsTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      void updateLocationState(double newLat, double newLon, bool newFakeGps) {
+        bool changed = false;
+        if ((newLat - _realLatitude).abs() > 0.00005) {
+          _realLatitude = newLat;
+          if (_useRealNetworkAndGps) _simulatedLatitude = newLat;
+          changed = true;
+        }
+        if ((newLon - _realLongitude).abs() > 0.00005) {
+          _realLongitude = newLon;
+          if (_useRealNetworkAndGps) _simulatedLongitude = newLon;
+          changed = true;
+        }
+        if (newFakeGps != _isFakeGps) {
+          _isFakeGps = newFakeGps;
+          changed = true;
+        }
+        if (changed) {
+          notifyListeners();
+        }
+      }
+
+      // Periodic timer every 5 seconds (instead of 1s) to check GPS
+      _gpsTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
         try {
           final p = await LocationWifiHelper.getCurrentLocation();
           if (p != null) {
-            _realLatitude = p.latitude;
-            _realLongitude = p.longitude;
-            _isFakeGps = await DetectFakeLocation().detectFakeLocation();
-            if (_useRealNetworkAndGps) {
-              _simulatedLatitude = p.latitude;
-              _simulatedLongitude = p.longitude;
-            }
-            notifyListeners();
+            final fake = await DetectFakeLocation().detectFakeLocation();
+            updateLocationState(p.latitude, p.longitude, fake);
           }
         } catch (_) {}
       });
 
       _gpsSubscription = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 0,
+          accuracy: LocationAccuracy.medium,
+          distanceFilter: 5,
         ),
       ).listen((Position position) async {
-        _realLatitude = position.latitude;
-        _realLongitude = position.longitude;
-        _isFakeGps = await DetectFakeLocation().detectFakeLocation();
-
-        if (_useRealNetworkAndGps) {
-          _simulatedIp = _realIp;
-          _simulatedLatitude = position.latitude;
-          _simulatedLongitude = position.longitude;
-        }
-
-        notifyListeners();
+        final fake = await DetectFakeLocation().detectFakeLocation();
+        updateLocationState(position.latitude, position.longitude, fake);
       }, onError: (err) {
         debugPrint("Realtime GPS Stream Error: $err");
       });
     } catch (e) {
       debugPrint("Failed to initialize GPS subscription: $e");
-      _isAutoCheckInEvaluating = false;
-      notifyListeners();
+      if (_isAutoCheckInEvaluating) {
+        _isAutoCheckInEvaluating = false;
+        notifyListeners();
+      }
     }
   }
 }

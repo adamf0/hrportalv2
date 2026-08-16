@@ -5,7 +5,6 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
-	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
@@ -177,9 +176,6 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	var db *gorm.DB
 	if repo := reportInfra.GetReportRepository(); repo != nil {
 		db = repo.GetDB()
-	}
-	if db == nil {
-		db = commonhelper.GlobalFcmManager.GetDB()
 	}
 
 	ctxTx := ctx

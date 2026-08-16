@@ -88,8 +88,10 @@ class LeaveBloc extends ChangeNotifier {
           ? jc['id'] as int
           : int.tryParse(jc['id'].toString()) ?? 1;
       final name = (jc['name'] ?? jc['nama'] ?? 'Cuti').toString();
-      int defaultQuota =
-          jc['quota'] is int ? jc['quota'] as int : (id == 1 ? 12 : 0);
+      final rawQuota = jc['max_hari'] ?? jc['quota'];
+      int defaultQuota = rawQuota is int
+          ? rawQuota
+          : (int.tryParse(rawQuota?.toString() ?? '') ?? (id == 1 ? 12 : 0));
 
       int diambil = 0;
       int pending = 0;

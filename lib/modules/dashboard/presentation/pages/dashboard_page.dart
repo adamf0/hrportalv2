@@ -71,12 +71,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
   int _totalAbsen1To31 = 0;
   int _totalIzin1To31 = 0;
+  int _totalCuti1To31 = 0;
   int _totalSppd1To31 = 0;
   int _tidakMasuk1To31 = 0;
   int _totalUpacara1To31 = 0;
 
   int _totalAbsen15To15 = 0;
   int _totalIzin15To15 = 0;
+  int _totalCuti15To15 = 0;
   int _totalSppd15To15 = 0;
   int _tidakMasuk15To15 = 0;
   int _totalUpacara15To15 = 0;
@@ -221,6 +223,15 @@ class _DashboardPageState extends State<DashboardPage> {
       if (responseData is List) {
         for (var item in responseData) {
           if (item is Map<String, dynamic>) {
+            final type = (item['type'] as String? ?? '').toLowerCase();
+            final status = (item['status'] as String? ?? '').toLowerCase();
+
+            if (type == 'izin' || type == 'cuti' || type == 'leave' || type == 'sppd') {
+              if (status != 'terima sdm' && status != 'disetujui' && status != 'acc') {
+                continue;
+              }
+            }
+
             final tanggal = item['tanggal'] as String? ?? '';
             if (tanggal.isNotEmpty) {
               final cleanKey = tanggal.split('T')[0];
@@ -259,8 +270,8 @@ class _DashboardPageState extends State<DashboardPage> {
       // Parse CALENDAR summary (1-31)
       if (summaryCalendar is Map<String, dynamic>) {
         _totalAbsen1To31 = summaryCalendar['total_masuk'] ?? 0;
-        _totalIzin1To31 = (summaryCalendar['total_izin'] ?? 0) +
-            (summaryCalendar['total_cuti'] ?? 0);
+        _totalIzin1To31 = summaryCalendar['total_izin'] ?? 0;
+        _totalCuti1To31 = summaryCalendar['total_cuti'] ?? 0;
         _totalSppd1To31 = summaryCalendar['total_sppd'] ?? 0;
         _totalUpacara1To31 = summaryCalendar['total_upacara'] ?? 0;
 
@@ -276,15 +287,15 @@ class _DashboardPageState extends State<DashboardPage> {
               _selectedCalendarDay.year, _selectedCalendarDay.month + 1, 0);
           final totalLibur = summaryCalendar['total_libur'] ?? 0;
           _tidakMasuk1To31 = _calculateTidakMasukFromDB(_totalAbsen1To31,
-              _totalIzin1To31, _totalSppd1To31, totalLibur, start, end);
+              _totalIzin1To31 + _totalCuti1To31, _totalSppd1To31, totalLibur, start, end);
         }
       }
 
       // Parse CALENDAR-CUTOFF summary (15-15)
       if (summaryCutoff is Map<String, dynamic>) {
         _totalAbsen15To15 = summaryCutoff['total_masuk'] ?? 0;
-        _totalIzin15To15 = (summaryCutoff['total_izin'] ?? 0) +
-            (summaryCutoff['total_cuti'] ?? 0);
+        _totalIzin15To15 = summaryCutoff['total_izin'] ?? 0;
+        _totalCuti15To15 = summaryCutoff['total_cuti'] ?? 0;
         _totalSppd15To15 = summaryCutoff['total_sppd'] ?? 0;
         _totalUpacara15To15 = summaryCutoff['total_upacara'] ?? 0;
 
@@ -322,22 +333,29 @@ class _DashboardPageState extends State<DashboardPage> {
   int _calculateTidakMasukFromDB(int totalAbsen, int totalIzin, int totalSppd,
       int totalLibur, DateTime start, DateTime end) {
     int totalDays = 0;
+    int sundaysBeforeToday = 0;
     DateTime cur = start;
-    final today = DateTime.now();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final limit = end.isAfter(today) ? today : end;
     while (cur.isBefore(limit) || DateUtils.isSameDay(cur, limit)) {
       totalDays++;
+      if (cur.weekday == DateTime.sunday && cur.isBefore(today)) {
+        sundaysBeforeToday++;
+      }
       cur = cur.add(const Duration(days: 1));
     }
-    final missing = totalDays - totalAbsen - totalIzin - totalSppd - totalLibur;
+    final totalOff = sundaysBeforeToday + totalLibur;
+    final workingDays = totalDays - totalOff;
+    final missing = workingDays - totalAbsen - totalIzin - totalSppd;
     return missing > 0 ? missing : 0;
   }
 
   @override
   Widget build(BuildContext context) {
-    final authBloc = Provider.of<AuthBloc>(context);
-    final attendanceBloc = Provider.of<AttendanceBloc>(context);
-    final leaveBloc = Provider.of<LeaveBloc>(context);
+    final authBloc = context.read<AuthBloc>();
+    final attendanceBloc = context.read<AttendanceBloc>();
+    final leaveBloc = context.read<LeaveBloc>();
 
     final background = Theme.of(context).colorScheme.surface;
     return Scaffold(
@@ -365,52 +383,79 @@ class _DashboardPageState extends State<DashboardPage> {
                   onNotificationTap: () {},
                 ),
                 const SizedBox(height: 24),
-                GreetingBanner(
-                  isCheckedIn: attendanceBloc.isCheckedIn,
+                Selector<AttendanceBloc, bool>(
+                  selector: (_, bloc) => bloc.isCheckedIn,
+                  builder: (context, isCheckedIn, _) {
+                    return GreetingBanner(isCheckedIn: isCheckedIn);
+                  },
                 ),
                 const SizedBox(height: 20),
-                AttendanceTimeCards(
-                  isLoading: _calendarLoading,
-                  isCheckedIn: attendanceBloc.isCheckedIn,
-                  checkInTime: attendanceBloc.checkInTime,
-                  checkOutTime: attendanceBloc.checkOutTime,
-                  onJamMasukTap: () {
-                    if (!attendanceBloc.isCheckedIn) {
-                      attendanceBloc.setTabIndex(1);
-                    }
-                  },
-                  onJamPulangTap: () {
-                    if (attendanceBloc.isCheckedIn &&
-                        attendanceBloc.checkOutTime == "--:--") {
-                      _simulateCheckOut(context, attendanceBloc);
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                Builder(
-                  builder: (context) {
-                    final now = DateTime.now();
-                    final isButtonEnabled = now.day == 17 && now.hour == 8;
-                    return FlagCeremonyCard(
-                      isUpacaraCheckedIn: attendanceBloc.isUpacaraCheckedIn,
-                      upacaraTime: attendanceBloc.upacaraTime,
-                      isButtonEnabled: isButtonEnabled,
-                      onVerifyTap: () {
-                        attendanceBloc.isUpacaraCheckInIntent = true;
-                        attendanceBloc.setTabIndex(1);
+                Selector<AttendanceBloc, (bool, String, String)>(
+                  selector: (_, bloc) =>
+                      (bloc.isCheckedIn, bloc.checkInTime, bloc.checkOutTime),
+                  builder: (context, data, _) {
+                    return AttendanceTimeCards(
+                      isLoading: false,
+                      isCheckedIn: data.$1,
+                      checkInTime: data.$2,
+                      checkOutTime: data.$3,
+                      onJamMasukTap: () {
+                        if (!data.$1) {
+                          context.read<AttendanceBloc>().setTabIndex(1);
+                        }
+                      },
+                      onJamPulangTap: () {
+                        final bloc = context.read<AttendanceBloc>();
+                        if (bloc.isCheckedIn &&
+                            bloc.checkOutTime == "--:--") {
+                          _simulateCheckOut(context, bloc);
+                        }
                       },
                     );
                   },
                 ),
                 const SizedBox(height: 16),
-                AutoCheckInStatusCard(
-                  isCheckedIn: attendanceBloc.isCheckedIn,
-                  isAutoCheckInEvaluating:
-                      attendanceBloc.isAutoCheckInEvaluating,
-                  realIp: attendanceBloc.realIp,
-                  realLatitude: attendanceBloc.realLatitude,
-                  realLongitude: attendanceBloc.realLongitude,
-                  onManualCheckInTap: () => attendanceBloc.setTabIndex(1),
+                Selector<AttendanceBloc, (bool, String)>(
+                  selector: (_, bloc) =>
+                      (bloc.isUpacaraCheckedIn, bloc.upacaraTime),
+                  builder: (context, data, _) {
+                    final now = DateTime.now();
+                    final isButtonEnabled = now.day == 17 && now.hour == 8;
+                    return FlagCeremonyCard(
+                      isUpacaraCheckedIn: data.$1,
+                      upacaraTime: data.$2,
+                      isButtonEnabled: isButtonEnabled,
+                      onVerifyTap: () {
+                        final bloc = context.read<AttendanceBloc>();
+                        bloc.isUpacaraCheckInIntent = true;
+                        bloc.setTabIndex(1);
+                      },
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+                Selector<AttendanceBloc, (bool, bool, String, String)>(
+                  selector: (_, bloc) => (
+                    bloc.isCheckedIn,
+                    bloc.isAutoCheckInEvaluating,
+                    bloc.realIp,
+                    "${bloc.realLatitude.toStringAsFixed(4)}, ${bloc.realLongitude.toStringAsFixed(4)}",
+                  ),
+                  builder: (context, data, _) {
+                    final coords = data.$4.split(', ');
+                    final lat = double.tryParse(coords[0]) ?? 0.0;
+                    final lon = double.tryParse(coords[1]) ?? 0.0;
+
+                    return AutoCheckInStatusCard(
+                      isCheckedIn: data.$1,
+                      isAutoCheckInEvaluating: data.$2,
+                      realIp: data.$3,
+                      realLatitude: lat,
+                      realLongitude: lon,
+                      onManualCheckInTap: () =>
+                          context.read<AttendanceBloc>().setTabIndex(1),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
                 const QuestionnaireSection(),
@@ -466,11 +511,13 @@ class _DashboardPageState extends State<DashboardPage> {
                   isLoading: _calendarLoading,
                   totalAbsen1To31: _totalAbsen1To31,
                   totalIzin1To31: _totalIzin1To31,
+                  totalCuti1To31: _totalCuti1To31,
                   totalSppd1To31: _totalSppd1To31,
                   tidakMasuk1To31: _tidakMasuk1To31,
                   totalUpacara1To31: _totalUpacara1To31,
                   totalAbsen15To15: _totalAbsen15To15,
                   totalIzin15To15: _totalIzin15To15,
+                  totalCuti15To15: _totalCuti15To15,
                   totalSppd15To15: _totalSppd15To15,
                   tidakMasuk15To15: _tidakMasuk15To15,
                   totalUpacara15To15: _totalUpacara15To15,

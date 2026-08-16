@@ -15,12 +15,13 @@ import (
 )
 
 type SimakRepository struct {
-	dbSimak  *gorm.DB
-	dbSimpeg *gorm.DB
+	dbSimak     *gorm.DB
+	dbSimpeg    *gorm.DB
+	dbSimpegNew *gorm.DB
 }
 
-func NewSimakRepository(dbSimak *gorm.DB, dbSimpeg *gorm.DB) domain.ISimakRepository {
-	return &SimakRepository{dbSimak: dbSimak, dbSimpeg: dbSimpeg}
+func NewSimakRepository(dbSimak *gorm.DB, dbSimpeg *gorm.DB, dbSimpegNew *gorm.DB) domain.ISimakRepository {
+	return &SimakRepository{dbSimak: dbSimak, dbSimpeg: dbSimpeg, dbSimpegNew: dbSimpegNew}
 }
 
 func (r *SimakRepository) Authenticate(ctx context.Context, username, password string) (*domain.AuthResult, error) {
@@ -39,80 +40,118 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 	_ = r.dbSimak.WithContext(ctx).Table("user").
 		Where("username = ? AND (password = SHA1(MD5(?)) OR password = SHA1(?) OR password = MD5(?) OR password = ?)",
 			rawUsername, rawPassword, rawPassword, rawPassword, rawPassword).
-		Where("level = ?", "DOSEN").
-		Where("aktif = ?", "Y").
 		Find(&userSimak)
 
-	if len(userSimak) > 1 {
-		return nil, errors.New("akun " + rawUsername + " lebih dari 1")
+	if len(userSimak) == 0 {
+		hash1 := r.hashSimak(rawPassword)
+		_ = r.dbSimak.WithContext(ctx).Table("user").
+			Where("username = ? AND password = ?", rawUsername, hash1).
+			Find(&userSimak)
 	}
 
-	if len(userSimak) == 1 {
-		userid := userSimak[0].Userid
-
-		var dosen struct {
-			NIDN *string `gorm:"column:NIDN"`
-			NIP  *string `gorm:"column:NIP"`
-			Nama *string `gorm:"column:nama"`
-		}
-		_ = r.dbSimak.WithContext(ctx).Table("m_dosen").Where("NIDN = ? OR NIP = ?", userid, userid).First(&dosen)
-
-		sid := userid
-		if helper.StringValue(dosen.NIDN) != "" {
-			sid = helper.StringValue(dosen.NIDN)
-		}
-
-		return &domain.AuthResult{
-			Sid:    sid,
-			Source: "simak",
-			Name:   helper.StringValue(dosen.Nama),
-			Nip:    helper.StringValue(dosen.NIP),
-			Nidn:   helper.StringValue(dosen.NIDN),
-		}, nil
+	if len(userSimak) == 0 {
+		return nil, errors.New("invalid credentials in SIMAK")
 	}
 
-	return nil, nil
+	var validUser *struct {
+		Userid string `gorm:"column:userid"`
+		Aktif  string `gorm:"column:aktif"`
+	}
+
+	for _, u := range userSimak {
+		if strings.EqualFold(strings.TrimSpace(u.Aktif), "ya") {
+			validUser = &u
+			break
+		}
+	}
+
+	if validUser == nil {
+		return nil, errors.New("SIMAK account is inactive")
+	}
+
+	var dosen struct {
+		Nidn      string `gorm:"column:NIDN"`
+		NamaDosen string `gorm:"column:Nama_Dosen"`
+	}
+
+	errDosen := r.dbSimak.WithContext(ctx).Table("m_dosen").
+		Where("NIDN = ?", validUser.Userid).
+		First(&dosen).Error
+
+	if errDosen != nil {
+		return nil, errors.New("dosen profile not found in SIMAK")
+	}
+
+	return &domain.AuthResult{
+		Sid:    dosen.Nidn,
+		Source: "simak",
+		Name:   dosen.NamaDosen,
+		Nidn:   dosen.Nidn,
+	}, nil
 }
 
 func (r *SimakRepository) GetInfo(ctx context.Context, sid string) (*domain.UserInfo, error) {
-	var simakU struct {
-		Nama  string  `gorm:"column:nama"`
-		Email *string `gorm:"column:email"`
-	}
-	err := r.dbSimak.WithContext(ctx).Table("user").Where("userid = ?", sid).First(&simakU).Error
-	if err != nil {
-		return nil, errors.New("user simak tidak ditemukan")
+	if r == nil || r.dbSimak == nil {
+		return nil, errors.New("database SIMAK connection not available")
 	}
 
-	// Struct penampung yang sudah mendukung data join
 	var dosen struct {
 		Nidn         string  `gorm:"column:NIDN"`
-		NamaDosen    string  `gorm:"column:nama_dosen"`
-		KodeFakultas *string `gorm:"column:kode_fakultas"`
-		NamaFakultas *string `gorm:"column:nama_fakultas"` // Opsional jika Anda butuh nama fakultasnya
+		NamaDosen    string  `gorm:"column:Nama_Dosen"`
+		KodeFakultas *string `gorm:"column:kode_fak"`
+		NamaFakultas *string `gorm:"column:nama_fakultas"`
 		KodeProdi    *string `gorm:"column:kode_prodi"`
-		NamaProdi    *string `gorm:"column:nama_prodi"` // Opsional jika Anda butuh nama prodi-nya
+		NamaProdi    *string `gorm:"column:nama_prodi"`
 	}
 
-	// Query dengan Inner Join / Left Join sesuai relasi tabel
-	_ = r.dbSimak.WithContext(ctx).
-		Table("m_dosen").
-		Select("m_dosen.NIDN, m_dosen.nama_dosen, m_dosen.kode_fak as kode_fakultas, m_dosen.kode_prodi as kode_prodi, m_fakultas.nama_fakultas as nama_fakultas, m_program_studi.nama_prodi as nama_prodi").
+	err := r.dbSimak.WithContext(ctx).Table("m_dosen").
+		Select("m_dosen.NIDN, m_dosen.Nama_Dosen, m_dosen.kode_fak, m_fakultas.nama_fakultas, m_dosen.kode_prodi, m_program_studi.nama_prodi").
 		Joins("LEFT JOIN m_fakultas ON m_fakultas.kode_fakultas = m_dosen.kode_fak").
-		Joins("LEFT JOIN m_program_studi ON m_program_studi.kode_prodi = m_dosen.kode_prodi"). // Catatan: sesuaikan nama kolom di ON jika ada typo di db (misal: kode_podi)
+		Joins("LEFT JOIN m_program_studi ON m_program_studi.kode_prodi = m_dosen.kode_prodi").
 		Where("m_dosen.NIDN = ?", sid).
-		First(&dosen)
+		First(&dosen).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	var simakU struct {
+		Email *string `gorm:"column:email"`
+	}
+	_ = r.dbSimak.WithContext(ctx).Table("user").
+		Where("username = ?", sid).
+		First(&simakU)
 
 	var ePribadi struct {
 		Nip *string `gorm:"column:nip"`
 	}
-	_ = r.dbSimpeg.WithContext(ctx).Table("e_pribadi").Where("nidn = ?", sid).First(&ePribadi)
-
 	var unitKerja string
-	if ePribadi.Nip != nil {
-		_ = r.dbSimpeg.WithContext(ctx).Table("n_pengangkatan").
-			Where("nip = ?", *ePribadi.Nip).
-			Pluck("unit_kerja", &unitKerja)
+
+	dbTarget := r.dbSimpegNew
+	if dbTarget == nil {
+		dbTarget = r.dbSimpeg
+	}
+
+	if dbTarget != nil {
+		type NSInfo struct {
+			Nip      *string `gorm:"column:nip"`
+			NamaUnit *string `gorm:"column:nama_unit"`
+		}
+		var ns NSInfo
+		_ = dbTarget.WithContext(ctx).
+			Table("pegawais p").
+			Select("p.nip, u.nama_unit").
+			Joins("LEFT JOIN pegawai_pekerjaans pp ON pp.pegawai_id = p.id").
+			Joins("LEFT JOIN master_units u ON (u.id = pp.master_unit_id OR u.id = pp.unit_id)").
+			Where("p.nidn = ? OR p.nip = ?", sid, sid).
+			First(&ns)
+
+		if ns.Nip != nil && *ns.Nip != "" {
+			ePribadi.Nip = ns.Nip
+		}
+		if ns.NamaUnit != nil && *ns.NamaUnit != "" {
+			unitKerja = *ns.NamaUnit
+		}
 	}
 
 	return &domain.UserInfo{

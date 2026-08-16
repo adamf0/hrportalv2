@@ -122,6 +122,49 @@ class FcmService {
     }
   }
 
+  /// Displays a separate silent persistent notification for Auto Renew Token / Session Status (ID: 9998)
+  static Future<void> showSilentSessionNotification({
+    required String title,
+    required String content,
+  }) async {
+    await initLocalNotifications();
+    try {
+      const androidDetails = AndroidNotificationDetails(
+        'hrportal_ongoing_channel',
+        'HR Portal Presensi Latar Belakang',
+        channelDescription:
+            'Menampilkan status IP, GPS, dan Auto Renew Session secara terus-menerus',
+        importance: Importance.low,
+        priority: Priority.low,
+        ongoing: true,
+        autoCancel: false,
+        playSound: false,
+        showWhen: false,
+        icon: '@mipmap/ic_launcher',
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: false,
+        presentBanner: false,
+        presentSound: false,
+      );
+
+      const platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _localNotificationsPlugin.show(
+        9998,
+        title,
+        content,
+        platformDetails,
+      );
+    } catch (e) {
+      debugPrint('[FCM Service Error] Silent session notification error: $e');
+    }
+  }
+
   /// Displays OS Native System Drawer Notification (Heads-Up Banner & Status Bar Icon)
   static Future<void> _showSystemDrawerNotification(
       NotificationModel notif) async {
