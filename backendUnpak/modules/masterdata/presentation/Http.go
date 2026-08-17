@@ -12,9 +12,21 @@ import (
 )
 
 func ModuleMasterData(app *fiber.App) {
-	group := app.Group("/api/v2/masterdata", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	group := app.Group("/api/masterdata", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	group2 := app.Group("/api/v2/masterdata", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
 
 	group.Get("/fakultas", func(c *fiber.Ctx) error {
+		q := &query.GetAllFakultasQuery{}
+		res, err := mediatr.Send[*query.GetAllFakultasQuery, common.ResultValue[[]domain.Fakultas]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
+	group2.Get("/fakultas", func(c *fiber.Ctx) error {
 		q := &query.GetAllFakultasQuery{}
 		res, err := mediatr.Send[*query.GetAllFakultasQuery, common.ResultValue[[]domain.Fakultas]](c.UserContext(), q)
 		if err != nil {
@@ -37,8 +49,30 @@ func ModuleMasterData(app *fiber.App) {
 		}
 		return c.JSON(res.Value)
 	})
+	group2.Get("/prodi", func(c *fiber.Ctx) error {
+		q := &query.GetAllProdiQuery{}
+		res, err := mediatr.Send[*query.GetAllProdiQuery, common.ResultValue[[]domain.Prodi]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
 
 	group.Get("/jenis-cuti", func(c *fiber.Ctx) error {
+		q := &query.GetAllJenisCutiQuery{}
+		res, err := mediatr.Send[*query.GetAllJenisCutiQuery, common.ResultValue[[]domain.JenisCuti]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
+	group2.Get("/jenis-cuti", func(c *fiber.Ctx) error {
 		q := &query.GetAllJenisCutiQuery{}
 		res, err := mediatr.Send[*query.GetAllJenisCutiQuery, common.ResultValue[[]domain.JenisCuti]](c.UserContext(), q)
 		if err != nil {
@@ -61,8 +95,30 @@ func ModuleMasterData(app *fiber.App) {
 		}
 		return c.JSON(res.Value)
 	})
+	group2.Get("/jenis-izin", func(c *fiber.Ctx) error {
+		q := &query.GetAllJenisIzinQuery{}
+		res, err := mediatr.Send[*query.GetAllJenisIzinQuery, common.ResultValue[[]domain.JenisIzin]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
 
 	group.Get("/jenis-sppd", func(c *fiber.Ctx) error {
+		q := &query.GetAllJenisSppdQuery{}
+		res, err := mediatr.Send[*query.GetAllJenisSppdQuery, common.ResultValue[[]domain.JenisSppd]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
+	group2.Get("/jenis-sppd", func(c *fiber.Ctx) error {
 		q := &query.GetAllJenisSppdQuery{}
 		res, err := mediatr.Send[*query.GetAllJenisSppdQuery, common.ResultValue[[]domain.JenisSppd]](c.UserContext(), q)
 		if err != nil {
@@ -87,8 +143,34 @@ func ModuleMasterData(app *fiber.App) {
 		}
 		return c.JSON(res.Value)
 	})
+	group2.Get("/verifikator", func(c *fiber.Ctx) error {
+		q := &query.GetAllVerifikatorQuery{
+			Type: c.Query("type"),
+		}
+		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
 
 	group.Get("/people", func(c *fiber.Ctx) error {
+		q := &query.GetAllVerifikatorQuery{
+			Type: c.Query("type"),
+		}
+		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+		return c.JSON(res.Value)
+	})
+	group2.Get("/people", func(c *fiber.Ctx) error {
 		q := &query.GetAllVerifikatorQuery{
 			Type: c.Query("type"),
 		}
