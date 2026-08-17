@@ -68,19 +68,19 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			if verifikasi {
-				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nidn)
+				query = query.Where("verifikasi = ? or verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
 			} else {
 				query = query.Where("nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
 			}
 		} else if nip != "" {
 			if verifikasi {
-				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nip)
+				query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
 			} else {
 				query = query.Where("nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
 			}
 		} else {
 			if verifikasi {
-				query = query.Where("verifikasi = ? or verifikasi = ?", nidn, nidn)
+				query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
 			} else {
 				query = query.Where("nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
 			}
