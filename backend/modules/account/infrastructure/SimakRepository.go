@@ -52,6 +52,9 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 	if len(userSimak) == 0 {
 		return nil, errors.New("invalid credentials in SIMAK")
 	}
+	if len(userSimak) > 1 {
+		return nil, errors.New("akun " + rawUsername + " lebih dari 1")
+	}
 
 	var validUser *struct {
 		Userid string `gorm:"column:userid"`
@@ -59,7 +62,7 @@ func (r *SimakRepository) Authenticate(ctx context.Context, username, password s
 	}
 
 	for _, u := range userSimak {
-		if strings.EqualFold(strings.TrimSpace(u.Aktif), "ya") {
+		if strings.EqualFold(strings.TrimSpace(u.Aktif), "Y") {
 			validUser = &u
 			break
 		}
