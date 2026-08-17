@@ -57,10 +57,8 @@ func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, ve
 	var izins []domain.Izin
 	query := commoninfra.GetTx(ctx, r.db).Debug().Model(&domain.Izin{})
 
-	if isSdm {
-		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
-			query = query.Where("tanggal_pengajuan between ? and ?", *tanggal_mulai, *tanggal_akhir)
-		}
+	if isSdm && (tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "") {
+		query = query.Where("tanggal_pengajuan between ? and ?", *tanggal_mulai, *tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			if verifikasi {

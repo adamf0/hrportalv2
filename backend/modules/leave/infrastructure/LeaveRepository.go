@@ -57,10 +57,8 @@ func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn 
 	var items []domain.Cuti
 	query := r.db.WithContext(ctx).Debug().Model(&domain.Cuti{})
 
-	if isSdm {
-		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
-			query = query.Where("tanggal_mulai >= ? and tanggal_akhir <= ?", *tanggal_mulai, *tanggal_akhir)
-		}
+	if isSdm && (tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "") {
+		query = query.Where("tanggal_mulai >= ? and tanggal_akhir <= ?", *tanggal_mulai, *tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			if verifikasi {

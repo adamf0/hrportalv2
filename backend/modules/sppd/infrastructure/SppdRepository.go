@@ -61,10 +61,8 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 
 	query := r.db.WithContext(ctx).Debug().Model(&domain.Sppd{})
 
-	if isSdm {
-		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
-			query = query.Where("tanggal_berangkat >= ? and tanggal_kembali <= ?", *tanggal_mulai, *tanggal_akhir)
-		}
+	if isSdm && (tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "") {
+		query = query.Where("tanggal_berangkat >= ? and tanggal_kembali <= ?", *tanggal_mulai, *tanggal_akhir)
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
 			if verifikasi {

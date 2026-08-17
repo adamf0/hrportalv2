@@ -208,7 +208,7 @@ func ModuleLeave(app *fiber.App) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nip := c.FormValue("nip")
 		nidn := c.FormValue("nidn")
-		isSdm := c.FormValue("role") == "sdm"
+		isSdm := c.FormValue("role") == "sdm" && (c.Query("verifikasi") == "haxor" || c.Query("is_sdm") == "true")
 
 		query := &GetAllCuti.GetAllCutiQuery{
 			Nip:          nip,

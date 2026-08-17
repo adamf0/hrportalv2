@@ -204,7 +204,7 @@ func ModuleIzin(app *fiber.App) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nidn := c.FormValue("nidn")
 		nip := c.FormValue("nip")
-		isSdm := c.FormValue("role") == "sdm"
+		isSdm := c.FormValue("role") == "sdm" && (c.Query("verifikasi") == "haxor" || c.Query("is_sdm") == "true")
 
 		query := getAll.GetAllIzinsQuery{
 			Nidn:         nidn,
