@@ -346,7 +346,11 @@ class AttendanceBloc extends ChangeNotifier {
         for (var json in responseData) {
           final record = AbsenUpacaraData.fromJson(json);
           _ceremonyAttendances.add(record);
-          if (record.tanggal == todayStr) {
+          final cleanTanggal = record.tanggal.split('T')[0].trim();
+          final isTodayRecord = cleanTanggal == todayStr ||
+              (record.createdAt.isNotEmpty && record.createdAt.startsWith(todayStr));
+
+          if (isTodayRecord) {
             upacaraToday = true;
             if (record.createdAt.isNotEmpty) {
               try {

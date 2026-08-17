@@ -42,6 +42,14 @@ func (h *CreateAbsenUpacaraCommandHandler) Handle(ctx context.Context, cmd *Crea
 		return common.FailureValue[*domain.AbsenUpacara](common.FailureError("CeremonyAttendance.InvalidInput", err.Error())), nil
 	}
 
+	// Cek apakah NIDN / NIP pada tanggal tersebut sudah melakukan absen upacara
+	existingList, errCheck := h.repo.GetAll(ctx, cmd.Nip, cmd.Nidn, cmd.Tanggal)
+	if errCheck == nil && len(existingList) > 0 {
+		return common.FailureValue[*domain.AbsenUpacara](
+			common.FailureError("CeremonyAttendance.AlreadyCheckedIn", "sudah absen upacara"),
+		), nil
+	}
+
 	now := time.Now()
 	upacara := &domain.AbsenUpacara{
 		Nip:       cmd.Nip,

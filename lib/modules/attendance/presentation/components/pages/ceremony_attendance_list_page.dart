@@ -54,6 +54,21 @@ class _CeremonyAttendanceListPageState extends State<CeremonyAttendanceListPage>
     }
   }
 
+  DateTime _parseDateOnly(String dateStr) {
+    if (dateStr.isEmpty) return DateTime.now();
+    final cleanStr = dateStr.split('T')[0].trim();
+    final parts = cleanStr.split('-');
+    if (parts.length == 3) {
+      final year = int.tryParse(parts[0]);
+      final month = int.tryParse(parts[1]);
+      final day = int.tryParse(parts[2]);
+      if (year != null && month != null && day != null) {
+        return DateTime(year, month, day);
+      }
+    }
+    return DateTime.tryParse(dateStr)?.toLocal() ?? DateTime.now();
+  }
+
   @override
   Widget build(BuildContext context) {
     final onSurface = Theme.of(context).colorScheme.onSurface;
@@ -162,8 +177,8 @@ class _CeremonyAttendanceListPageState extends State<CeremonyAttendanceListPage>
             // Sort by date descending
             final sortedItems = List.from(items)
               ..sort((a, b) {
-                final dateA = DateTime.tryParse(a.tanggal) ?? DateTime.now();
-                final dateB = DateTime.tryParse(b.tanggal) ?? DateTime.now();
+                final dateA = _parseDateOnly(a.tanggal);
+                final dateB = _parseDateOnly(b.tanggal);
                 return dateB.compareTo(dateA);
               });
 
@@ -174,8 +189,7 @@ class _CeremonyAttendanceListPageState extends State<CeremonyAttendanceListPage>
               separatorBuilder: (context, index) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final upacara = sortedItems[index];
-                final date =
-                    DateTime.tryParse(upacara.tanggal) ?? DateTime.now();
+                final date = _parseDateOnly(upacara.tanggal);
                 final dayName = _getDayName(date.weekday);
                 final monthName = _getMonthName(date.month);
                 final dateFormatted = "${date.day} $monthName ${date.year}";
