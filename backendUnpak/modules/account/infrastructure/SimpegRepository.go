@@ -47,7 +47,7 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 		Status   string `gorm:"column:status"`
 	}
 
-	errUser := dbAuth.WithContext(ctx).Table("pengguna").
+	errUser := dbAuth.WithContext(ctx).Debug().Table("pengguna").
 		Where("username = ? AND (password = SHA1(?) OR password = MD5(?) OR password = ?) AND LOWER(level) IN ('dosen', 'pegawai') AND UPPER(status) = 'AKTIF'",
 			rawUsername, rawPassword, rawPassword, rawPassword).
 		First(&pengguna).Error
@@ -70,7 +70,7 @@ func (r *SimpegRepository) Authenticate(ctx context.Context, username, password 
 
 	var nsPeg NewSimpegPegawai
 	if dbNew != nil {
-		_ = dbNew.WithContext(ctx).
+		_ = dbNew.WithContext(ctx).Debug().
 			Table("pegawais p").
 			Select("p.nip, null as nidn, p.nama").
 			Where("p.nip = ? OR p.id = ?", rawUsername, rawUsername).
@@ -130,7 +130,7 @@ func (r *SimpegRepository) GetInfo(ctx context.Context, sid string) (*domain.Use
 	}
 
 	var nsDetail NewSimpegDetail
-	errNS := dbNew.WithContext(ctx).
+	errNS := dbNew.WithContext(ctx).Debug().
 		Table("pegawais p").
 		Select("p.nip, null as nidn, p.nama, p.email, u.nama_unit").
 		Joins("LEFT JOIN pegawai_pekerjaans pp ON pp.pegawai_id = p.id").
