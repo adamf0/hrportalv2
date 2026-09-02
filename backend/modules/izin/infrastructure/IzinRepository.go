@@ -57,27 +57,30 @@ func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, ve
 	var izins []domain.Izin
 	query := commoninfra.GetTx(ctx, r.db).Debug().Model(&domain.Izin{})
 
-	if isSdm && (tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "") {
-		query = query.Where("tanggal_pengajuan between ? and ?", *tanggal_mulai, *tanggal_akhir)
+	if isSdm {
+		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
+			query = query.Where("tanggal_pengajuan between ? and ?", *tanggal_mulai, *tanggal_akhir)
+		}
+		if nip == "" && nidn == "" {
+			query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui sdm", "proses sdm", "%sdm%")
+		}
+	} else if verifikasi {
+		if nip != "" && nidn != "" {
+			query = query.Where("verifikasi = ? OR verifikasi = ?", nip, nidn)
+		} else if nip != "" {
+			query = query.Where("verifikasi = ?", nip)
+		} else if nidn != "" {
+			query = query.Where("verifikasi = ?", nidn)
+		} else {
+			query = query.Where("verifikasi IS NOT NULL AND verifikasi != ''")
+		}
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
-			if verifikasi {
-				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nidn)
-			} else {
-				query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
-			}
+			query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
 		} else if nip != "" {
-			if verifikasi {
-				query = query.Where("verifikasi = ?", nip)
-			} else {
-				query = query.Where("nip = ?", nip)
-			}
+			query = query.Where("nip = ?", nip)
 		} else {
-			if verifikasi {
-				query = query.Where("verifikasi = ?", nidn)
-			} else {
-				query = query.Where("nidn = ?", nidn)
-			}
+			query = query.Where("nidn = ?", nidn)
 		}
 	}
 

@@ -2,13 +2,16 @@ package CheckOut
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	common "hrportal_backend/common/domain"
 	"hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
+	"hrportal_backend/modules/notification/application/CreateNotification"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/mehdihadeli/go-mediatr"
 )
 
 type CheckOutCommand struct {
@@ -65,6 +68,23 @@ func (h *CheckOutCommandHandler) Handle(ctx context.Context, cmd *CheckOutComman
 
 	if err := h.attendanceRepo.UpdateAbsen(ctx, existing); err != nil {
 		return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err
+	}
+
+	targetNips := []string{}
+	if existing.Nip != "" {
+		targetNips = append(targetNips, existing.Nip)
+	}
+	if existing.Nidn != "" && existing.Nidn != existing.Nip {
+		targetNips = append(targetNips, existing.Nidn)
+	}
+	if len(targetNips) > 0 {
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: targetNips,
+			Title:      "Presensi Keluar Berhasil",
+			Body:       "Sistem sudah mencatat absen keluar Anda",
+			Type:       "attendance",
+			Payload:    map[string]string{"type": "check-out", "id": strconv.Itoa(int(existing.ID))},
+		})
 	}
 
 	return common.SuccessValue(existing), nil

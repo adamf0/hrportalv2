@@ -92,31 +92,35 @@ class CutiTypeSelectorSheet extends StatelessWidget {
                                       color: onSurface,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    type['desc']!,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: onSurfaceVariant,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isSelected ? AppTheme.infoContainer : Theme.of(context).colorScheme.surfaceContainer,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      'Maks: ${type['max']}',
+                                  if (type['desc'] != null && type['desc']!.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      type['desc']!,
                                       style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                        color: isSelected ? primaryColor : onSurfaceVariant,
+                                        fontSize: 12,
+                                        color: onSurfaceVariant,
+                                        height: 1.4,
                                       ),
                                     ),
-                                  ),
+                                  ],
+                                  if ((type['max'] ?? '').isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? AppTheme.infoContainer : Theme.of(context).colorScheme.surfaceContainer,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        type['max']!,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSelected ? primaryColor : onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),

@@ -178,6 +178,7 @@ class SppdFormSection extends StatelessWidget {
           const SizedBox(height: 8),
           TextFormField(
             controller: sppdCityController,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: GoogleFonts.inter(fontSize: 14, color: onSurface, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               hintText: 'e.g. Jakarta, Yogyakarta, Singapore',
@@ -215,6 +216,7 @@ class SppdFormSection extends StatelessWidget {
           TextFormField(
             controller: sppdDurationController,
             keyboardType: TextInputType.number,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: GoogleFonts.inter(fontSize: 14, color: onSurface, fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               filled: true,
@@ -243,6 +245,7 @@ class SppdFormSection extends StatelessWidget {
           TextFormField(
             controller: sppdPurposeController,
             maxLines: 4,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: GoogleFonts.inter(fontSize: 14, color: onSurface),
             decoration: InputDecoration(
               hintText: 'Tuliskan alasan lengkap perjalanan dinas Anda di sini...',

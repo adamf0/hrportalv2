@@ -85,8 +85,9 @@ class AuthBloc extends ChangeNotifier {
         _session = sessionResult;
         _isLoading = false;
         notifyListeners();
-        final targetNip = _session!.nip.isNotEmpty ? _session!.nip : 'SDM';
-        FcmService.registerFcmToken(targetNip, isSdm: isSdmUser);
+        final targetNip = _session!.nip.isNotEmpty ? _session!.nip : '';
+        final targetNidn = _session!.nidn.isNotEmpty ? _session!.nidn : '';
+        FcmService.registerFcmToken(targetNip, targetNidn, isSdm: isSdmUser);
         return true;
       } else {
         _errorMessage = 'Gagal masuk via SSO.';
@@ -113,6 +114,7 @@ class AuthBloc extends ChangeNotifier {
           _session = AuthSession(
             name: sessionData['name'] ?? '',
             nip: sessionData['nip'] ?? '',
+            nidn: sessionData['nidn'] ?? '',
             email: sessionData['email'] ?? '',
             role: sessionData['role'] ?? '',
             groups: sessionData['groups'] != null
@@ -124,7 +126,7 @@ class AuthBloc extends ChangeNotifier {
           );
           _isLoading = false;
           notifyListeners();
-          FcmService.registerFcmToken(_session!.nip);
+          FcmService.registerFcmToken(_session!.nip, _session!.nidn);
           return true;
         }
       }

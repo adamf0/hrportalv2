@@ -145,6 +145,7 @@ class IzinFormSection extends StatelessWidget {
           TextFormField(
             controller: izinPurposeController,
             maxLines: 4,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
             style: GoogleFonts.inter(fontSize: 14, color: onSurface),
             decoration: InputDecoration(
               hintText: 'Tuliskan alasan lengkap pengajuan izin Anda di sini...',

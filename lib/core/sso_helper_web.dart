@@ -180,47 +180,74 @@ class SsoHelper {
     }
   }
 
+  static Completer<String?>? _refreshCompleter;
+
   static Future<String?> getValidToken() async {
     final token = html.window.localStorage['token'];
     final refresh = html.window.localStorage['refresh'];
 
     if (token == null) return null;
 
-    if (_isTokenExpired(token)) {
-      if (refresh != null) {
-        print("Token expired. Attempting to refresh token via Golang API...");
-        try {
-          final request = html.HttpRequest();
-          request.open('POST', '${ApiClient.baseUrl}/api/account/refresh-token',
-              async: false);
-          request.setRequestHeader(
-              'Content-Type', 'application/x-www-form-urlencoded');
-          final body = "refresh_token=${Uri.encodeComponent(refresh)}";
-          request.send(body);
+    if (!_isTokenExpired(token)) {
+      return token;
+    }
 
-          if (request.status == 200) {
-            final response = jsonDecode(request.responseText ?? '{}')
-                as Map<String, dynamic>;
-            final newAccessToken = response['token'] as String?;
-            final newRefreshToken = response['refresh'] as String?;
-            if (newAccessToken != null) {
-              html.window.localStorage['token'] = newAccessToken;
-              if (newRefreshToken != null) {
-                html.window.localStorage['refresh'] = newRefreshToken;
-              }
-              print("Token refreshed successfully.");
-              return newAccessToken;
-            }
-          }
-        } catch (e) {
-          print("Failed to refresh token: $e");
-        }
-      }
-      print("Token & Refresh Token EXPIRED. Force clearing local storage...");
+    if (_refreshCompleter != null && !_refreshCompleter!.isCompleted) {
+      return await _refreshCompleter!.future;
+    }
+
+    _refreshCompleter = Completer<String?>();
+    try {
+      final newToken = await _performTokenRefreshWeb(token, refresh);
+      _refreshCompleter!.complete(newToken);
+      return newToken;
+    } catch (e) {
+      _refreshCompleter!.complete(null);
+      return null;
+    } finally {
+      _refreshCompleter = null;
+    }
+  }
+
+  static Future<String?> _performTokenRefreshWeb(String currentToken, String? refresh) async {
+    if (refresh == null || refresh.isEmpty) {
       logout();
       return null;
     }
-    return token;
+
+    print("[SsoHelper Web] Token expired. Refreshing token via Golang API...");
+    try {
+      final request = html.HttpRequest();
+      request.open('POST', '${ApiClient.baseUrl}/api/account/refresh-token');
+      request.setRequestHeader('Content-Type', 'application/json');
+      request.send(jsonEncode({"refresh_token": refresh}));
+
+      await request.onLoadEnd.first;
+
+      if (request.status == 200) {
+        final response = jsonDecode(request.responseText ?? '{}') as Map<String, dynamic>;
+        final newAccessToken = response['token'] as String?;
+        final newRefreshToken = response['refresh'] as String?;
+        if (newAccessToken != null) {
+          html.window.localStorage['token'] = newAccessToken;
+          if (newRefreshToken != null) {
+            html.window.localStorage['refresh'] = newRefreshToken;
+          }
+          print("[SsoHelper Web] Token refreshed successfully.");
+          return newAccessToken;
+        }
+      } else if (request.status == 400 || request.status == 401) {
+        print("[SsoHelper Web] Refresh token rejected (${request.status}). Logging out...");
+        logout();
+        return null;
+      } else {
+        return currentToken;
+      }
+    } catch (e) {
+      print("[SsoHelper Web] Failed to refresh token: $e. Preserving session.");
+      return currentToken;
+    }
+    return null;
   }
 
   static Map<String, dynamic> _decodeJwt(String token) {

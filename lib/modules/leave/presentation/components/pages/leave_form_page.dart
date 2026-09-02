@@ -217,6 +217,40 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     _cutiDurationController.text = difference.toString();
   }
 
+  void _onCutiDurationChanged(String value) {
+    final days = int.tryParse(value);
+    if (days != null && days > 0) {
+      setState(() {
+        _cutiEndDate = _cutiStartDate.add(Duration(days: days - 1));
+      });
+    }
+  }
+
+  void _syncCutiDurationForType(String? typeName) {
+    if (typeName == null || typeName.trim().isEmpty) return;
+    Map<String, String>? currentType;
+    try {
+      currentType = LeaveFormData.cutiTypes.firstWhere(
+        (element) => element['name'] == typeName,
+      );
+    } catch (_) {}
+
+    if (currentType != null) {
+      final minHari = int.tryParse(currentType['min_hari'] ?? '') ?? 0;
+      final maxHari = int.tryParse(currentType['max_hari'] ?? '') ?? 0;
+
+      int currentDays = int.tryParse(_cutiDurationController.text) ?? 1;
+      if (minHari > 0 && currentDays < minHari) {
+        currentDays = minHari;
+      } else if (maxHari > 0 && currentDays > maxHari) {
+        currentDays = maxHari;
+      }
+
+      _cutiDurationController.text = currentDays.toString();
+      _cutiEndDate = _cutiStartDate.add(Duration(days: currentDays - 1));
+    }
+  }
+
   void _calculateSppdDuration() {
     final difference = _sppdEndDate.difference(_sppdStartDate).inDays + 1;
     _sppdDurationController.text = difference.toString();
@@ -515,7 +549,9 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
           onCutiTypeSelected: (type) {
             setState(() {
               _selectedCutiType = type;
+              _syncCutiDurationForType(type);
             });
+            _cutiFormKey.currentState?.validate();
           },
         );
       },
@@ -785,6 +821,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     return CutiFormSection(
       formKey: _cutiFormKey,
       selectedCutiType: _selectedCutiType,
+      cutiTypes: LeaveFormData.cutiTypes,
       onCutiTypeTap: () => _showCutiTypeSelector(context),
       cutiStartDate: _cutiStartDate,
       cutiEndDate: _cutiEndDate,
@@ -793,6 +830,7 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
       onSelectEndDate: () =>
           _selectSingleDate(context, false, LeaveFormType.cuti),
       cutiDurationController: _cutiDurationController,
+      onDurationChanged: _onCutiDurationChanged,
       cutiPurposeController: _cutiPurposeController,
       attachmentWidget: _buildAttachmentSection(LeaveFormType.cuti),
       supervisorSelectorWidget: Builder(

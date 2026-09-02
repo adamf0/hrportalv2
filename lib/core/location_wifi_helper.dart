@@ -242,20 +242,24 @@ class LocationWifiHelper {
     try {
       Position? pos;
 
-      // 1. Try FusedLocationProvider (fastest indoor/outdoor fix)
+      // 1. Try last known position from OS (instant fix)
       try {
-        pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 10),
-          ),
-        );
-      } catch (e) {
-        debugPrint('[LocationWifiHelper] getCurrentPosition error: $e');
-      }
+        pos = await Geolocator.getLastKnownPosition();
+      } catch (_) {}
 
-      // 2. Try last known position from OS
-      pos ??= await Geolocator.getLastKnownPosition();
+      // 2. Try FusedLocationProvider with short timeout
+      if (pos == null) {
+        try {
+          pos = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.low,
+              timeLimit: Duration(seconds: 3),
+            ),
+          );
+        } catch (e) {
+          debugPrint('[LocationWifiHelper] getCurrentPosition error: $e');
+        }
+      }
 
       // 3. Fallback to LocationManager if FusedLocationProvider failed
       if (pos == null && Platform.isAndroid) {
@@ -264,7 +268,7 @@ class LocationWifiHelper {
             locationSettings: AndroidSettings(
               accuracy: LocationAccuracy.low,
               forceLocationManager: true,
-              timeLimit: const Duration(seconds: 5),
+              timeLimit: const Duration(seconds: 3),
             ),
           );
         } catch (_) {}

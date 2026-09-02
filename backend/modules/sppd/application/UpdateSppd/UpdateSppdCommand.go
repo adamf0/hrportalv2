@@ -2,14 +2,17 @@ package UpdateSppd
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	common "hrportal_backend/common/domain"
 	commoninfra "hrportal_backend/common/infrastructure"
+	"hrportal_backend/modules/notification/application/CreateNotification"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/mehdihadeli/go-mediatr"
 	"gorm.io/gorm"
 )
 
@@ -204,6 +207,75 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	if tx != nil {
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Sppd](common.FailureError("Sppd.CommitFailed", err.Error())), nil
+		}
+	}
+
+	status := sppd.Status
+	atasanNip := ""
+	if sppd.Verifikasi != nil && *sppd.Verifikasi != "" {
+		atasanNip = *sppd.Verifikasi
+	}
+
+	switch status {
+	case "terima atasan":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{sppd.Nip},
+			Title:      "Pengajuan SPPD Disetujui Atasan",
+			Body:       "Pengajuan SPPD Anda telah disetujui Atasan. Menunggu verifikasi SDM.",
+			Type:       "sppd",
+			Payload:    map[string]string{"id": strconv.Itoa(int(sppd.ID)), "status": status},
+		})
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{"SDM_BROADCAST"},
+			Title:      "Verifikasi SDM SPPD",
+			Body:       "Pengajuan SPPD NIP " + sppd.Nip + " telah disetujui Atasan. Mohon verifikasi final SDM.",
+			Type:       "sppd",
+			Payload:    map[string]string{"id": strconv.Itoa(int(sppd.ID)), "status": status},
+		})
+
+	case "tolak atasan":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{sppd.Nip},
+			Title:      "Pengajuan SPPD Ditolak Atasan",
+			Body:       "Pengajuan SPPD Anda ditolak oleh Atasan.",
+			Type:       "sppd",
+			Payload:    map[string]string{"id": strconv.Itoa(int(sppd.ID)), "status": status},
+		})
+
+	case "terima sdm":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{sppd.Nip},
+			Title:      "Pengajuan SPPD Disetujui SDM",
+			Body:       "Selamat! Pengajuan SPPD Anda telah disetujui oleh SDM.",
+			Type:       "sppd",
+			Payload:    map[string]string{"id": strconv.Itoa(int(sppd.ID)), "status": status},
+		})
+		if atasanNip != "" {
+			_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+				TargetNips: []string{atasanNip},
+				Title:      "Status Final SPPD",
+				Body:       "Pengajuan SPPD NIP " + sppd.Nip + " telah disetujui oleh SDM.",
+				Type:       "sppd",
+				Payload:    map[string]string{"id": strconv.Itoa(int(sppd.ID)), "status": status},
+			})
+		}
+
+	case "tolak sdm":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{sppd.Nip},
+			Title:      "Pengajuan SPPD Ditolak SDM",
+			Body:       "Pengajuan SPPD Anda ditolak oleh SDM.",
+			Type:       "sppd",
+			Payload:    map[string]string{"id": strconv.Itoa(int(sppd.ID)), "status": status},
+		})
+		if atasanNip != "" {
+			_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+				TargetNips: []string{atasanNip},
+				Title:      "Status Final SPPD",
+				Body:       "Pengajuan SPPD NIP " + sppd.Nip + " ditolak oleh SDM.",
+				Type:       "sppd",
+				Payload:    map[string]string{"id": strconv.Itoa(int(sppd.ID)), "status": status},
+			})
 		}
 	}
 

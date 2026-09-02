@@ -49,9 +49,10 @@ class FcmService {
       'BFaK6w-3VQxC6gJsmW9i782akeR5tAuAIM068_-P0Ha6Luu5zKJd5DND3xpjegvYvdDJaaygsBlj4FEdXo2IFdk';
 
   static String? _currentFcmToken;
-  static Timer? _foregroundPollTimer;
-  static final Set<String> _shownNotificationIds = {};
   static String? _activeNip;
+  static String? get activeNip => _activeNip;
+  static String? _activeNidn;
+  static String? get activeNidn => _activeNidn;
 
   static final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -82,17 +83,6 @@ class FcmService {
       final androidPlugin =
           _localNotificationsPlugin.resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>();
-      await androidPlugin?.requestNotificationsPermission();
-
-      final iosPlugin =
-          _localNotificationsPlugin.resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>();
-      await iosPlugin?.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-        critical: true,
-      );
 
       const androidChannel = AndroidNotificationChannel(
         'hrportal_channel',
@@ -110,15 +100,47 @@ class FcmService {
             'Menampilkan status IP, GPS, dan area kampus secara terus-menerus',
         importance: Importance.low,
         playSound: false,
-        showBadge: false,
+        enableVibration: false,
       );
       await androidPlugin?.createNotificationChannel(ongoingChannel);
+
+      const sessionChannel = AndroidNotificationChannel(
+        'hrportal_session_channel',
+        'HR Portal Sesi Aktif',
+        description: 'Menampilkan status sesi login dan auto-renew JWT token',
+        importance: Importance.min,
+        playSound: false,
+        enableVibration: false,
+      );
+      await androidPlugin?.createNotificationChannel(sessionChannel);
 
       _isLocalNotifInitialized = true;
       debugPrint(
           '[FCM Service] Local notification drawer initialized successfully.');
     } catch (e) {
       debugPrint('[FCM Service Error] Local notification init failed: $e');
+    }
+  }
+
+  /// Explicitly requests Android 13+ & iOS notification permissions when running in UI context
+  static Future<void> requestNotificationPermissions() async {
+    try {
+      final androidPlugin =
+          _localNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.requestNotificationsPermission();
+
+      final iosPlugin =
+          _localNotificationsPlugin.resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin>();
+      await iosPlugin?.requestPermissions(
+        alert: true,
+        badge: true,
+        sound: true,
+        critical: true,
+      );
+    } catch (e) {
+      debugPrint('[FCM Service] requestNotificationPermissions error: $e');
     }
   }
 
@@ -166,7 +188,7 @@ class FcmService {
   }
 
   /// Displays OS Native System Drawer Notification (Heads-Up Banner & Status Bar Icon)
-  static Future<void> _showSystemDrawerNotification(
+  static Future<void> showSystemDrawerNotification(
       NotificationModel notif) async {
     await initLocalNotifications();
 
@@ -359,25 +381,31 @@ class FcmService {
 
   static bool isSdmUser = false;
   static String? _lastRegisteredNip;
+  static String? _lastRegisteredNidn;
 
   /// Registers user NIP with backend FCM Token registry and starts Foreground Listener
-  static Future<bool> registerFcmToken(String nip, {bool isSdm = false}) async {
-    if (nip.isEmpty) return false;
+  static Future<bool> registerFcmToken(String nip, String nidn,
+      {bool isSdm = false}) async {
+    if (nip.isEmpty && nidn.isEmpty) return false;
+
     _activeNip = nip;
+    _activeNidn = nidn;
     isSdmUser = isSdm;
-    if (_lastRegisteredNip == nip) {
+    requestNotificationPermissions();
+    if (_lastRegisteredNip == nip && _lastRegisteredNidn == nidn) {
       // Already registered in this app session, just ensure listener is running
-      startForegroundNotificationListener(nip);
+      startForegroundNotificationListener(nip, nidn);
       return true;
     }
     try {
       final url = Uri.parse('${ApiClient.baseUrl}/api/account/fcm-token');
       debugPrint(
-          '[FCM Service] Registering FCM token for NIP: $nip (isSdm: $isSdm)');
+          '[FCM Service] Registering FCM token for NIP: $nip NIDN: $nidn (isSdm: $isSdm)');
       final response = await http.post(
         url,
         body: {
           'nip': nip,
+          'nidn': nidn,
           'fcm_token': fcmToken,
           if (isSdm) 'is_sdm': 'true',
         },
@@ -385,95 +413,60 @@ class FcmService {
 
       if (response.statusCode == 200) {
         _lastRegisteredNip = nip;
-        debugPrint('[FCM Service] FCM Token registered on server for NIP $nip');
-        startForegroundNotificationListener(nip);
+        _lastRegisteredNidn = nidn;
+        debugPrint(
+            '[FCM Service] FCM Token registered on server for NIP $nip NIDN $nidn');
+        startForegroundNotificationListener(nip, nidn);
         return true;
       }
     } catch (e) {
       debugPrint('[FCM Service Error] Register FCM token failed: $e');
     }
-    startForegroundNotificationListener(nip);
+    startForegroundNotificationListener(nip, nidn);
     return false;
   }
 
-  /// Starts listening to real-time notifications in foreground (when app is OPEN)
-  static void startForegroundNotificationListener(String nip) {
-    if (nip.isEmpty) return;
-    _activeNip = nip;
-    _foregroundPollTimer?.cancel();
+  static Timer? _notifSyncTimer;
+  static final Set<String> _displayedNotifIds = {};
 
-    // Poll every 2 seconds for new foreground notifications from server
-    _foregroundPollTimer =
-        Timer.periodic(const Duration(seconds: 2), (timer) async {
-      checkAndShowLatestNotifications();
+  /// Periodically polls backend notification API to present new notifications in OS System Drawer
+  static void startNotificationDrawerSync(String nip, String nidn) {
+    _notifSyncTimer?.cancel();
+    _notifSyncTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+      await syncPendingNotificationsDrawer(nip, nidn);
     });
-
-    // Run immediate check
-    checkAndShowLatestNotifications();
+    syncPendingNotificationsDrawer(nip, nidn);
   }
 
-  /// Checks for unshown notifications targeted for the active user NIP and pushes System Drawer Notifications
-  static Future<void> checkAndShowLatestNotifications() async {
-    if (_activeNip == null || _activeNip!.isEmpty) return;
-    final notifications = await fetchNotifications(_activeNip!);
-    if (notifications.isEmpty) return;
-
-    for (var notif in notifications) {
-      if (!_shownNotificationIds.contains(notif.id)) {
-        _shownNotificationIds.add(notif.id);
-        _showSystemDrawerNotification(notif);
-        markNotificationAsDone(notif.id);
-      }
-    }
-  }
-
-  /// Marks notification status as done on server
-  static Future<void> markNotificationAsDone(String id) async {
+  static Future<void> syncPendingNotificationsDrawer(String nip, String nidn) async {
+    if (nip.isEmpty && nidn.isEmpty) return;
     try {
-      final url =
-          Uri.parse('${ApiClient.baseUrl}/api/account/notifications/mark-done');
-      await http
-          .post(url, body: {'id': id}).timeout(const Duration(seconds: 3));
-    } catch (_) {}
-  }
-
-  /// Fetches in-app notification history for a specific NIP
-  static Future<List<NotificationModel>> fetchNotifications(String nip) async {
-    if (nip.isEmpty) return [];
-    try {
-      final url = Uri.parse(
-          '${ApiClient.baseUrl}/api/account/notifications?nip=$nip${isSdmUser ? "&is_sdm=true" : ""}');
-      final response = await http.get(url).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> body = json.decode(response.body);
-        final List<dynamic> list = body['data'] as List<dynamic>? ?? [];
-        final items = list
-            .map((item) =>
-                NotificationModel.fromJson(item as Map<String, dynamic>))
-            .toList();
-
-        // Client-side safeguard: Filter out verification request notifications
-        // intended for supervisors (e.g. "Pegawai NIP X mengajukan... Mohon verifikasi")
-        // if current active NIP is the applicant (X).
-        return items.where((notif) {
-          final isVerificationRequest =
-              notif.title.toLowerCase().contains('pengajuan') ||
-                  notif.body.toLowerCase().contains('mohon verifikasi');
-          if (isVerificationRequest && notif.body.contains(nip)) {
-            // Current user is the applicant, not the verifier -> do not notify applicant
-            return false;
+      final uri = Uri.parse('${ApiClient.baseUrl}/api/account/notifications?nip=$nip&nidn=$nidn');
+      final resp = await http.get(uri).timeout(const Duration(seconds: 4));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        if (data is Map && data['data'] is List) {
+          final list = (data['data'] as List)
+              .map((item) => NotificationModel.fromJson(item as Map<String, dynamic>))
+              .toList();
+          for (final n in list) {
+            if (!_displayedNotifIds.contains(n.id)) {
+              _displayedNotifIds.add(n.id);
+              await showSystemDrawerNotification(n);
+            }
           }
-          return true;
-        }).toList();
+        }
       }
     } catch (e) {
-      debugPrint('[FCM Service Error] Fetch notifications failed: $e');
+      debugPrint('[FCM Service] Sync drawer notification error: $e');
     }
-    return [];
   }
 
-  static void stopListener() {
-    _foregroundPollTimer?.cancel();
+  /// Sets active user NIP for FCM push notification payload mapping
+  static void startForegroundNotificationListener(String nip, String nidn) {
+    if (nip.isEmpty && nidn.isEmpty) return;
+    _activeNip = nip;
+    _activeNidn = nidn;
+    startNotificationDrawerSync(nip, nidn);
   }
 }

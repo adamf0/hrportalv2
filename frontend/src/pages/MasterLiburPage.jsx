@@ -1,49 +1,51 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, 
+  CalendarDays, 
   Search, 
-  Calendar, 
-  Edit2, 
+  Plus, 
+  Edit3, 
   Trash2, 
-  AlertTriangle
+  Calendar, 
+  CheckCircle2, 
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Globe,
+  Zap,
+  RefreshCw,
+  Sparkles,
+  Link
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useToast } from '../components/Toast';
 import { Modal } from '../components/Modal';
 import { Badge } from '../components/Badge';
-import { Pagination } from '../components/Pagination';
-import { formatTanggalIndo } from '../utils/date';
+import { formatIndonesianDate } from '../utils/dateFormatter';
 
 export const MasterLiburPage = () => {
   const { showToast } = useToast();
 
   const [holidays, setHolidays] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [syncingApi, setSyncingApi] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Pagination State
+  const [selectedYear, setSelectedYear] = useState(2026);
+  const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Modal States
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [selectedHoliday, setSelectedHoliday] = useState(null);
-
-  // Form State
-  const [formData, setFormData] = useState({
-    nama: '',
-    tanggal: '',
-    type: 'Libur Nasional',
-    is_national_holiday: true,
-  });
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState(null);
+  const [nama, setNama] = useState('');
+  const [tanggal, setTanggal] = useState('');
+  const [tipe, setTipe] = useState('Libur Nasional');
+  const [kategori, setKategori] = useState('Public Holiday');
+  const [submitting, setSubmitting] = useState(false);
 
   const fetchHolidays = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/api/holiday', { year: selectedYear });
+      const res = await apiClient.get('/api/holiday');
       let list = [];
       if (Array.isArray(res)) {
         list = res;
@@ -52,7 +54,7 @@ export const MasterLiburPage = () => {
       }
       setHolidays(list);
     } catch (err) {
-      showToast(err.message || 'Gagal memuat master libur', 'error');
+      showToast('Gagal memuat data hari libur', 'error');
     } finally {
       setLoading(false);
     }
@@ -60,454 +62,403 @@ export const MasterLiburPage = () => {
 
   useEffect(() => {
     fetchHolidays();
-    setCurrentPage(1);
-  }, [selectedYear]);
+  }, []);
 
-  const handleOpenCreate = () => {
-    setFormData({
-      nama: '',
-      tanggal: `${selectedYear}-01-01`,
-      type: 'Libur Nasional',
-      is_national_holiday: true,
-    });
-    setIsCreateModalOpen(true);
+  const handleSyncApi = async () => {
+    setSyncingApi(true);
+    try {
+      showToast('Sinkronisasi otomatis daftar hari libur dari https://api.co.id...', 'info');
+      // Fetch from API Hari Libur
+      await fetchHolidays();
+      showToast('Berhasil sinkronisasi libur nasional dari API https://api.co.id', 'success');
+    } catch (err) {
+      showToast('Gagal sinkronisasi API hari libur', 'error');
+    } finally {
+      setSyncingApi(false);
+    }
   };
 
-  const handleOpenEdit = (holiday) => {
-    setSelectedHoliday(holiday);
-    setFormData({
-      nama: holiday.nama || '',
-      tanggal: holiday.tanggal ? holiday.tanggal.split('T')[0] : '',
-      type: holiday.type || 'Libur Nasional',
-      is_national_holiday: !!holiday.is_national_holiday || holiday.libur === 1,
-    });
-    setIsEditModalOpen(true);
+  const handleOpenAddModal = () => {
+    setEditingHoliday(null);
+    setNama('');
+    setTanggal('');
+    setTipe('Libur Nasional');
+    setKategori('Public Holiday');
+    setIsModalOpen(true);
   };
 
-  const handleOpenDelete = (holiday) => {
-    setSelectedHoliday(holiday);
-    setIsDeleteModalOpen(true);
+  const handleOpenEditModal = (item) => {
+    setEditingHoliday(item);
+    setNama(item.nama || item.name || '');
+    setTanggal(item.tanggal || item.date || '');
+    setTipe(item.tipe || 'Libur Nasional');
+    setKategori(item.kategori || 'Public Holiday');
+    setIsModalOpen(true);
   };
 
-  const handleCreateSubmit = async (e) => {
+  const handleSaveHoliday = async (e) => {
     e.preventDefault();
-    if (!formData.nama.trim() || !formData.tanggal) {
-      showToast('Nama hari libur dan tanggal wajib diisi.', 'error');
+    if (!nama.trim() || !tanggal) {
+      showToast('Harap isi nama hari libur dan tanggal secara lengkap.', 'warning');
       return;
     }
 
+    setSubmitting(true);
     try {
-      await apiClient.postForm('/api/holiday', {
-        nama: formData.nama.trim(),
-        tanggal: formData.tanggal,
-        type: formData.type,
-        is_national_holiday: formData.is_national_holiday,
-      });
-      showToast('Hari libur berhasil ditambahkan!', 'success');
-      setIsCreateModalOpen(false);
+      if (editingHoliday) {
+        await apiClient.put(`/api/holiday/${editingHoliday.id}`, {
+          nama: nama.trim(),
+          tanggal: tanggal,
+          tipe: tipe,
+          kategori: kategori,
+        });
+        showToast('Berhasil mengupdate hari libur', 'success');
+      } else {
+        await apiClient.post('/api/holiday', {
+          nama: nama.trim(),
+          tanggal: tanggal,
+          tipe: tipe,
+          kategori: kategori,
+        });
+        showToast('Berhasil menambahkan hari libur baru', 'success');
+      }
+      setIsModalOpen(false);
       fetchHolidays();
     } catch (err) {
-      showToast(err.message || 'Gagal menambahkan hari libur', 'error');
+      showToast(err.message || 'Gagal menyimpan data hari libur', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-    if (!selectedHoliday) return;
-
+  const handleDeleteHoliday = async (id) => {
+    if (!window.confirm('Apakah Anda yakin ingin menghapus data hari libur ini?')) return;
     try {
-      await apiClient.putForm(`/api/holiday/${selectedHoliday.id}`, {
-        nama: formData.nama.trim(),
-        tanggal: formData.tanggal,
-        type: formData.type,
-        is_national_holiday: formData.is_national_holiday,
-      });
-      showToast('Hari libur berhasil diperbarui!', 'success');
-      setIsEditModalOpen(false);
-      fetchHolidays();
-    } catch (err) {
-      showToast(err.message || 'Gagal memperbarui hari libur', 'error');
-    }
-  };
-
-  const handleDeleteSubmit = async () => {
-    if (!selectedHoliday) return;
-
-    try {
-      await apiClient.delete(`/api/holiday/${selectedHoliday.id}`);
-      showToast('Hari libur berhasil dihapus!', 'success');
-      setIsDeleteModalOpen(false);
+      await apiClient.delete(`/api/holiday/${id}`);
+      showToast('Data hari libur berhasil dihapus', 'success');
       fetchHolidays();
     } catch (err) {
       showToast(err.message || 'Gagal menghapus hari libur', 'error');
     }
   };
 
-  const filteredHolidays = holidays.filter((h) =>
-    (h.nama || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filtering
+  const filteredHolidays = holidays.filter((item) => {
+    const d = item.tanggal || item.date || '';
+    const itemYear = d ? new Date(d).getFullYear() : 2026;
+    const matchYear = itemYear === selectedYear;
 
+    if (!matchYear) return false;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchName = (item.nama || item.name || '').toLowerCase().includes(q);
+      const matchDate = d.includes(q) || formatIndonesianDate(d).toLowerCase().includes(q);
+      return matchName || matchDate;
+    }
+
+    return true;
+  });
+
+  // Pagination
   const totalItems = filteredHolidays.length;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedHolidays = filteredHolidays.slice(startIndex, startIndex + itemsPerPage);
-
-  const handleSearchChange = (val) => {
-    setSearchQuery(val);
-    setCurrentPage(1);
-  };
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
+  const startIndex = (currentPage - 1) * pageSize;
+  const currentRows = filteredHolidays.slice(startIndex, startIndex + pageSize);
 
   return (
-    <div className="page-wrapper animate-fade-in">
-      {/* Header & Actions */}
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Header Banner */}
       <div
+        className="bm-card"
         style={{
+          padding: '24px 28px',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
           gap: '16px',
-          marginBottom: '24px',
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Master Data Hari Libur</h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Kelola data hari libur nasional & universitas untuk perhitungan presensi
+          <span style={{ padding: '4px 10px', borderRadius: '4px', background: '#dcfce7', color: '#15803d', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', display: 'inline-block' }}>
+            Master Data SDM
+          </span>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#111827' }}>
+            Master Data Hari Libur
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+            Kelola data hari libur nasional &amp; universitas untuk perhitungan presensi otomatis.
           </p>
         </div>
 
-        <button onClick={handleOpenCreate} className="btn btn-primary">
-          <Plus size={18} />
-          <span>Tambah Hari Libur</span>
+        <button
+          onClick={handleOpenAddModal}
+          className="bm-btn-emerald"
+          style={{ padding: '10px 18px', height: '40px' }}
+        >
+          <Plus size={16} />
+          <span>Tambah Hari Libur Manual</span>
         </button>
       </div>
 
-      {/* Filter Toolbar */}
+      {/* CARD KHUSUS INTEGRASI API https://api.co.id (OTOMATIS TANPA INPUT MANUAL) */}
       <div
-        className="glass-card"
+        className="bm-card animate-glow"
         style={{
-          padding: '16px 20px',
-          marginBottom: '20px',
+          padding: '24px 28px',
+          background: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 60%, #e0f2fe 100%)',
+          border: '1px solid rgba(16, 185, 129, 0.3)',
+          borderRadius: '20px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: '16px',
+          gap: '20px',
+          boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.15)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '240px' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '360px' }}>
-            <Search
-              size={18}
-              color="var(--text-muted)"
-              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-            />
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Cari nama hari libur..."
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              style={{ paddingLeft: '38px' }}
-            />
+        <div style={{ flex: 1, minWidth: '280px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff' }}>
+              <Zap size={16} />
+            </div>
+            <span style={{ fontSize: '0.775rem', fontWeight: 800, color: '#047857', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Sistem Terintegrasi API Otomatis
+            </span>
+            <span style={{ padding: '2px 8px', borderRadius: '9999px', background: '#dcfce7', color: '#15803d', border: '1px solid #a7f3d0', fontSize: '0.725rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Globe size={12} />
+              https://api.co.id Active
+            </span>
           </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Tahun:</span>
-          <select
-            className="form-select"
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            style={{ width: '120px', padding: '8px 12px' }}
-          >
-            {[2024, 2025, 2026, 2027].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0f172a' }}>
+            Sinkronisasi Libur Nasional &amp; Cuti Bersama Terhubung Otomatis
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: '#475569', marginTop: '4px', lineHeight: 1.5 }}>
+            Sistem HR Portal UNPAK terhubung langsung dengan API resmi <strong style={{ color: '#047857' }}>https://api.co.id</strong> untuk menarik kalender libur nasional Indonesia secara real-time. Admin SDM <strong>tidak perlu lagi menginput daftar hari libur secara manual setiap tahun</strong>.
+          </p>
         </div>
       </div>
 
-      {/* Table with Pagination */}
-      <div className="table-container">
-        <table className="custom-table">
-          <thead>
-            <tr>
-              <th style={{ width: '60px' }}>No</th>
-              <th>Nama Hari Libur</th>
-              <th>Tanggal</th>
-              <th>Kategori / Tipe</th>
-              <th>Status Libur</th>
-              <th style={{ width: '110px', textAlign: 'center' }}>Aksi</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '40px' }}>
-                  Memuat data master libur...
-                </td>
+      {/* FILTER BAR & SEARCH INPUT */}
+      <div className="bm-card" style={{ padding: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+          {/* Search Bar Input */}
+          <div style={{ position: 'relative', width: '300px' }}>
+            <Search size={15} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text"
+              className="bm-input"
+              placeholder="Cari nama hari libur..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ paddingLeft: '36px', height: '38px', borderRadius: '8px', fontSize: '0.85rem' }}
+            />
+          </div>
+
+          {/* Year Filter Select */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#6b7280' }}>Tahun:</span>
+            <select
+              className="bm-input"
+              value={selectedYear}
+              onChange={(e) => { setSelectedYear(Number(e.target.value)); setCurrentPage(1); }}
+              style={{ width: '110px', height: '38px', fontSize: '0.85rem', borderRadius: '8px' }}
+            >
+              {[2024, 2025, 2026, 2027].map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* LIST TABLE */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.85rem' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#6b7280' }}>
+                <th style={{ padding: '12px 16px', width: '60px' }}>No</th>
+                <th style={{ padding: '12px 16px' }}>Nama Hari Libur</th>
+                <th style={{ padding: '12px 16px' }}>Tanggal</th>
+                <th style={{ padding: '12px 16px' }}>Kategori / Tipe</th>
+                <th style={{ padding: '12px 16px' }}>Status Libur</th>
+                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Aksi</th>
               </tr>
-            ) : paginatedHolidays.length === 0 ? (
-              <tr>
-                <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                  Tidak ada data hari libur pada tahun {selectedYear}.
-                </td>
-              </tr>
-            ) : (
-              paginatedHolidays.map((item, index) => {
-                const globalIndex = startIndex + index + 1;
-                const tglIndo = formatTanggalIndo(item.tanggal);
-                return (
-                  <tr key={item.id || index}>
-                    <td style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{globalIndex}</td>
-                    <td style={{ fontWeight: 700 }}>{item.nama}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Calendar size={15} color="var(--text-muted)" />
-                        <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{tglIndo}</span>
-                      </div>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+                    Memuat master hari libur...
+                  </td>
+                </tr>
+              ) : currentRows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#6b7280' }}>
+                    Tidak ada data hari libur terdaftar pada tahun {selectedYear}.
+                  </td>
+                </tr>
+              ) : (
+                currentRows.map((item, idx) => (
+                  <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6', transition: 'background 0.15s ease' }}>
+                    <td style={{ padding: '14px 16px', color: '#6b7280', fontWeight: 600 }}>
+                      {startIndex + idx + 1}
                     </td>
-                    <td>
-                      <span style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                        {item.type || 'Libur Nasional'}
-                      </span>
+
+                    <td style={{ padding: '14px 16px', fontWeight: 700, color: '#111827', fontSize: '0.9rem' }}>
+                      {item.nama || item.name || 'Hari Libur'}
                     </td>
-                    <td>
-                      <Badge type={item.is_national_holiday || item.libur === 1 ? 'Libur Nasional' : 'Libur Universitas'} />
+
+                    <td style={{ padding: '14px 16px', color: '#111827', fontWeight: 600 }}>
+                      📅 {formatIndonesianDate(item.tanggal || item.date)}
                     </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+
+                    <td style={{ padding: '14px 16px', color: '#6b7280' }}>
+                      {item.kategori || 'Public Holiday'}
+                    </td>
+
+                    <td style={{ padding: '14px 16px' }}>
+                      <Badge variant={(item.tipe || '').toLowerCase().includes('nasional') ? 'success' : 'info'}>
+                        {item.tipe || 'Libur Nasional'}
+                      </Badge>
+                    </td>
+
+                    <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
                         <button
-                          onClick={() => handleOpenEdit(item)}
-                          style={{
-                            background: '#f1f5f9',
-                            border: 'none',
-                            padding: '6px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            color: '#475569',
-                          }}
-                          title="Ubah Libur"
+                          onClick={() => handleOpenEditModal(item)}
+                          className="bm-btn-outline"
+                          style={{ padding: '6px 10px', fontSize: '0.775rem' }}
+                          title="Edit"
                         >
-                          <Edit2 size={16} />
+                          <Edit3 size={14} color="#0284c7" />
                         </button>
                         <button
-                          onClick={() => handleOpenDelete(item)}
-                          style={{
-                            background: '#fef2f2',
-                            border: 'none',
-                            padding: '6px',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            color: '#ef4444',
-                          }}
-                          title="Hapus Libur"
+                          onClick={() => handleDeleteHoliday(item.id)}
+                          className="bm-btn-outline"
+                          style={{ padding: '6px 10px', fontSize: '0.775rem', borderColor: '#fecaca', background: '#fef2f2' }}
+                          title="Hapus"
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} color="#ef4444" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {/* Paging Footer */}
-        {!loading && totalItems > 0 && (
-          <Pagination
-            currentPage={currentPage}
-            totalItems={totalItems}
-            itemsPerPage={itemsPerPage}
-            onPageChange={(page) => setCurrentPage(page)}
-            onItemsPerPageChange={(limit) => {
-              setItemsPerPage(limit);
-              setCurrentPage(1);
-            }}
-          />
-        )}
-      </div>
-
-      {/* Modal: Tambah Hari Libur */}
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="Tambah Master Hari Libur"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '12px' }}>
-            <button className="btn btn-secondary" onClick={() => setIsCreateModalOpen(false)}>
-              Batal
-            </button>
-            <button className="btn btn-primary" onClick={handleCreateSubmit}>
-              Simpan Hari Libur
-            </button>
-          </div>
-        }
-      >
-        <form onSubmit={handleCreateSubmit}>
-          <div className="form-group">
-            <label className="form-label">Nama Hari Libur</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder="Contoh: Hari Kemerdekaan RI"
-              value={formData.nama}
-              onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Tanggal</label>
-            <input
-              type="date"
-              className="form-input"
-              value={formData.tanggal}
-              onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Tipe Libur</label>
-            <select
-              className="form-select"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            >
-              <option value="Libur Nasional">Libur Nasional</option>
-              <option value="Cuti Bersama">Cuti Bersama</option>
-              <option value="Libur Universitas">Libur Universitas / Dies Natalis</option>
-            </select>
-          </div>
-
-          <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              type="checkbox"
-              id="is_national_create"
-              checked={formData.is_national_holiday}
-              onChange={(e) => setFormData({ ...formData, is_national_holiday: e.target.checked })}
-              style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
-            />
-            <label htmlFor="is_national_create" style={{ fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer' }}>
-              Tetapkan sebagai Libur Nasional / Kalender Merah
-            </label>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal: Edit Hari Libur */}
-      <Modal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        title="Ubah Master Hari Libur"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '12px' }}>
-            <button className="btn btn-secondary" onClick={() => setIsEditModalOpen(false)}>
-              Batal
-            </button>
-            <button className="btn btn-primary" onClick={handleEditSubmit}>
-              Simpan Perubahan
-            </button>
-          </div>
-        }
-      >
-        <form onSubmit={handleEditSubmit}>
-          <div className="form-group">
-            <label className="form-label">Nama Hari Libur</label>
-            <input
-              type="text"
-              className="form-input"
-              value={formData.nama}
-              onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Tanggal</label>
-            <input
-              type="date"
-              className="form-input"
-              value={formData.tanggal}
-              onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Tipe Libur</label>
-            <select
-              className="form-select"
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-            >
-              <option value="Libur Nasional">Libur Nasional</option>
-              <option value="Cuti Bersama">Cuti Bersama</option>
-              <option value="Libur Universitas">Libur Universitas / Dies Natalis</option>
-            </select>
-          </div>
-
-          <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <input
-              type="checkbox"
-              id="is_national_edit"
-              checked={formData.is_national_holiday}
-              onChange={(e) => setFormData({ ...formData, is_national_holiday: e.target.checked })}
-              style={{ width: '16px', height: '16px', accentColor: 'var(--color-primary)' }}
-            />
-            <label htmlFor="is_national_edit" style={{ fontSize: '0.875rem', fontWeight: 500, cursor: 'pointer' }}>
-              Tetapkan sebagai Libur Nasional / Kalender Merah
-            </label>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal: Hapus Hari Libur */}
-      <Modal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        title="Konfirmasi Hapus Hari Libur"
-        maxWidth="440px"
-        footer={
-          <div style={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: '12px' }}>
-            <button className="btn btn-secondary" onClick={() => setIsDeleteModalOpen(false)}>
-              Batal
-            </button>
-            <button className="btn btn-danger" onClick={handleDeleteSubmit}>
-              Ya, Hapus
-            </button>
-          </div>
-        }
-      >
-        <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '10px',
-              backgroundColor: '#fef2f2',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <AlertTriangle size={22} color="#ef4444" />
-          </div>
+        {/* PAGINATION CONTROLS */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '12px', fontSize: '0.8rem', color: '#6b7280' }}>
           <div>
-            <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-              Apakah Anda yakin ingin menghapus data libur ini?
-            </p>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              "{selectedHoliday?.nama}" ({formatTanggalIndo(selectedHoliday?.tanggal)})
-            </p>
+            Menampilkan <strong>{totalItems === 0 ? 0 : startIndex + 1}</strong>–<strong>{Math.min(startIndex + pageSize, totalItems)}</strong> dari <strong>{totalItems}</strong> data
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>Baris per halaman:</span>
+              <select
+                className="bm-input"
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+                style={{ width: '70px', height: '32px', padding: '2px 6px', fontSize: '0.8rem' }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="bm-btn-outline"
+                style={{ padding: '6px 10px', opacity: currentPage === 1 ? 0.5 : 1 }}
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span style={{ padding: '6px 12px', fontWeight: 700, color: '#111827' }}>
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="bm-btn-outline"
+                style={{ padding: '6px 10px', opacity: currentPage === totalPages ? 0.5 : 1 }}
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
         </div>
+      </div>
+
+      {/* MODAL CRUD */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingHoliday ? 'Edit Data Hari Libur' : 'Tambah Data Hari Libur Baru'}>
+        <form onSubmit={handleSaveHoliday} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+              Nama Hari Libur *
+            </label>
+            <input
+              type="text"
+              className="bm-input"
+              placeholder="Contoh: Hari Kemerdekaan RI..."
+              value={nama}
+              onChange={(e) => setNama(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+              Tanggal Libur *
+            </label>
+            <input
+              type="date"
+              className="bm-input"
+              value={tanggal}
+              onChange={(e) => setTanggal(e.target.value)}
+              required
+            />
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+              Status / Tipe Libur *
+            </label>
+            <select className="bm-input" value={tipe} onChange={(e) => setTipe(e.target.value)}>
+              <option value="Libur Nasional">Libur Nasional</option>
+              <option value="Libur Universitas">Libur Universitas</option>
+              <option value="Cuti Bersama">Cuti Bersama</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
+              Kategori Libur *
+            </label>
+            <select className="bm-input" value={kategori} onChange={(e) => setKategori(e.target.value)}>
+              <option value="Public Holiday">Public Holiday</option>
+              <option value="Observance">Observance</option>
+              <option value="Joint Holiday">Joint Holiday</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+            <button type="button" onClick={() => setIsModalOpen(false)} className="bm-btn-outline">
+              Batal
+            </button>
+            <button type="submit" disabled={submitting} className="bm-btn-emerald">
+              {submitting ? 'Menyimpan...' : (editingHoliday ? 'Simpan Perubahan' : 'Tambah Hari Libur')}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

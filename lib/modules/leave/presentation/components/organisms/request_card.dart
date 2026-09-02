@@ -373,6 +373,50 @@ class _RequestCardState extends State<RequestCard> {
               ),
             ),
 
+            if (sppdMembersList != null && sppdMembersList.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50]?.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange[100]!),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.groups_outlined, size: 16, color: Colors.orange[900]),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Anggota Rombongan (${sppdMembersList.length} orang):',
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange[900],
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            sppdMembersList.map((m) => m.displayName).join(', '),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.orange[900],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 10),
 
             // Card Body (Date, Duration, Details/Reason, Supervisor Note)

@@ -1,6 +1,7 @@
 class AuthSession {
   final String name;
   final String nip;
+  final String nidn;
   final String email;
   final String role;
   final List<String> groups;
@@ -9,6 +10,7 @@ class AuthSession {
   AuthSession({
     required this.name,
     required this.nip,
+    required this.nidn,
     required this.email,
     required this.role,
     required this.groups,
@@ -25,7 +27,8 @@ class AuthSession {
 
     return AuthSession(
       name: json['name'] ?? 'User',
-      nip: json['employeeid'] ?? '',
+      nip: groupList.contains('Tendik') ? json['employeeid'] : '',
+      nidn: groupList.contains('Dosen') ? json['employeeid'] : '',
       email: json['email'] ?? '',
       role: resolvedRole,
       groups: groupList,

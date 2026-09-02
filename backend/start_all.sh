@@ -22,16 +22,16 @@ echo "[1/5] Building Main API Server (main.go)..."
 go build -o "$BIN_DIR/hrportal_api" ./main.go
 
 echo "[2/5] Building Notification Microservice (cmd/notificationservice)..."
-go build -o "$BIN_DIR/notification_service" ./cmd/notificationservice/main.go
+go build -o "$BIN_DIR/notification_service" ./cmd/notificationservice
 
 echo "[3/5] Building SDM Auto-Verify Worker (cmd/autoverifysdm)..."
-go build -o "$BIN_DIR/autoverifysdm_worker" ./cmd/autoverifysdm/main.go
+go build -o "$BIN_DIR/autoverifysdm_worker" ./cmd/autoverifysdm
 
 echo "[4/5] Building Holiday Sync Worker (cmd/holidaysync)..."
-go build -o "$BIN_DIR/holidaysync_worker" ./cmd/holidaysync/main.go
+go build -o "$BIN_DIR/holidaysync_worker" ./cmd/holidaysync
 
 echo "[5/5] Building Export Queue Worker (cmd/exportworker)..."
-go build -o "$BIN_DIR/export_worker" ./cmd/exportworker/main.go
+go build -o "$BIN_DIR/export_worker" ./cmd/exportworker
 
 echo "----------------------------------------------------------------------"
 echo " All 5 binaries compiled successfully! Starting services in background..."

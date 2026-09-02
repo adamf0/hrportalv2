@@ -18,7 +18,12 @@ class MainShell extends StatelessWidget {
 
   void _onTabSelect(int index, AttendanceBloc attendanceBloc, bool isSdm) {
     attendanceBloc.setTabIndex(index);
-    final scopes = [isSdm ? 'sdm_report' : 'dashboard', 'attendance', 'requests', 'payroll'];
+    final scopes = [
+      isSdm ? 'sdm_report' : 'dashboard',
+      'attendance',
+      'requests',
+      'payroll'
+    ];
     if (index < scopes.length) {
       ApiClient.setActivePageScope(scopes[index]);
     }
@@ -32,8 +37,11 @@ class MainShell extends StatelessWidget {
 
     if (authBloc.session != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        final targetNip = authBloc.session!.nip.isNotEmpty ? authBloc.session!.nip : 'SDM';
-        FcmService.registerFcmToken(targetNip, isSdm: isSdm);
+        final targetNip =
+            authBloc.session!.nip.isNotEmpty ? authBloc.session!.nip : '';
+        final targetNidn =
+            authBloc.session!.nidn.isNotEmpty ? authBloc.session!.nidn : '';
+        FcmService.registerFcmToken(targetNip, targetNidn, isSdm: isSdm);
       });
     }
 

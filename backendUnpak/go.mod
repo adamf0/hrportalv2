@@ -24,6 +24,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
 	github.com/goccy/go-reflect v1.2.0 // indirect
 	github.com/gofiber/websocket/v2 v2.2.1
+	github.com/goforj/godump v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect

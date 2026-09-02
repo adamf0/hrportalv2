@@ -57,33 +57,51 @@ func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn 
 	var items []domain.Cuti
 	query := r.db.WithContext(ctx).Debug().Model(&domain.Cuti{})
 
-	if isSdm && (tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "") {
-		query = query.Where("tanggal_mulai >= ? and tanggal_akhir <= ?", *tanggal_mulai, *tanggal_akhir)
+	if isSdm {
+		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
+			query = query.Where("tanggal_mulai >= ? and tanggal_akhir <= ?", *tanggal_mulai, *tanggal_akhir)
+		}
+		if nip == "" && nidn == "" {
+			query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui sdm", "proses sdm", "%sdm%")
+		}
+	} else if verifikasi {
+		if nip != "" && nidn != "" {
+			query = query.Where("verifikasi = ? OR verifikasi = ?", nip, nidn)
+		} else if nip != "" {
+			query = query.Where("verifikasi = ?", nip)
+		} else if nidn != "" {
+			query = query.Where("verifikasi = ?", nidn)
+		} else {
+			query = query.Where("verifikasi IS NOT NULL AND verifikasi != ''")
+		}
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
-			if verifikasi {
-				query = query.Where("verifikasi = ? or verifikasi = ?", nip, nidn)
-			} else {
-				query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
-			}
+			query = query.Where("(nip = ? OR nidn = ?)", nip, nidn)
 		} else if nip != "" {
-			if verifikasi {
-				query = query.Where("verifikasi = ?", nip)
-			} else {
-				query = query.Where("nip = ?", nip)
-			}
+			query = query.Where("nip = ?", nip)
 		} else {
-			if verifikasi {
-				query = query.Where("verifikasi = ?", nidn)
-			} else {
-				query = query.Where("nidn = ?", nidn)
-			}
+			query = query.Where("nidn = ?", nidn)
 		}
 	}
 
 	err := query.Order("tanggal_mulai desc").Find(&items).Error
 	if err != nil {
 		return nil, err
+	}
+
+	var jenisList []domain.JenisCuti
+	if errJenis := r.db.WithContext(ctx).Table("jenis_cuti").Find(&jenisList).Error; errJenis == nil {
+		jMap := make(map[uint]string)
+		for _, j := range jenisList {
+			if j.Nama != "" {
+				jMap[j.ID] = j.Nama
+			}
+		}
+		for i := range items {
+			if name, ok := jMap[items[i].JenisCutiID]; ok {
+				items[i].JenisCuti = name
+			}
+		}
 	}
 
 	return items, nil

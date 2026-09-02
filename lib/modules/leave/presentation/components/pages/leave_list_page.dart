@@ -255,7 +255,8 @@ class _LeaveListPageState extends State<LeaveListPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('Hapus Pengajuan',
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+            style:
+                GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
         content: Text(
           'Apakah Anda yakin ingin menghapus pengajuan "${req.type}" ini?',
           style: GoogleFonts.inter(fontSize: 13),
@@ -753,15 +754,11 @@ class _LeaveListPageState extends State<LeaveListPage> {
                                               req: req,
                                               onEdit: _activeTab == 0
                                                   ? () => _handleEdit(
-                                                      context,
-                                                      leaveBloc,
-                                                      req)
+                                                      context, leaveBloc, req)
                                                   : null,
                                               onDelete: _activeTab == 0
                                                   ? () => _handleDelete(
-                                                      context,
-                                                      leaveBloc,
-                                                      req)
+                                                      context, leaveBloc, req)
                                                   : null,
                                               onApprove: _activeTab == 1
                                                   ? () => _handleApprove(

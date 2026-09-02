@@ -60,6 +60,7 @@ class AuthRepository implements IAuthRepository {
           return AuthSession(
             name: name,
             nip: nip,
+            nidn: nidn,
             email: email,
             role: resolvedRole,
             groups: groups,
@@ -104,6 +105,7 @@ class AuthRepository implements IAuthRepository {
         return AuthSession(
           name: sessionData['name'] ?? '',
           nip: sessionData['nip'] ?? '',
+          nidn: sessionData['nidn'] ?? '',
           email: sessionData['email'] ?? '',
           role: sessionData['role'] ?? '',
           groups: sessionData['groups'] != null

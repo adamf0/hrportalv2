@@ -35,18 +35,35 @@ class LeaveFormData {
           if (item is Map) {
             final val = (item['id'] ?? item['value'] ?? '').toString();
             final name = (item['nama'] ?? item['name'] ?? '').toString();
-            final maxHari =
-                (item['maks_hari'] ?? item['quota'] ?? item['max'] ?? '')
-                    .toString();
+            final minHariRaw = item['min_hari'] ?? item['min'];
+            final maxHariRaw = item['max_hari'] ?? item['maks_hari'] ?? item['quota'] ?? item['max'];
+
+            final minHari = int.tryParse(minHariRaw?.toString() ?? '') ?? 0;
+            final maxHari = int.tryParse(maxHariRaw?.toString() ?? '') ?? 0;
+
+            String rangeText = '';
+            if (minHari > 0 && maxHari > 0) {
+              if (minHari == maxHari) {
+                rangeText = '$minHari Hari';
+              } else {
+                rangeText = '$minHari - $maxHari Hari';
+              }
+            } else if (minHari > 0) {
+              rangeText = 'Min: $minHari Hari';
+            } else if (maxHari > 0) {
+              rangeText = 'Max: $maxHari Hari';
+            } else {
+              rangeText = 'Sesuai Ketentuan';
+            }
 
             if (name.isNotEmpty) {
               loadedCuti.add({
                 'value': val,
                 'name': name,
-                'desc': "",
-                'max': maxHari.isNotEmpty && maxHari != '0'
-                    ? '$maxHari Hari'
-                    : 'Maksimal Kuota',
+                'desc': '',
+                'min_hari': minHari.toString(),
+                'max_hari': maxHari.toString(),
+                'max': rangeText,
               });
             }
           }

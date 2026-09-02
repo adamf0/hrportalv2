@@ -2,14 +2,17 @@ package CreateSppd
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	common "hrportal_backend/common/domain"
 	commoninfra "hrportal_backend/common/infrastructure"
+	"hrportal_backend/modules/notification/application/CreateNotification"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/mehdihadeli/go-mediatr"
 	"gorm.io/gorm"
 )
 
@@ -172,6 +175,33 @@ func (h *CreateSppdCommandHandler) Handle(ctx context.Context, cmd *CreateSppdCo
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Sppd](domain.SppdNotFound()), err
 		}
+	}
+
+	if sppd.Verifikasi != nil && *sppd.Verifikasi != "" {
+		targets := []string{*sppd.Verifikasi}
+		title := "Pengajuan SPPD Baru"
+		body := "Pegawai NIP " + sppd.Nip + " mengajukan SPPD baru. Mohon verifikasi."
+		payload := map[string]string{"type": "sppd", "id": strconv.Itoa(int(sppd.ID)), "status": sppd.Status}
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: targets,
+			Title:      title,
+			Body:       body,
+			Type:       "sppd",
+			Payload:    payload,
+		})
+	}
+
+	if sppd.Nip != "" && (sppd.Verifikasi == nil || *sppd.Verifikasi != sppd.Nip) {
+		titleApp := "Pengajuan SPPD Berhasil Dikirim"
+		bodyApp := "Pengajuan SPPD Anda ke " + sppd.Tujuan + " (ID: " + strconv.Itoa(int(sppd.ID)) + ") telah berhasil dikirim dan menunggu verifikasi."
+		payloadApp := map[string]string{"type": "sppd", "id": strconv.Itoa(int(sppd.ID)), "status": sppd.Status}
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{sppd.Nip},
+			Title:      titleApp,
+			Body:       bodyApp,
+			Type:       "sppd",
+			Payload:    payloadApp,
+		})
 	}
 
 	return common.SuccessValue(sppd), nil

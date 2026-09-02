@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/unpak-api': {
-        target: 'https://hrportal.unpak.ac.id/api/v2',
+        target: 'http://localhost:4000/api/v2',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/unpak-api/, ''),
         secure: false,

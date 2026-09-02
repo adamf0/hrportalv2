@@ -6,7 +6,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/mehdihadeli/go-mediatr"
 
-	commondomain "hrportal_backend/common/domain"
+	common "hrportal_backend/common/domain"
 	"hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	commonpresentation "hrportal_backend/common/presentation"
@@ -23,9 +23,26 @@ func ModuleIzin(app *fiber.App) {
 
 	group.Post("/", func(c *fiber.Ctx) error {
 		jenisIzinID, _ := strconv.Atoi(c.FormValue("id_jenis_izin"))
+		if jenisIzinID == 0 {
+			jenisIzinID, _ = strconv.Atoi(c.FormValue("jenis_izin_id"))
+		}
+		if jenisIzinID == 0 {
+			jenisIzinID, _ = strconv.Atoi(c.FormValue("jenis_izin"))
+		}
+
+		tanggalPengajuan := c.FormValue("tanggal_pengajuan")
+		if tanggalPengajuan == "" {
+			tanggalPengajuan = c.FormValue("tanggal")
+		}
+		if tanggalPengajuan == "" {
+			tanggalPengajuan = c.FormValue("tanggal_mulai")
+		}
 
 		var verifikasi *string
 		vStr := c.FormValue("verifikasi")
+		if vStr == "" {
+			vStr = c.FormValue("nip_atasan")
+		}
 		if vStr != "" {
 			verifikasi = &vStr
 		}
@@ -50,13 +67,13 @@ func ModuleIzin(app *fiber.App) {
 			Fakultas:         c.FormValue("fakultas"),
 			Prodi:            c.FormValue("prodi"),
 			JenisIzinID:      uint(jenisIzinID),
-			TanggalPengajuan: c.FormValue("tanggal_pengajuan"),
+			TanggalPengajuan: tanggalPengajuan,
 			Tujuan:           c.FormValue("tujuan"),
 			FileLampiran:     fileLampiran,
 			Verifikasi:       verifikasi,
 		}
 
-		res, err := mediatr.Send[*create.CreateIzinCommand, commondomain.ResultValue[*domain.Izin]](c.UserContext(), &cmd)
+		res, err := mediatr.Send[*create.CreateIzinCommand, common.ResultValue[*domain.Izin]](c.UserContext(), &cmd)
 		if err != nil {
 			return commoninfra.HandleError(c, err)
 		}
@@ -65,18 +82,11 @@ func ModuleIzin(app *fiber.App) {
 			return commoninfra.HandleError(c, res.Error)
 		}
 
-		// Trigger FCM Notification for Create Izin
-		// if res.Value != nil {
-		// 	iz := res.Value
-		// 	helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "izin_updated", "module": "izin", "data": iz})
-		// 	if iz.Verifikasi != nil && *iz.Verifikasi != "" {
-		// 		targets := []string{*iz.Verifikasi}
-		// 		title := "Pengajuan Izin Baru"
-		// 		body := "Pegawai NIP " + iz.Nip + " mengajukan Izin baru. Mohon verifikasi."
-		// 		payload := map[string]string{"type": "izin", "id": strconv.Itoa(int(iz.ID)), "status": iz.Status}
-		// 		helper.GlobalFcmManager.DispatchNotification(targets, title, body, "izin", payload)
-		// 	}
-		// }
+		// Trigger Notification for Create Izin
+		if res.Value != nil {
+			iz := res.Value
+			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "izin_updated", "module": "izin", "data": iz})
+		}
 
 		return c.JSON(res.Value)
 	})
@@ -118,7 +128,7 @@ func ModuleIzin(app *fiber.App) {
 			IsSdm:            c.FormValue("role") == "sdm",
 		}
 
-		res, err := mediatr.Send[*update.UpdateIzinCommand, commondomain.ResultValue[*domain.Izin]](c.UserContext(), &cmd)
+		res, err := mediatr.Send[*update.UpdateIzinCommand, common.ResultValue[*domain.Izin]](c.UserContext(), &cmd)
 		if err != nil {
 			return commoninfra.HandleError(c, err)
 		}
@@ -127,36 +137,9 @@ func ModuleIzin(app *fiber.App) {
 			return commoninfra.HandleError(c, res.Error)
 		}
 
-		// Trigger FCM Notification for Update/Verify Izin
+		// Trigger Notification for Update/Verify Izin
 		if res.Value != nil {
 			iz := res.Value
-			// status := iz.Status
-			// atasanNip := ""
-			// if iz.Verifikasi != nil && *iz.Verifikasi != "" {
-			// 	atasanNip = *iz.Verifikasi
-			// }
-
-			// switch status {
-			// case "terima atasan":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Disetujui Atasan", "Pengajuan Izin Anda telah disetujui Atasan. Menunggu verifikasi SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{"SDM_BROADCAST"}, "Verifikasi SDM Izin", "Pengajuan Izin NIP "+iz.Nip+" telah disetujui Atasan. Mohon verifikasi final SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
-
-			// case "tolak atasan":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Ditolak Atasan", "Pengajuan Izin Anda ditolak oleh Atasan.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
-
-			// case "terima sdm":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Disetujui SDM", "Selamat! Pengajuan Izin Anda telah disetujui oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
-			// 	if atasanNip != "" {
-			// 		helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Izin", "Pengajuan Izin NIP "+iz.Nip+" telah disetujui oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
-			// 	}
-
-			// case "tolak sdm":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{iz.Nip}, "Pengajuan Izin Ditolak SDM", "Pengajuan Izin Anda ditolak oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
-			// 	if atasanNip != "" {
-			// 		helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Izin", "Pengajuan Izin NIP "+iz.Nip+" ditolak oleh SDM.", "izin", map[string]string{"id": strconv.Itoa(int(iz.ID)), "status": status})
-			// 	}
-			// }
-
 			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "izin_updated", "module": "izin", "data": iz})
 		}
 
@@ -170,7 +153,7 @@ func ModuleIzin(app *fiber.App) {
 			ID: uint(id),
 		}
 
-		res, err := mediatr.Send[*delete.DeleteIzinCommand, commondomain.ResultValue[bool]](c.UserContext(), &cmd)
+		res, err := mediatr.Send[*delete.DeleteIzinCommand, common.ResultValue[bool]](c.UserContext(), &cmd)
 		if err != nil {
 			return commoninfra.HandleError(c, err)
 		}
@@ -189,7 +172,7 @@ func ModuleIzin(app *fiber.App) {
 			ID: uint(id),
 		}
 
-		res, err := mediatr.Send[*get.GetIzinQuery, commondomain.ResultValue[*domain.Izin]](c.UserContext(), &query)
+		res, err := mediatr.Send[*get.GetIzinQuery, common.ResultValue[*domain.Izin]](c.UserContext(), &query)
 		if err != nil {
 			return commoninfra.HandleError(c, err)
 		}
@@ -202,20 +185,36 @@ func ModuleIzin(app *fiber.App) {
 	})
 
 	group.Get("/", func(c *fiber.Ctx) error {
-		nidn := c.FormValue("nidn")
 		nip := c.FormValue("nip")
-		isSdm := c.FormValue("role") == "sdm" && (c.Query("verifikasi") == "haxor" || c.Query("is_sdm") == "true")
+		if nip == "" {
+			nip = c.Query("nip")
+		}
+		if nip == "" {
+			nip = string(c.Request().PostArgs().Peek("nip"))
+		}
+		nidn := c.FormValue("nidn")
+		if nidn == "" {
+			nidn = c.Query("nidn")
+		}
+		if nidn == "" {
+			nidn = string(c.Request().PostArgs().Peek("nidn"))
+		}
+		role := c.FormValue("role")
+		if role == "" {
+			role = string(c.Request().PostArgs().Peek("role"))
+		}
+		isSdm := (role == "sdm" || role == "baum" || c.Query("role") == "sdm" || c.Query("role") == "baum")
 
 		query := getAll.GetAllIzinsQuery{
 			Nidn:         nidn,
 			Nip:          nip,
-			Verifikasi:   c.Query("verifikasi") == "haxor",
+			Verifikasi:   c.Query("verifikasi") == "haxor" || c.Query("verifikasi") == "true",
 			IsSdm:        isSdm,
 			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
 		}
 
-		res, err := mediatr.Send[*getAll.GetAllIzinsQuery, commondomain.ResultValue[[]domain.Izin]](c.UserContext(), &query)
+		res, err := mediatr.Send[*getAll.GetAllIzinsQuery, common.ResultValue[[]domain.Izin]](c.UserContext(), &query)
 		if err != nil {
 			return commoninfra.HandleError(c, err)
 		}
@@ -224,7 +223,7 @@ func ModuleIzin(app *fiber.App) {
 			return commoninfra.HandleError(c, res.Error)
 		}
 
-		pagedData := commondomain.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
 		sseAdapter := &commonpresentation.SSEAdapter[domain.Izin]{}
 
 		return sseAdapter.Send(c, pagedData)

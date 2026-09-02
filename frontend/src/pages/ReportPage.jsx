@@ -8,13 +8,21 @@ import {
   Award, 
   Filter,
   Building,
-  GraduationCap
+  GraduationCap,
+  Users,
+  CheckCircle2,
+  CalendarDays,
+  Clock,
+  Printer,
+  FileText
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useToast } from '../components/Toast';
 import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
-import { formatTanggalIndo } from '../utils/date';
+import { Badge } from '../components/Badge';
+import { SearchableSelect } from '../components/SearchableSelect';
+import { formatIndonesianDate } from '../utils/dateFormatter';
 
 const BULAN_LIST = [
   { value: 1, name: 'Januari', short: 'Jan' },
@@ -31,7 +39,7 @@ const BULAN_LIST = [
   { value: 12, name: 'Desember', short: 'Des' },
 ];
 
-const TAHUN_LIST = [2023, 2024, 2025, 2026, 2027];
+const TAHUN_LIST = [2024, 2025, 2026, 2027];
 
 const formatJamMasuk = (str) => {
   if (!str) return '';
@@ -50,26 +58,31 @@ const formatJamMasuk = (str) => {
   return str;
 };
 
-export const ReportPage = () => {
+export const ReportPage = ({ globalPeriodType = 'cutoff', onPeriodTypeChange }) => {
   const { showToast } = useToast();
 
-  // Top-level Navigation Tab: 'presensi' (Reguler Bulanan) vs 'upacara' (Presensi Upacara Tahunan)
+  // Top Main Tab: 'presensi' (Reguler Bulanan) vs 'upacara' (Presensi Upacara Tahunan)
   const [mainReportTab, setMainReportTab] = useState('presensi');
 
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [periodType, setPeriodType] = useState('calendar'); // 'calendar' (1-31) or 'cutoff' (16-15) for Presensi tab
+  const [periodType, setPeriodType] = useState(globalPeriodType);
 
-  // Filter States: Fakultas, Prodi, Unit, Search Query
-  const [selectedFakultas, setSelectedFakultas] = useState('');
-  const [selectedProdi, setSelectedProdi] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('');
+  useEffect(() => {
+    setPeriodType(globalPeriodType);
+  }, [globalPeriodType]);
+
+  // Master Filters State (Default null for SearchableSelect)
+  const [selectedFakultas, setSelectedFakultas] = useState(null);
+  const [selectedProdi, setSelectedProdi] = useState(null);
+  const [selectedUnit, setSelectedUnit] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Master Data States
+  // Master Data Lists
   const [fakultasList, setFakultasList] = useState([]);
   const [prodiList, setProdiList] = useState([]);
+  const [unitList, setUnitList] = useState([]);
 
   // Data States
   const [loading, setLoading] = useState(true);
@@ -81,73 +94,80 @@ export const ReportPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  // Cell Detail Modal State
+  // Modal Cell State
   const [selectedCell, setSelectedCell] = useState(null);
   const [isCellModalOpen, setIsCellModalOpen] = useState(false);
 
-  // Export State
+  // Exporting state
   const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState(0);
 
-  // Fetch Master Data Fakultas & Prodi from https://hrportal.unpak.ac.id/api/v2/masterdata/fakultas & prodi
+  // Fetch Master Data Fakultas, Prodi & Unit Kerja (from ModuleMasterData Go Backend endpoints: /api/masterdata & /api/v2/masterdata)
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
-        // 1. Fetch Fakultas from https://hrportal.unpak.ac.id/api/v2/masterdata/fakultas
         let fakData = [];
         try {
-          const resFak = await apiClient.get('/unpak-api/masterdata/fakultas');
+          const resFak = await apiClient.get('/api/masterdata/fakultas');
           fakData = Array.isArray(resFak) ? resFak : (resFak?.data || resFak?.list_data || []);
         } catch (e) {
-          const localFak = await apiClient.get('/api/masterdata/fakultas').catch(() => []);
-          fakData = Array.isArray(localFak) ? localFak : (localFak?.data || localFak?.list_data || []);
+          const v2Fak = await apiClient.get('/api/v2/masterdata/fakultas').catch(() => []);
+          fakData = Array.isArray(v2Fak) ? v2Fak : (v2Fak?.data || v2Fak?.list_data || []);
         }
 
-        // 2. Fetch Prodi from https://hrportal.unpak.ac.id/api/v2/masterdata/prodi
         let prodData = [];
         try {
-          const resProd = await apiClient.get('/unpak-api/masterdata/prodi');
+          const resProd = await apiClient.get('/api/masterdata/prodi');
           prodData = Array.isArray(resProd) ? resProd : (resProd?.data || resProd?.list_data || []);
         } catch (e) {
-          const localProd = await apiClient.get('/api/masterdata/prodi').catch(() => []);
-          prodData = Array.isArray(localProd) ? localProd : (localProd?.data || localProd?.list_data || []);
+          const v2Prod = await apiClient.get('/api/v2/masterdata/prodi').catch(() => []);
+          prodData = Array.isArray(v2Prod) ? v2Prod : (v2Prod?.data || v2Prod?.list_data || []);
+        }
+
+        let uData = [];
+        try {
+          const resUnit = await apiClient.get('/api/masterdata/unit');
+          uData = Array.isArray(resUnit) ? resUnit : (resUnit?.data || resUnit?.list_data || []);
+        } catch (e) {
+          const v2Unit = await apiClient.get('/api/v2/masterdata/unit').catch(() => []);
+          uData = Array.isArray(v2Unit) ? v2Unit : (v2Unit?.data || v2Unit?.list_data || []);
         }
 
         setFakultasList(fakData.filter(f => f && (f.nama || f.nama_fakultas || f.fakultas || f.kode)));
         setProdiList(prodData.filter(p => p && (p.nama || p.nama_prodi || p.prodi || p.kode)));
+        setUnitList(uData.filter(u => u && (u.nama || u.nama_unit || u.unit || u.kode_unit)));
       } catch (err) {
-        console.warn('Gagal memuat masterdata:', err);
+        console.warn('Masterdata fetch error:', err);
       }
     };
-
     fetchMasterData();
   }, []);
 
-  // Compute start & end date strings based on selected period
   const getPeriodDates = () => {
     if (mainReportTab === 'upacara') {
       return {
         startStr: `${selectedYear}-01-01`,
         endStr: `${selectedYear}-12-31`,
         daysInPeriod: 365,
-        startDay: 1,
       };
     }
 
     if (periodType === 'calendar') {
       const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
       const pad = (n) => String(n).padStart(2, '0');
-      const startStr = `${selectedYear}-${pad(selectedMonth)}-01`;
-      const endStr = `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`;
-      return { startStr, endStr, daysInPeriod: lastDay, startDay: 1 };
+      return {
+        startStr: `${selectedYear}-${pad(selectedMonth)}-01`,
+        endStr: `${selectedYear}-${pad(selectedMonth)}-${pad(lastDay)}`,
+        daysInPeriod: lastDay,
+      };
     } else {
-      // Cutoff 16 prev month to 15 this month
       const prevYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
       const prevMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
       const pad = (n) => String(n).padStart(2, '0');
-      const startStr = `${prevYear}-${pad(prevMonth)}-16`;
-      const endStr = `${selectedYear}-${pad(selectedMonth)}-15`;
-      return { startStr, endStr, daysInPeriod: 31, startDay: 16 };
+      return {
+        startStr: `${prevYear}-${pad(prevMonth)}-16`,
+        endStr: `${selectedYear}-${pad(selectedMonth)}-15`,
+        daysInPeriod: 31,
+      };
     }
   };
 
@@ -168,10 +188,7 @@ export const ReportPage = () => {
     const { startStr, endStr } = getPeriodDates();
     try {
       const [reportRes, holidayRes, ceremonyRes] = await Promise.allSettled([
-        apiClient.get('/api/laporan/all', {
-          tanggal_mulai: startStr,
-          tanggal_akhir: endStr,
-        }),
+        apiClient.get('/api/laporan/all', { tanggal_mulai: startStr, tanggal_akhir: endStr }),
         apiClient.get('/api/holiday', { year: selectedYear }),
         apiClient.get('/api/ceremony-attendance'),
       ]);
@@ -179,35 +196,25 @@ export const ReportPage = () => {
       let empList = [];
       if (reportRes.status === 'fulfilled' && reportRes.value) {
         const val = reportRes.value;
-        if (val.list_data && Array.isArray(val.list_data)) {
-          empList = val.list_data;
-        } else if (val.pegawai && Array.isArray(val.pegawai)) {
-          empList = val.pegawai;
-        } else if (Array.isArray(val)) {
-          empList = val;
-        } else if (val.data && Array.isArray(val.data)) {
-          empList = val.data;
-        }
+        if (val.list_data && Array.isArray(val.list_data)) empList = val.list_data;
+        else if (val.pegawai && Array.isArray(val.pegawai)) empList = val.pegawai;
+        else if (Array.isArray(val)) empList = val;
+        else if (val.data && Array.isArray(val.data)) empList = val.data;
       }
 
       const holidaySet = new Set();
       if (holidayRes.status === 'fulfilled' && holidayRes.value) {
         const hList = Array.isArray(holidayRes.value) ? holidayRes.value : (holidayRes.value?.data || []);
         hList.forEach((h) => {
-          if (h.tanggal) {
-            holidaySet.add(h.tanggal.split('T')[0]);
-          }
+          if (h.tanggal) holidaySet.add(h.tanggal.split('T')[0]);
         });
       }
 
       let cList = [];
       if (ceremonyRes.status === 'fulfilled' && ceremonyRes.value) {
         const val = ceremonyRes.value;
-        if (Array.isArray(val)) {
-          cList = val;
-        } else if (val.data && Array.isArray(val.data)) {
-          cList = val.data;
-        }
+        if (Array.isArray(val)) cList = val;
+        else if (val.data && Array.isArray(val.data)) cList = val.data;
       }
 
       setHolidays(holidaySet);
@@ -225,18 +232,43 @@ export const ReportPage = () => {
     setCurrentPage(1);
   }, [mainReportTab, selectedMonth, selectedYear, periodType]);
 
-  // Extract unique Units from dataset for filter
-  const uniqueUnits = useMemo(() => {
+  // Format options for SearchableSelect
+  const fakultasOptions = useMemo(() => {
+    return fakultasList.map((f, i) => {
+      const name = f.nama || f.nama_fakultas || f.fakultas || f.kode || `Fakultas ${i + 1}`;
+      return { value: name, label: name, subtitle: `Kode: ${f.kode || f.kode_fakultas || f.id || i + 1}` };
+    });
+  }, [fakultasList]);
+
+  const prodiOptions = useMemo(() => {
+    return prodiList
+      .filter((p) => {
+        const name = (p.nama || p.nama_prodi || p.prodi || p.kode || '').toLowerCase();
+        return !name.includes('isi nama ps');
+      })
+      .map((p, i) => {
+        const name = p.nama || p.nama_prodi || p.prodi || p.kode || `Prodi ${i + 1}`;
+        return { value: name, label: name, subtitle: `Program Studi UNPAK` };
+      });
+  }, [prodiList]);
+
+  const unitOptions = useMemo(() => {
+    if (unitList.length > 0) {
+      return unitList.map((u, i) => {
+        const name = u.nama_unit || u.nama || u.unit || u.kode_unit || `Unit ${i + 1}`;
+        return { value: name, label: name, subtitle: `Kode Unit: ${u.kode_unit || i + 1}` };
+      });
+    }
+    // Fallback extract from employee dataset
     const set = new Set();
     rawEmployees.forEach((item) => {
       const p = item.pengguna || {};
       const u = p.unit || p.unit_kerja;
       if (u && u.trim() && u.trim() !== '-') set.add(u.trim());
     });
-    return Array.from(set).sort();
-  }, [rawEmployees]);
+    return Array.from(set).sort().map((u) => ({ value: u, label: u, subtitle: `Unit Kerja` }));
+  }, [unitList, rawEmployees]);
 
-  // Filtered employees by Search, Fakultas, Prodi, and Unit
   const filteredEmployees = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return rawEmployees.filter((item) => {
@@ -247,60 +279,31 @@ export const ReportPage = () => {
       const fakultas = (p.fakultas || '').toLowerCase();
       const prodi = (p.prodi || '').toLowerCase();
 
-      // Search Query
       if (q && !nama.includes(q) && !nip.includes(q) && !unit.includes(q) && !fakultas.includes(q) && !prodi.includes(q)) {
         return false;
       }
-
-      // Fakultas Filter
       if (selectedFakultas && !fakultas.includes(selectedFakultas.toLowerCase())) {
         return false;
       }
-
-      // Prodi Filter
       if (selectedProdi && !prodi.includes(selectedProdi.toLowerCase())) {
         return false;
       }
-
-      // Unit Filter
       if (selectedUnit && !unit.includes(selectedUnit.toLowerCase())) {
         return false;
       }
-
       return true;
     });
   }, [rawEmployees, searchQuery, selectedFakultas, selectedProdi, selectedUnit]);
 
-  const handleExportExcel = () => {
-    if (mainReportTab === 'presensi') {
-      exportPresensiCSV();
-    } else {
-      exportCeremonyYearlyCSV();
-    }
-  };
-
-  const exportPresensiCSV = () => {
+  const handleExportCSV = () => {
     try {
+      setIsExporting(true);
       const dates = getDatesList();
       const monthName = BULAN_LIST.find((b) => b.value === selectedMonth)?.name || selectedMonth;
       const periodLabel = periodType === 'calendar' ? 'Bulan_Penuh' : 'Cutoff_Payroll';
 
-      const dateHeaders = dates.map((d) => {
-        const day = d.getDate();
-        const m = d.getMonth() + 1;
-        return `${day}/${m}`;
-      });
-
-      const headers = [
-        'No',
-        'NIP',
-        'Nama Pegawai',
-        'Unit Kerja',
-        'Fakultas',
-        'Prodi',
-        'Total Hadir',
-        ...dateHeaders,
-      ];
+      const dateHeaders = dates.map((d) => `${d.getDate()}/${d.getMonth() + 1}`);
+      const headers = ['No', 'NIP', 'Nama Pegawai', 'Unit Kerja', 'Fakultas', 'Prodi', 'Total Hadir', ...dateHeaders];
 
       const rows = filteredEmployees.map((item, idx) => {
         const p = item.pengguna || {};
@@ -318,36 +321,18 @@ export const ReportPage = () => {
           const isSunday = d.getDay() === 0;
           const isHoliday = holidays.has(dKey);
 
-          const rec = getRecordForDate(records, dKey);
+          const rec = records.find((r) => r.tanggal === dKey);
           if (rec) {
-            if (rec.type === 'absen') {
-              return `"${formatJamMasuk(rec.info?.masuk) || 'Hadir'}"`;
-            } else if (rec.type === 'izin') {
-              return '"Izin"';
-            } else if (rec.type === 'cuti') {
-              return '"Cuti"';
-            } else if (rec.type === 'sppd') {
-              return '"SPPD"';
-            }
+            if (rec.type === 'absen') return `"${formatJamMasuk(rec.info?.masuk) || 'Hadir'}"`;
+            if (rec.type === 'izin') return '"Izin"';
+            if (rec.type === 'cuti') return '"Cuti"';
+            if (rec.type === 'sppd') return '"SPPD"';
           }
-
-          if (isSunday || isHoliday) {
-            return '"Libur"';
-          }
-
+          if (isSunday || isHoliday) return '"Libur"';
           return '"-"';
         });
 
-        return [
-          idx + 1,
-          `"${nip}"`,
-          `"${nama.replace(/"/g, '""')}"`,
-          `"${unit.replace(/"/g, '""')}"`,
-          `"${fak.replace(/"/g, '""')}"`,
-          `"${prd.replace(/"/g, '""')}"`,
-          totalHadir,
-          ...dayValues,
-        ].join(',');
+        return [idx + 1, `"${nip}"`, `"${nama.replace(/"/g, '""')}"`, `"${unit.replace(/"/g, '""')}"`, `"${fak.replace(/"/g, '""')}"`, `"${prd.replace(/"/g, '""')}"`, totalHadir, ...dayValues].join(',');
       });
 
       const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
@@ -358,59 +343,11 @@ export const ReportPage = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      showToast(`File Laporan Presensi ${monthName} ${selectedYear} berhasil diunduh!`, 'success');
+      showToast(`File Excel Laporan Presensi ${monthName} ${selectedYear} berhasil diunduh!`, 'success');
     } catch (e) {
-      console.error(e);
       showToast('Gagal mengunduh file laporan presensi', 'error');
-    }
-  };
-
-  const exportCeremonyYearlyCSV = () => {
-    try {
-      const headers = ['No', 'NIP', 'Nama Pegawai', 'Unit Kerja', 'Fakultas', 'Prodi', 'Total Upacara', ...BULAN_LIST.map((b) => b.name)];
-      
-      const rows = filteredEmployees.map((item, idx) => {
-        const p = item.pengguna || {};
-        const nip = p.nip || item.kode || '';
-        const nama = p.nama || `Pegawai ${nip}`;
-        const unit = p.unit_kerja || p.unit || '';
-        const fak = p.fakultas || '';
-        const prd = p.prodi || '';
-
-        const monthCounts = BULAN_LIST.map((b) => {
-          const count = ceremonyList.filter((c) => {
-            const cDate = new Date(c.tanggal);
-            const isMatchingEmp = (c.nip && c.nip === nip) || (c.nidn && c.nidn === p.nidn);
-            return isMatchingEmp && cDate.getFullYear() === selectedYear && (cDate.getMonth() + 1) === b.value;
-          }).length;
-          return count > 0 ? count : 0;
-        });
-
-        const totalUpacara = monthCounts.reduce((acc, curr) => acc + curr, 0);
-
-        return [
-          idx + 1,
-          `"${nip}"`,
-          `"${nama.replace(/"/g, '""')}"`,
-          `"${unit.replace(/"/g, '""')}"`,
-          `"${fak.replace(/"/g, '""')}"`,
-          `"${prd.replace(/"/g, '""')}"`,
-          totalUpacara,
-          ...monthCounts,
-        ].join(',');
-      });
-
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows].join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `Laporan_Presensi_Upacara_${selectedYear}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast(`File Laporan Presensi Upacara Tahun ${selectedYear} berhasil diunduh!`, 'success');
-    } catch (e) {
-      showToast('Gagal mengunduh file laporan upacara', 'error');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -425,662 +362,492 @@ export const ReportPage = () => {
   };
 
   const handleCellClick = (emp, dateStr, record, isUpacara = false) => {
-    setSelectedCell({
-      emp,
-      dateStr,
-      record,
-      isUpacara,
-    });
+    setSelectedCell({ emp, dateStr, record, isUpacara });
     setIsCellModalOpen(true);
   };
 
   return (
-    <div className="page-wrapper animate-fade-in">
-      {/* Top Main Tab Navigation: Presensi vs Presensi Upacara */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-light)', paddingBottom: '12px' }}>
-        <button
-          onClick={() => {
-            setMainReportTab('presensi');
-            setSearchQuery('');
-            setCurrentPage(1);
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            borderRadius: '10px',
-            border: 'none',
-            backgroundColor: mainReportTab === 'presensi' ? 'var(--color-primary)' : '#f1f5f9',
-            color: mainReportTab === 'presensi' ? '#ffffff' : 'var(--text-main)',
-            fontWeight: 700,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
-        >
-          <FileSpreadsheet size={18} />
-          <span>Presensi</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setMainReportTab('upacara');
-            setSearchQuery('');
-            setCurrentPage(1);
-          }}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            borderRadius: '10px',
-            border: 'none',
-            backgroundColor: mainReportTab === 'upacara' ? 'var(--color-primary)' : '#f1f5f9',
-            color: mainReportTab === 'upacara' ? '#ffffff' : 'var(--text-main)',
-            fontWeight: 700,
-            fontSize: '0.9rem',
-            cursor: 'pointer',
-            transition: 'all 0.15s',
-          }}
-        >
-          <Award size={18} />
-          <span>Presensi Upacara</span>
-        </button>
-      </div>
-
-      {/* Filter Card with Periode, Fakultas, Prodi, Unit & Search */}
+    <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* 3D Header Banner */}
       <div
-        className="glass-card"
+        className="bm-card"
         style={{
-          padding: '18px 20px',
-          marginBottom: '24px',
+          padding: '24px 28px',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)',
           display: 'flex',
-          flexDirection: 'column',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
           gap: '16px',
         }}
       >
-        {/* Row 1: Primary Controls */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <span style={{ padding: '4px 10px', borderRadius: '4px', background: '#dcfce7', color: '#15803d', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', marginBottom: '6px', display: 'inline-block' }}>
+            Rekapitulasi Kehadiran
+          </span>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#111827' }}>
+            Laporan Presensi Pegawai
+          </h1>
+          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '2px' }}>
+            Matriks Rekapitulasi Presensi Reguler ({periodType === 'cutoff' ? 'Cutoff 16-15' : 'Bulan 01-31'}) &amp; Presensi Upacara Tahunan UNPAK.
+          </p>
+        </div>
+
+        {/* Top Report Tab Switcher */}
+        <div style={{ display: 'flex', gap: '4px', background: '#f7f8f6', padding: '4px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <button
+            onClick={() => { setMainReportTab('presensi'); setCurrentPage(1); }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              background: mainReportTab === 'presensi' ? '#ffffff' : 'transparent',
+              color: mainReportTab === 'presensi' ? '#111827' : '#6b7280',
+              fontWeight: mainReportTab === 'presensi' ? 700 : 500,
+              fontSize: '0.825rem',
+              cursor: 'pointer',
+              boxShadow: mainReportTab === 'presensi' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <FileSpreadsheet size={16} color="#10b981" />
+            <span>Presensi Reguler</span>
+          </button>
+
+          <button
+            onClick={() => { setMainReportTab('upacara'); setCurrentPage(1); }}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              background: mainReportTab === 'upacara' ? '#ffffff' : 'transparent',
+              color: mainReportTab === 'upacara' ? '#111827' : '#6b7280',
+              fontWeight: mainReportTab === 'upacara' ? 700 : 500,
+              fontSize: '0.825rem',
+              cursor: 'pointer',
+              boxShadow: mainReportTab === 'upacara' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <Award size={16} color="#f59e0b" />
+            <span>Presensi Upacara</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Bar Controls Card */}
+      <div className="bm-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Row 1: Month, Year, Cutoff Toggle, Export Excel */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            {/* Month Selector: ONLY for Presensi Reguler Tab */}
             {mainReportTab === 'presensi' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-muted)' }}>Bulan:</span>
+                <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#374151' }}>Bulan:</span>
                 <select
-                  className="form-select"
+                  className="bm-input"
                   value={selectedMonth}
-                  onChange={(e) => {
-                    setSelectedMonth(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  style={{ width: '130px', padding: '6px 10px', fontSize: '0.85rem' }}
+                  onChange={(e) => { setSelectedMonth(Number(e.target.value)); setCurrentPage(1); }}
+                  style={{ width: '130px', height: '38px', fontSize: '0.85rem' }}
                 >
                   {BULAN_LIST.map((b) => (
-                    <option key={b.value} value={b.value}>
-                      {b.name}
-                    </option>
+                    <option key={b.value} value={b.value}>{b.name}</option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Year Selector */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-muted)' }}>Tahun:</span>
+              <span style={{ fontSize: '0.825rem', fontWeight: 700, color: '#374151' }}>Tahun:</span>
               <select
-                className="form-select"
+                className="bm-input"
                 value={selectedYear}
-                onChange={(e) => {
-                  setSelectedYear(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                style={{ width: '95px', padding: '6px 10px', fontSize: '0.85rem' }}
+                onChange={(e) => { setSelectedYear(Number(e.target.value)); setCurrentPage(1); }}
+                style={{ width: '95px', height: '38px', fontSize: '0.85rem' }}
               >
                 {TAHUN_LIST.map((y) => (
-                  <option key={y} value={y}>
-                    {y}
-                  </option>
+                  <option key={y} value={y}>{y}</option>
                 ))}
               </select>
             </div>
-
-            {/* Sub-Tabs: ONLY for Presensi Reguler Tab */}
-            {mainReportTab === 'presensi' && (
-              <div style={{ display: 'flex', backgroundColor: '#f1f5f9', borderRadius: '8px', padding: '3px' }}>
-                <button
-                  onClick={() => setPeriodType('calendar')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: periodType === 'calendar' ? 'var(--color-primary)' : 'transparent',
-                    color: periodType === 'calendar' ? '#ffffff' : 'var(--text-muted)',
-                    fontWeight: 700,
-                    fontSize: '0.775rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  Tab 01 - 31 (Bulan Penuh)
-                </button>
-                <button
-                  onClick={() => setPeriodType('cutoff')}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    backgroundColor: periodType === 'cutoff' ? 'var(--color-primary)' : 'transparent',
-                    color: periodType === 'cutoff' ? '#ffffff' : 'var(--text-muted)',
-                    fontWeight: 700,
-                    fontSize: '0.775rem',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  Tab 16 - 15 (Cutoff Payroll)
-                </button>
-              </div>
-            )}
           </div>
 
-          {/* Export Button */}
-          <button
-            onClick={handleExportExcel}
-            disabled={isExporting || loading}
-            className="btn btn-primary"
-            style={{ padding: '8px 16px', fontSize: '0.825rem', gap: '6px' }}
-          >
-            {isExporting ? (
-              <>
-                <RefreshCw size={15} className="animate-spin" />
-                <span>Exporting ({exportProgress}%)...</span>
-              </>
-            ) : (
-              <>
-                <Download size={15} />
-                <span>Export Excel</span>
-              </>
-            )}
-          </button>
+          {/* Export Action Buttons */}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={fetchAllData}
+              className="bm-btn-outline"
+              style={{ height: '38px', padding: '0 14px' }}
+              title="Refresh Data"
+            >
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+              <span>Refresh</span>
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              disabled={isExporting || loading}
+              className="bm-btn-emerald"
+              style={{ height: '38px', padding: '0 16px' }}
+            >
+              <Download size={16} />
+              <span>Export Excel</span>
+            </button>
+          </div>
         </div>
 
-        {/* Row 2: Master Data Filters (Fakultas, Prodi, Unit, Search) */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '12px',
-            borderTop: '1px solid var(--border-light)',
-            paddingTop: '14px',
-          }}
-        >
-          {/* Fakultas Filter (from https://hrportal.unpak.ac.id/api/v2/masterdata/fakultas) */}
+        {/* Row 2: SEARCHABLE SELECT FOR FAKULTAS, PRODI, AND UNIT KERJA (FROM BACKEND MASTERDATA ENDPOINTS: /api/masterdata/unit & master_units) */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px', borderTop: '1px solid #e5e7eb', paddingTop: '16px' }}>
+          {/* FAKULTAS SEARCHABLE SELECT */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
               Fakultas
             </label>
-            <select
-              className="form-select"
+            <SearchableSelect
+              options={fakultasOptions}
               value={selectedFakultas}
-              onChange={(e) => {
-                setSelectedFakultas(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={{ width: '100%', fontSize: '0.825rem', padding: '6px 10px' }}
-            >
-              <option value="">Semua Fakultas</option>
-              {fakultasList.map((f, i) => {
-                const name = f.nama || f.nama_fakultas || f.fakultas || f.kode || `Fakultas ${i + 1}`;
-                return (
-                  <option key={f.id || i} value={name}>
-                    {name}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={(val) => { setSelectedFakultas(val); setCurrentPage(1); }}
+              placeholder="Semua Fakultas"
+              searchPlaceholder="Cari Fakultas UNPAK..."
+            />
           </div>
 
-          {/* Prodi Filter (from https://hrportal.unpak.ac.id/api/v2/masterdata/prodi) */}
+          {/* PROGRAM STUDI SEARCHABLE SELECT */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
               Program Studi
             </label>
-            <select
-              className="form-select"
+            <SearchableSelect
+              options={prodiOptions}
               value={selectedProdi}
-              onChange={(e) => {
-                setSelectedProdi(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={{ width: '100%', fontSize: '0.825rem', padding: '6px 10px' }}
-            >
-              <option value="">Semua Program Studi</option>
-              {prodiList.map((p, i) => {
-                const name = p.nama || p.nama_prodi || p.prodi || p.kode || `Prodi ${i + 1}`;
-                return (
-                  <option key={p.id || i} value={name}>
-                    {name}
-                  </option>
-                );
-              })}
-            </select>
+              onChange={(val) => { setSelectedProdi(val); setCurrentPage(1); }}
+              placeholder="Semua Program Studi"
+              searchPlaceholder="Cari Prodi UNPAK..."
+            />
           </div>
 
-          {/* Unit Kerja Filter */}
+          {/* UNIT KERJA SEARCHABLE SELECT (FETCHED FROM unpak_newsimpeg.master_units) */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
               Unit Kerja
             </label>
-            <select
-              className="form-select"
+            <SearchableSelect
+              options={unitOptions}
               value={selectedUnit}
-              onChange={(e) => {
-                setSelectedUnit(e.target.value);
-                setCurrentPage(1);
-              }}
-              style={{ width: '100%', fontSize: '0.825rem', padding: '6px 10px' }}
-            >
-              <option value="">Semua Unit</option>
-              {uniqueUnits.map((u, i) => (
-                <option key={i} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => { setSelectedUnit(val); setCurrentPage(1); }}
+              placeholder="Semua Unit Kerja"
+              searchPlaceholder="Cari Unit Kerja (master_units)..."
+            />
           </div>
 
-          {/* Search Input */}
+          {/* PENCARIAN PEGAWAI INPUT */}
           <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#111827', marginBottom: '6px' }}>
               Pencarian Pegawai
             </label>
             <div style={{ position: 'relative' }}>
-              <Search
-                size={15}
-                color="var(--text-muted)"
-                style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }}
-              />
+              <Search size={15} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="text"
-                className="form-input"
-                placeholder="Cari Nama / NIP / Unit..."
+                className="bm-input"
+                placeholder="Cari nama/NIP..."
                 value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setCurrentPage(1);
-                }}
-                style={{ paddingLeft: '32px', fontSize: '0.825rem', padding: '6px 10px 6px 32px' }}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                style={{ paddingLeft: '36px', height: '42px', fontSize: '0.85rem' }}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* TAB 1: PRESENSI REGULER (BULANAN 1..31) */}
-      {/* ========================================================================= */}
-      {mainReportTab === 'presensi' && (
-        <div className="table-container" style={{ overflowX: 'auto', maxWidth: '100%' }}>
-          <table className="custom-table" style={{ fontSize: '0.78rem', minWidth: '1350px' }}>
-            <thead>
-              <tr>
-                <th style={{ width: '45px', textAlign: 'center', position: 'sticky', left: 0, zIndex: 10, background: '#f8fafc' }}>
-                  NO
-                </th>
-                <th style={{ minWidth: '180px', position: 'sticky', left: '45px', zIndex: 10, background: '#f8fafc' }}>
-                  PEGAWAI & NIP
-                </th>
-                <th style={{ minWidth: '130px' }}>UNIT KERJA</th>
-                <th style={{ minWidth: '160px' }}>FAKULTAS & PRODI</th>
-                <th style={{ width: '80px', textAlign: 'center' }}>TOTAL HADIR</th>
+      {/* Data Table Matrix Section */}
+      {mainReportTab === 'presensi' ? (
+        <div className="bm-card" style={{ padding: '24px' }}>
+          <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem', minWidth: '1350px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f8fafc', color: '#475569' }}>
+                  <th style={{ width: '45px', padding: '12px', textAlign: 'center', position: 'sticky', left: 0, zIndex: 10, background: '#f8fafc' }}>
+                    NO
+                  </th>
+                  <th style={{ minWidth: '180px', padding: '12px', position: 'sticky', left: '45px', zIndex: 10, background: '#f8fafc' }}>
+                    PEGAWAI &amp; NIP
+                  </th>
+                  <th style={{ minWidth: '130px', padding: '12px' }}>UNIT KERJA</th>
+                  <th style={{ minWidth: '160px', padding: '12px' }}>FAKULTAS &amp; PRODI</th>
+                  <th style={{ width: '80px', padding: '12px', textAlign: 'center', color: '#10b981' }}>TOTAL HADIR</th>
 
-                {/* Dynamic Date Headers (1..31 with Sunday / Holiday in red) */}
-                {datesList.map((d) => {
-                  const dayNum = d.getDate();
-                  const isSunday = d.getDay() === 0;
-                  const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                  const isHoliday = holidays.has(dKey);
+                  {datesList.map((d) => {
+                    const dayNum = d.getDate();
+                    const isSunday = d.getDay() === 0;
+                    const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                    const isHoliday = holidays.has(dKey);
 
-                  return (
-                    <th
-                      key={dKey}
-                      style={{
-                        width: '52px',
-                        minWidth: '52px',
-                        textAlign: 'center',
-                        padding: '8px 2px',
-                        backgroundColor: isSunday || isHoliday ? '#fee2e2' : undefined,
-                        color: isSunday || isHoliday ? '#dc2626' : undefined,
-                      }}
-                      title={`${dKey} ${isHoliday ? '(Libur)' : ''}`}
-                    >
-                      <div style={{ fontWeight: 800 }}>{dayNum}</div>
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={datesList.length + 5} style={{ textAlign: 'center', padding: '40px' }}>
-                    <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px', color: 'var(--color-primary)' }} />
-                    <div>Memuat matriks laporan presensi pegawai...</div>
-                  </td>
-                </tr>
-              ) : paginatedEmployees.length === 0 ? (
-                <tr>
-                  <td colSpan={datesList.length + 5} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Tidak ada data pegawai pada kriteria filter terpilih ({BULAN_LIST.find((b) => b.value === selectedMonth)?.name} {selectedYear}).
-                  </td>
-                </tr>
-              ) : (
-                paginatedEmployees.map((item, index) => {
-                  const globalIndex = startIndex + index + 1;
-                  const p = item.pengguna || {};
-                  const nip = p.nip || item.kode || '-';
-                  const nama = p.nama || `Pegawai ${nip}`;
-                  const unit = p.unit_kerja || p.unit || '-';
-                  const fakultas = p.fakultas || '-';
-                  const prodi = p.prodi || '';
-                  const records = item.records || [];
-
-                  const totalHadir = records.filter((r) => r.type === 'absen' && r.info?.masuk).length;
-
-                  return (
-                    <tr key={item.kode || index}>
-                      <td
+                    return (
+                      <th
+                        key={dKey}
                         style={{
+                          width: '52px',
                           textAlign: 'center',
-                          fontWeight: 600,
-                          position: 'sticky',
-                          left: 0,
-                          zIndex: 5,
-                          background: '#ffffff',
+                          padding: '8px 2px',
+                          background: isSunday || isHoliday ? '#fef2f2' : undefined,
+                          color: isSunday || isHoliday ? '#ef4444' : undefined,
                         }}
                       >
-                        {globalIndex}
-                      </td>
-                      <td
-                        style={{
-                          position: 'sticky',
-                          left: '45px',
-                          zIndex: 5,
-                          background: '#ffffff',
-                          boxShadow: '2px 0 4px rgba(0,0,0,0.02)',
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{nama}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>NIP: {nip}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.78rem', color: '#475569', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {unit}
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <div style={{ fontWeight: 800 }}>{dayNum}</div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={datesList.length + 5} style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                      Memuat matriks presensi pegawai...
+                    </td>
+                  </tr>
+                ) : paginatedEmployees.length === 0 ? (
+                  <tr>
+                    <td colSpan={datesList.length + 5} style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                      Tidak ada data pegawai pada kriteria filter terpilih.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedEmployees.map((item, index) => {
+                    const globalIndex = startIndex + index + 1;
+                    const p = item.pengguna || {};
+                    const nip = p.nip || item.kode || '-';
+                    const nama = p.nama || `Pegawai ${nip}`;
+                    const unit = p.unit_kerja || p.unit || '-';
+                    const fakultas = p.fakultas || '-';
+                    const prodi = p.prodi || '';
+                    const records = item.records || [];
+
+                    const totalHadir = records.filter((r) => r.type === 'absen' && r.info?.masuk).length;
+
+                    return (
+                      <tr key={item.kode || index} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ textAlign: 'center', fontWeight: 600, position: 'sticky', left: 0, zIndex: 5, background: '#ffffff', padding: '12px' }}>
+                          {globalIndex}
+                        </td>
+                        <td style={{ position: 'sticky', left: '45px', zIndex: 5, background: '#ffffff', padding: '12px', boxShadow: '2px 0 4px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontWeight: 800, color: '#111827' }}>{nama}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>NIP: {nip}</div>
+                        </td>
+                        <td style={{ padding: '12px', color: '#4b5563' }}>{unit}</td>
+                        <td style={{ padding: '12px', color: '#111827', fontWeight: 600 }}>
                           {fakultas}
-                        </div>
-                        {prodi && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            Prodi: {prodi}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--color-primary)' }}>
-                        {totalHadir}
-                      </td>
+                          {prodi && <div style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 400 }}>Prodi: {prodi}</div>}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center', fontWeight: 800, color: '#10b981' }}>
+                          {totalHadir}
+                        </td>
 
-                      {/* Day Cells with Check-in Time */}
-                      {datesList.map((d) => {
-                        const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                        const isSunday = d.getDay() === 0;
-                        const isHoliday = holidays.has(dKey);
+                        {datesList.map((d) => {
+                          const dKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                          const isSunday = d.getDay() === 0;
+                          const isHoliday = holidays.has(dKey);
 
-                        let bg = 'transparent';
-                        let text = '-';
-                        let textColor = '#94a3b8';
-                        let cellRecord = null;
-                        let isHadir = false;
+                          let bg = 'transparent';
+                          let text = '-';
+                          let textColor = '#9ca3af';
+                          let cellRecord = null;
+                          let isHadir = false;
 
-                        if (isSunday || isHoliday) {
-                          bg = '#fef2f2';
-                          text = 'L';
-                          textColor = '#ef4444';
-                        }
-
-                        const rec = getRecordForDate(records, dKey);
-                        cellRecord = rec;
-                        if (rec) {
-                          if (rec.type === 'absen') {
-                            isHadir = true;
-                            bg = '#ecfdf5';
-                            text = formatJamMasuk(rec.info?.masuk) || 'Hadir';
-                            textColor = '#047857';
-                          } else if (rec.type === 'izin') {
-                            bg = '#eff6ff';
-                            text = 'I';
-                            textColor = '#3b82f6';
-                          } else if (rec.type === 'cuti') {
-                            bg = '#f5f3ff';
-                            text = 'C';
-                            textColor = '#8b5cf6';
-                          } else if (rec.type === 'sppd') {
-                            bg = '#fffbeb';
-                            text = 'S';
-                            textColor = '#f59e0b';
+                          if (isSunday || isHoliday) {
+                            bg = '#fef2f2';
+                            text = 'L';
+                            textColor = '#ef4444';
                           }
-                        }
 
-                        return (
-                          <td
-                            key={dKey}
-                            onClick={() => handleCellClick(p, dKey, cellRecord, false)}
-                            style={{
-                              textAlign: 'center',
-                              backgroundColor: bg,
-                              color: textColor,
-                              fontWeight: isHadir ? 800 : 700,
-                              fontSize: isHadir ? '0.72rem' : '0.78rem',
-                              padding: '6px 2px',
-                              cursor: 'pointer',
-                              transition: 'all 0.1s',
-                            }}
-                            title={`Klik untuk detail ${dKey} ${isHadir ? `(Jam Masuk: ${text})` : ''}`}
-                          >
-                            {text}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                          const rec = getRecordForDate(records, dKey);
+                          cellRecord = rec;
+                          if (rec) {
+                            if (rec.type === 'absen') {
+                              isHadir = true;
+                              bg = '#dcfce7';
+                              text = formatJamMasuk(rec.info?.masuk) || 'Hadir';
+                              textColor = '#15803d';
+                            } else if (rec.type === 'izin') {
+                              bg = '#e0f2fe';
+                              text = 'I';
+                              textColor = '#0369a1';
+                            } else if (rec.type === 'cuti') {
+                              bg = '#f3e8ff';
+                              text = 'C';
+                              textColor = '#6d28d9';
+                            } else if (rec.type === 'sppd') {
+                              bg = '#e0e7ff';
+                              text = 'S';
+                              textColor = '#4338ca';
+                            }
+                          }
 
-          {/* Pagination */}
+                          return (
+                            <td
+                              key={dKey}
+                              onClick={() => handleCellClick(p, dKey, cellRecord, false)}
+                              style={{
+                                textAlign: 'center',
+                                backgroundColor: bg,
+                                color: textColor,
+                                fontWeight: isHadir ? 800 : 700,
+                                fontSize: isHadir ? '0.72rem' : '0.78rem',
+                                padding: '6px 2px',
+                                cursor: 'pointer',
+                              }}
+                              title={`Klik detail ${dKey}`}
+                            >
+                              {text}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
           {!loading && totalItems > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              onPageChange={(p) => setCurrentPage(p)}
-              onItemsPerPageChange={(limit) => {
-                setItemsPerPage(limit);
-                setCurrentPage(1);
-              }}
-            />
+            <div style={{ marginTop: '18px' }}>
+              <Pagination
+                currentPage={currentPage}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChange={(p) => setCurrentPage(p)}
+                onItemsPerPageChange={(limit) => { setItemsPerPage(limit); setCurrentPage(1); }}
+              />
+            </div>
           )}
         </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 2: PRESENSI UPACARA (TAHUNAN 12 BULAN DENGAN JAM MASUK) */}
-      {/* ========================================================================= */}
-      {mainReportTab === 'upacara' && (
-        <div className="table-container" style={{ overflowX: 'auto', maxWidth: '100%' }}>
-          <table className="custom-table" style={{ fontSize: '0.8rem', minWidth: '1150px' }}>
-            <thead>
-              <tr>
-                <th style={{ width: '45px', textAlign: 'center', position: 'sticky', left: 0, zIndex: 10, background: '#f8fafc' }}>
-                  NO
-                </th>
-                <th style={{ minWidth: '180px', position: 'sticky', left: '45px', zIndex: 10, background: '#f8fafc' }}>
-                  PEGAWAI & NIP
-                </th>
-                <th style={{ minWidth: '130px' }}>UNIT KERJA</th>
-                <th style={{ minWidth: '160px' }}>FAKULTAS & PRODI</th>
-                <th style={{ width: '85px', textAlign: 'center', backgroundColor: '#faf5ff', color: 'var(--color-primary)' }}>
-                  TOTAL HADIR
-                </th>
-
-                {/* 12 Bulan Headers */}
-                {BULAN_LIST.map((b) => (
-                  <th key={b.value} style={{ width: '60px', textAlign: 'center' }}>
-                    <div style={{ fontWeight: 800 }}>{b.value}</div>
-                    <div style={{ fontSize: '0.68rem', fontWeight: 500, color: 'var(--text-muted)' }}>{b.short}</div>
+      ) : (
+        /* Presensi Upacara Matrix */
+        <div className="bm-card" style={{ padding: '24px' }}>
+          <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem', minWidth: '1150px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #e5e7eb', background: '#f8fafc', color: '#475569' }}>
+                  <th style={{ width: '45px', padding: '12px', textAlign: 'center', position: 'sticky', left: 0, zIndex: 10, background: '#f8fafc' }}>
+                    NO
                   </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="17" style={{ textAlign: 'center', padding: '40px' }}>
-                    <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 12px', color: 'var(--color-primary)' }} />
-                    <div>Memuat matriks presensi upacara tahun {selectedYear}...</div>
-                  </td>
+                  <th style={{ minWidth: '180px', padding: '12px', position: 'sticky', left: '45px', zIndex: 10, background: '#f8fafc' }}>
+                    PEGAWAI &amp; NIP
+                  </th>
+                  <th style={{ minWidth: '130px', padding: '12px' }}>UNIT KERJA</th>
+                  <th style={{ minWidth: '160px', padding: '12px' }}>FAKULTAS &amp; PRODI</th>
+                  <th style={{ width: '85px', padding: '12px', textAlign: 'center', color: '#d97706' }}>TOTAL HADIR</th>
+
+                  {BULAN_LIST.map((b) => (
+                    <th key={b.value} style={{ width: '60px', padding: '12px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: 800 }}>{b.value}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#6b7280' }}>{b.short}</div>
+                    </th>
+                  ))}
                 </tr>
-              ) : paginatedEmployees.length === 0 ? (
-                <tr>
-                  <td colSpan="17" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                    Tidak ada data pegawai pada kriteria filter tahun {selectedYear}.
-                  </td>
-                </tr>
-              ) : (
-                paginatedEmployees.map((item, index) => {
-                  const globalIndex = startIndex + index + 1;
-                  const p = item.pengguna || {};
-                  const nip = p.nip || item.kode || '-';
-                  const nama = p.nama || `Pegawai ${nip}`;
-                  const unit = p.unit_kerja || p.unit || '-';
-                  const fakultas = p.fakultas || '-';
-                  const prodi = p.prodi || '';
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan="17" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                      Memuat matriks presensi upacara tahun {selectedYear}...
+                    </td>
+                  </tr>
+                ) : paginatedEmployees.length === 0 ? (
+                  <tr>
+                    <td colSpan="17" style={{ textAlign: 'center', padding: '40px', color: '#6b7280' }}>
+                      Tidak ada data presensi upacara pada kriteria filter terpilih.
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedEmployees.map((item, index) => {
+                    const globalIndex = startIndex + index + 1;
+                    const p = item.pengguna || {};
+                    const nip = p.nip || item.kode || '-';
+                    const nama = p.nama || `Pegawai ${nip}`;
+                    const unit = p.unit_kerja || p.unit || '-';
+                    const fakultas = p.fakultas || '-';
+                    const prodi = p.prodi || '';
 
-                  // Ceremony attendances for this employee in selectedYear
-                  const empCeremonies = ceremonyList.filter((c) => {
-                    const cDate = new Date(c.tanggal);
-                    const isMatchingEmp = (c.nip && c.nip === nip) || (c.nidn && c.nidn === p.nidn);
-                    return isMatchingEmp && cDate.getFullYear() === selectedYear;
-                  });
+                    const empCeremonies = ceremonyList.filter((c) => {
+                      const cDate = new Date(c.tanggal);
+                      const isMatchingEmp = (c.nip && c.nip === nip) || (c.nidn && c.nidn === p.nidn);
+                      return isMatchingEmp && cDate.getFullYear() === selectedYear;
+                    });
 
-                  const totalHadir = empCeremonies.length;
+                    const totalHadir = empCeremonies.length;
 
-                  return (
-                    <tr key={item.kode || index}>
-                      <td
-                        style={{
-                          textAlign: 'center',
-                          fontWeight: 600,
-                          position: 'sticky',
-                          left: 0,
-                          zIndex: 5,
-                          background: '#ffffff',
-                        }}
-                      >
-                        {globalIndex}
-                      </td>
-                      <td
-                        style={{
-                          position: 'sticky',
-                          left: '45px',
-                          zIndex: 5,
-                          background: '#ffffff',
-                          boxShadow: '2px 0 4px rgba(0,0,0,0.02)',
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, color: 'var(--text-main)' }}>{nama}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>NIP: {nip}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.78rem', color: '#475569' }}>{unit}</div>
-                      </td>
-                      <td>
-                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                    return (
+                      <tr key={item.kode || index} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ textAlign: 'center', fontWeight: 600, position: 'sticky', left: 0, zIndex: 5, background: '#ffffff', padding: '12px' }}>
+                          {globalIndex}
+                        </td>
+                        <td style={{ position: 'sticky', left: '45px', zIndex: 5, background: '#ffffff', padding: '12px', boxShadow: '2px 0 4px rgba(0,0,0,0.02)' }}>
+                          <div style={{ fontWeight: 800, color: '#111827' }}>{nama}</div>
+                          <div style={{ fontSize: '0.72rem', color: '#6b7280' }}>NIP: {nip}</div>
+                        </td>
+                        <td style={{ padding: '12px', color: '#4b5563' }}>{unit}</td>
+                        <td style={{ padding: '12px', color: '#111827', fontWeight: 600 }}>
                           {fakultas}
-                        </div>
-                        {prodi && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '1px' }}>
-                            Prodi: {prodi}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ textAlign: 'center', fontWeight: 800, color: 'var(--color-primary)', backgroundColor: '#faf5ff' }}>
-                        <span
-                          style={{
-                            background: totalHadir > 0 ? 'var(--color-primary-100)' : '#f1f5f9',
-                            color: totalHadir > 0 ? 'var(--color-primary)' : 'var(--text-muted)',
-                            padding: '2px 8px',
-                            borderRadius: '9999px',
-                            fontSize: '0.8rem',
-                          }}
-                        >
-                          {totalHadir}
-                        </span>
-                      </td>
+                          {prodi && <div style={{ fontSize: '0.7rem', color: '#6b7280', fontWeight: 400 }}>Prodi: {prodi}</div>}
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center', fontWeight: 800, color: '#d97706' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '9999px', background: '#fef3c7', color: '#b45309' }}>
+                            {totalHadir}
+                          </span>
+                        </td>
 
-                      {/* 12 Bulan Cells with Jam Masuk Upacara */}
-                      {BULAN_LIST.map((b) => {
-                        const monthCeremonies = empCeremonies.filter((c) => {
-                          const cDate = new Date(c.tanggal);
-                          return (cDate.getMonth() + 1) === b.value;
-                        });
+                        {BULAN_LIST.map((b) => {
+                          const monthCeremonies = empCeremonies.filter((c) => {
+                            const cDate = new Date(c.tanggal);
+                            return (cDate.getMonth() + 1) === b.value;
+                          });
 
-                        const isAttended = monthCeremonies.length > 0;
-                        const firstRecord = monthCeremonies[0];
-                        const displayTime = isAttended ? (formatJamMasuk(firstRecord.created_at || firstRecord.tanggal) || '07:00') : '-';
+                          const isAttended = monthCeremonies.length > 0;
+                          const firstRecord = monthCeremonies[0];
+                          const displayTime = isAttended ? (formatJamMasuk(firstRecord.created_at || firstRecord.tanggal) || '07:00') : '-';
 
-                        return (
-                          <td
-                            key={b.value}
-                            onClick={() => isAttended && handleCellClick(p, firstRecord.tanggal, firstRecord, true)}
-                            style={{
-                              textAlign: 'center',
-                              fontWeight: isAttended ? 800 : 400,
-                              fontSize: isAttended ? '0.75rem' : '0.8rem',
-                              color: isAttended ? '#047857' : '#cbd5e1',
-                              backgroundColor: isAttended ? '#ecfdf5' : 'transparent',
-                              cursor: isAttended ? 'pointer' : 'default',
-                              padding: '6px 2px',
-                            }}
-                            title={isAttended ? `Hadir Upacara: ${formatTanggalIndo(firstRecord.tanggal)} (Jam: ${displayTime})` : `Bulan ${b.name}: Tidak ada upacara`}
-                          >
-                            {displayTime}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                          return (
+                            <td
+                              key={b.value}
+                              onClick={() => isAttended && handleCellClick(p, firstRecord.tanggal, firstRecord, true)}
+                              style={{
+                                textAlign: 'center',
+                                fontWeight: isAttended ? 800 : 400,
+                                fontSize: isAttended ? '0.75rem' : '0.8rem',
+                                color: isAttended ? '#15803d' : '#9ca3af',
+                                backgroundColor: isAttended ? '#dcfce7' : 'transparent',
+                                cursor: isAttended ? 'pointer' : 'default',
+                                padding: '6px 2px',
+                              }}
+                            >
+                              {displayTime}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-          {/* Pagination */}
           {!loading && totalItems > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalItems={totalItems}
-              itemsPerPage={itemsPerPage}
-              onPageChange={(p) => setCurrentPage(p)}
-              onItemsPerPageChange={(limit) => {
-                setItemsPerPage(limit);
-                setCurrentPage(1);
-              }}
-            />
+            <div style={{ marginTop: '18px' }}>
+              <Pagination
+                currentPage={currentPage}
+                totalItems={totalItems}
+                itemsPerPage={itemsPerPage}
+                onPageChange={(p) => setCurrentPage(p)}
+                onItemsPerPageChange={(limit) => { setItemsPerPage(limit); setCurrentPage(1); }}
+              />
+            </div>
           )}
         </div>
       )}
@@ -1090,35 +857,31 @@ export const ReportPage = () => {
         isOpen={isCellModalOpen}
         onClose={() => setIsCellModalOpen(false)}
         title={selectedCell?.isUpacara ? 'Detail Presensi Upacara' : 'Detail Presensi Pegawai'}
-        maxWidth="500px"
       >
         {selectedCell && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderRadius: '10px' }}>
-              <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>{selectedCell.emp?.nama || selectedCell.emp?.nip}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                NIP: {selectedCell.emp?.nip || '-'} • Unit: {selectedCell.emp?.unit_kerja || selectedCell.emp?.unit || '-'}
+            <div style={{ padding: '14px', backgroundColor: '#f9fafb', borderRadius: '10px', border: '1px solid #e5e7eb' }}>
+              <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#111827' }}>{selectedCell.emp?.nama || selectedCell.emp?.nip}</div>
+              <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '2px' }}>
+                NIP: {selectedCell.emp?.nip || '-'} &bull; Unit: {selectedCell.emp?.unit_kerja || selectedCell.emp?.unit || '-'}
               </div>
-              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '2px' }}>
-                {[selectedCell.emp?.fakultas, selectedCell.emp?.prodi].filter(Boolean).join(' • ') || 'Universitas Pakuan'}
-              </div>
-              <div style={{ fontSize: '0.825rem', fontWeight: 600, color: 'var(--color-primary)', marginTop: '6px' }}>
-                📅 {formatTanggalIndo(selectedCell.dateStr)}
+              <div style={{ fontSize: '0.825rem', fontWeight: 700, color: '#10b981', marginTop: '6px' }}>
+                📅 {formatIndonesianDate(selectedCell.dateStr)}
               </div>
             </div>
 
             {selectedCell.record ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f1f5f9', borderRadius: '6px' }}>
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Status Kehadiran:</span>
-                  <strong style={{ textTransform: 'uppercase', fontSize: '0.85rem', color: '#047857' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#f3f4f6', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#4b5563' }}>Status Presensi:</span>
+                  <strong style={{ textTransform: 'uppercase', fontSize: '0.85rem', color: '#10b981' }}>
                     {selectedCell.isUpacara ? 'HADIR UPACARA' : selectedCell.record.type}
                   </strong>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#ecfdf5', borderRadius: '6px' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#047857' }}>Jam Masuk:</span>
-                  <strong style={{ fontSize: '0.85rem', color: '#065f46' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#dcfce7', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.85rem', color: '#15803d' }}>Jam Masuk:</span>
+                  <strong style={{ fontSize: '0.85rem', color: '#14532d' }}>
                     {selectedCell.isUpacara 
                       ? (formatJamMasuk(selectedCell.record.created_at || selectedCell.record.tanggal) || '07:00 WIB')
                       : (selectedCell.record.info?.masuk || '-')}
@@ -1126,15 +889,15 @@ export const ReportPage = () => {
                 </div>
 
                 {!selectedCell.isUpacara && selectedCell.record.info?.keluar && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#eff6ff', borderRadius: '6px' }}>
-                    <span style={{ fontSize: '0.8rem', color: '#1d4ed8' }}>Jam Keluar:</span>
-                    <strong style={{ fontSize: '0.85rem', color: '#1e40af' }}>{selectedCell.record.info.keluar}</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#e0f2fe', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '0.85rem', color: '#0369a1' }}>Jam Keluar:</span>
+                    <strong style={{ fontSize: '0.85rem', color: '#0c4a6e' }}>{selectedCell.record.info.keluar}</strong>
                   </div>
                 )}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                {holidays.has(selectedCell.dateStr) ? 'Hari Libur Kalender / Universitas' : (selectedCell.isUpacara ? 'Tidak ada catatan presensi upacara pada tanggal ini.' : 'Tidak ada catatan presensi / Alpha pada tanggal ini.')}
+              <div style={{ textAlign: 'center', padding: '16px', color: '#6b7280', fontSize: '0.85rem', background: '#f9fafb', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+                {holidays.has(selectedCell.dateStr) ? 'Hari Libur Kalender / Universitas' : (selectedCell.isUpacara ? 'Tidak ada catatan presensi upacara.' : 'Tidak ada catatan presensi / Tanpa Keterangan.')}
               </div>
             )}
           </div>

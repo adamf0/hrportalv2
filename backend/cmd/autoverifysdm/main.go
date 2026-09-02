@@ -9,8 +9,6 @@ import (
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-
-	commonhelper "hrportal_backend/common/helper"
 )
 
 func main() {
@@ -38,7 +36,7 @@ func main() {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		commonhelper.RunSdmAutoVerifyLoop(db)
+		RunSdmAutoVerifyLoop(db)
 	}()
 
 	sig := <-sigChan

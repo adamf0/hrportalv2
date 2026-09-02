@@ -148,7 +148,7 @@ class LeaveRepository implements ILeaveRepository {
                   return SppdMember.fromJson(Map<String, dynamic>.from(m));
                 }
                 return SppdMember(nama: m.toString());
-              }).where((m) => m.nama.isNotEmpty).toList();
+              }).where((m) => m.nama.isNotEmpty || m.nip.isNotEmpty || m.nidn.isNotEmpty).toList();
             }
           } catch (e) {
             debugPrint('[LeaveRepository parse anggota error]: $e');
@@ -162,6 +162,18 @@ class LeaveRepository implements ILeaveRepository {
                 role: s.unit))
             .toList();
 
+        final appName = json['nama_pemohon'] as String? ??
+            json['nama'] as String? ??
+            json['nama_pegawai'] as String? ??
+            json['user_nama'] as String? ??
+            sessionName;
+        final appNip = json['nip'] as String? ??
+            json['nip_pemohon'] as String? ??
+            sessionNip;
+        final appNidn = json['nidn'] as String? ??
+            json['nidn_pemohon'] as String? ??
+            sessionNidn;
+
         allRequests.add(LeaveRequest(
           id: "sppd_${json['id']}",
           type: "SPPD",
@@ -173,9 +185,9 @@ class LeaveRepository implements ILeaveRepository {
           note: json['catatan'] ?? json['keterangan'] ?? 'Menunggu verifikasi',
           startDate: startDate,
           endDate: endDate,
-          applicantName: sessionName,
-          applicantNip: sessionNip,
-          applicantNidn: sessionNidn,
+          applicantName: appName,
+          applicantNip: appNip,
+          applicantNidn: appNidn,
           supervisorId: svId,
           attachmentPath: attPath,
           members: legacyMembers,

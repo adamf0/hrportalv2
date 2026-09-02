@@ -13,6 +13,7 @@ import (
 	"hrportal_backend/modules/leave/application/SubmitCuti"
 	"hrportal_backend/modules/leave/application/UpdateCuti"
 	"hrportal_backend/modules/leave/domain"
+	"hrportal_backend/modules/notification/application/CreateNotification"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/mehdihadeli/go-mediatr"
@@ -23,10 +24,33 @@ func ModuleLeave(app *fiber.App) {
 
 	group.Post("/submit", func(c *fiber.Ctx) error {
 		jenisCutiID, _ := strconv.Atoi(c.FormValue("jenis_cuti_id"))
+		if jenisCutiID == 0 {
+			jenisCutiID, _ = strconv.Atoi(c.FormValue("id_jenis_cuti"))
+		}
+		if jenisCutiID == 0 {
+			jenisCutiID, _ = strconv.Atoi(c.FormValue("jenis_cuti"))
+		}
+
 		jumlahHari, _ := strconv.Atoi(c.FormValue("jumlah_hari"))
+		if jumlahHari == 0 {
+			jumlahHari, _ = strconv.Atoi(c.FormValue("lama_cuti"))
+		}
+
+		tanggalMulai := c.FormValue("tanggal_mulai")
+		if tanggalMulai == "" {
+			tanggalMulai = c.FormValue("tanggal_pengajuan")
+		}
+
+		tanggalSelesai := c.FormValue("tanggal_selesai")
+		if tanggalSelesai == "" {
+			tanggalSelesai = c.FormValue("tanggal_akhir")
+		}
 
 		var nipAtasan *string
 		nipAtasanStr := c.FormValue("nip_atasan")
+		if nipAtasanStr == "" {
+			nipAtasanStr = c.FormValue("verifikasi")
+		}
 		if nipAtasanStr != "" {
 			nipAtasan = &nipAtasanStr
 		}
@@ -35,6 +59,9 @@ func ModuleLeave(app *fiber.App) {
 		fStr := c.FormValue("file_lampiran")
 		if fStr == "" {
 			fStr = c.FormValue("file")
+		}
+		if fStr == "" {
+			fStr = c.FormValue("dokumen")
 		}
 		if fStr != "" {
 			fileLampiran = &fStr
@@ -48,8 +75,8 @@ func ModuleLeave(app *fiber.App) {
 			Fakultas:       c.FormValue("fakultas"),
 			Prodi:          c.FormValue("prodi"),
 			JenisCutiID:    uint(jenisCutiID),
-			TanggalMulai:   c.FormValue("tanggal_mulai"),
-			TanggalSelesai: c.FormValue("tanggal_selesai"),
+			TanggalMulai:   tanggalMulai,
+			TanggalSelesai: tanggalSelesai,
 			JumlahHari:     jumlahHari,
 			Alasan:         c.FormValue("alasan"),
 			NipAtasan:      nipAtasan,
@@ -65,18 +92,40 @@ func ModuleLeave(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		// Trigger FCM Notification for Submit Cuti
-		// if res.Value != nil {
-		// 	cutiData := res.Value
-		// 	helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "cuti_updated", "module": "leave", "data": cutiData})
-		// 	if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
-		// 		targets := []string{*cutiData.Verifikasi}
-		// 		title := "Pengajuan Cuti Baru"
-		// 		body := "Pegawai NIP " + cutiData.Nip + " NIDN " + cutiData.Nidn + " mengajukan Cuti baru. Mohon verifikasi."
-		// 		payload := map[string]string{"type": "cuti", "id": strconv.Itoa(int(cutiData.ID)), "status": cutiData.Status}
-		// 		helper.GlobalFcmManager.DispatchNotification(targets, title, body, "cuti", payload)
-		// 	}
-		// }
+		// Trigger Notification for Submit Cuti
+		if res.Value != nil {
+			cutiData := res.Value
+			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "cuti_updated", "module": "leave", "data": cutiData})
+
+			// 1. Notify Atasan (Verifikator)
+			if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
+				targets := []string{*cutiData.Verifikasi}
+				title := "Pengajuan Cuti Baru"
+				body := "Pegawai NIP " + cutiData.Nip + " NIDN " + cutiData.Nidn + " mengajukan Cuti baru. Mohon verifikasi."
+				payload := map[string]string{"type": "cuti", "id": strconv.Itoa(int(cutiData.ID)), "status": cutiData.Status}
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: targets,
+					Title:      title,
+					Body:       body,
+					Type:       "cuti",
+					Payload:    payload,
+				})
+			}
+
+			// 2. Notify Pemohon Cuti (Applicant)
+			if cutiData.Nip != "" && (cutiData.Verifikasi == nil || *cutiData.Verifikasi != cutiData.Nip) {
+				titleApp := "Pengajuan Cuti Berhasil Dikirim"
+				bodyApp := "Pengajuan Cuti Anda (ID: " + strconv.Itoa(int(cutiData.ID)) + ") telah berhasil dikirim dan menunggu verifikasi Atasan."
+				payloadApp := map[string]string{"type": "cuti", "id": strconv.Itoa(int(cutiData.ID)), "status": cutiData.Status}
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: []string{cutiData.Nip},
+					Title:      titleApp,
+					Body:       bodyApp,
+					Type:       "cuti",
+					Payload:    payloadApp,
+				})
+			}
+		}
 
 		return c.JSON(res.Value)
 	})
@@ -130,36 +179,78 @@ func ModuleLeave(app *fiber.App) {
 			return infrastructure.HandleError(c, res.Error)
 		}
 
-		// Trigger FCM Notification for Update/Verify Cuti
+		// Trigger Notification for Update/Verify Cuti
 		if res.Value != nil {
 			cutiData := res.Value
-			// status := cutiData.Status
+			status := cutiData.Status
 
-			// atasanNip := ""
-			// if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
-			// 	atasanNip = *cutiData.Verifikasi
-			// }
+			atasanNip := ""
+			if cutiData.Verifikasi != nil && *cutiData.Verifikasi != "" {
+				atasanNip = *cutiData.Verifikasi
+			}
 
-			// switch status {
-			// case "terima atasan":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Disetujui Atasan", "Pengajuan Cuti Anda telah disetujui Atasan. Menunggu verifikasi SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{"SDM_BROADCAST"}, "Verifikasi SDM Cuti", "Pengajuan Cuti NIP "+cutiData.Nip+" telah disetujui Atasan. Mohon verifikasi final SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+			switch status {
+			case "terima atasan":
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: []string{cutiData.Nip},
+					Title:      "Pengajuan Cuti Disetujui Atasan",
+					Body:       "Pengajuan Cuti Anda telah disetujui Atasan. Menunggu verifikasi SDM.",
+					Type:       "cuti",
+					Payload:    map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status},
+				})
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: []string{"SDM_BROADCAST"},
+					Title:      "Verifikasi SDM Cuti",
+					Body:       "Pengajuan Cuti NIP " + cutiData.Nip + " telah disetujui Atasan. Mohon verifikasi final SDM.",
+					Type:       "cuti",
+					Payload:    map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status},
+				})
 
-			// case "tolak atasan":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Ditolak Atasan", "Pengajuan Cuti Anda ditolak oleh Atasan.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
+			case "tolak atasan":
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: []string{cutiData.Nip},
+					Title:      "Pengajuan Cuti Ditolak Atasan",
+					Body:       "Pengajuan Cuti Anda ditolak oleh Atasan.",
+					Type:       "cuti",
+					Payload:    map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status},
+				})
 
-			// case "terima sdm":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Disetujui SDM", "Selamat! Pengajuan Cuti Anda telah disetujui oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
-			// 	if atasanNip != "" && atasanNip != cutiData.Nip {
-			// 		helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Cuti", "Pengajuan Cuti NIP "+cutiData.Nip+" telah disetujui oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
-			// 	}
+			case "terima sdm":
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: []string{cutiData.Nip},
+					Title:      "Pengajuan Cuti Disetujui SDM",
+					Body:       "Selamat! Pengajuan Cuti Anda telah disetujui oleh SDM.",
+					Type:       "cuti",
+					Payload:    map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status},
+				})
+				if atasanNip != "" && atasanNip != cutiData.Nip {
+					_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+						TargetNips: []string{atasanNip},
+						Title:      "Status Final Cuti",
+						Body:       "Pengajuan Cuti NIP " + cutiData.Nip + " telah disetujui oleh SDM.",
+						Type:       "cuti",
+						Payload:    map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status},
+					})
+				}
 
-			// case "tolak sdm":
-			// 	helper.GlobalFcmManager.DispatchNotification([]string{cutiData.Nip}, "Pengajuan Cuti Ditolak SDM", "Pengajuan Cuti Anda ditolak oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
-			// 	if atasanNip != "" && atasanNip != cutiData.Nip {
-			// 		helper.GlobalFcmManager.DispatchNotification([]string{atasanNip}, "Status Final Cuti", "Pengajuan Cuti NIP "+cutiData.Nip+" ditolak oleh SDM.", "cuti", map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status})
-			// 	}
-			// }
+			case "tolak sdm":
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: []string{cutiData.Nip},
+					Title:      "Pengajuan Cuti Ditolak SDM",
+					Body:       "Pengajuan Cuti Anda ditolak oleh SDM.",
+					Type:       "cuti",
+					Payload:    map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status},
+				})
+				if atasanNip != "" && atasanNip != cutiData.Nip {
+					_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+						TargetNips: []string{atasanNip},
+						Title:      "Status Final Cuti",
+						Body:       "Pengajuan Cuti NIP " + cutiData.Nip + " ditolak oleh SDM.",
+						Type:       "cuti",
+						Payload:    map[string]string{"id": strconv.Itoa(int(cutiData.ID)), "status": status},
+					})
+				}
+			}
 
 			helper.GlobalSdmWsHub.Broadcast(fiber.Map{"event": "cuti_updated", "module": "leave", "data": cutiData})
 		}
@@ -208,7 +299,11 @@ func ModuleLeave(app *fiber.App) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nip := c.FormValue("nip")
 		nidn := c.FormValue("nidn")
-		isSdm := c.FormValue("role") == "sdm" && (c.Query("verifikasi") == "haxor" || c.Query("is_sdm") == "true")
+		role := c.FormValue("role")
+		if role == "" {
+			role = string(c.Request().PostArgs().Peek("role"))
+		}
+		isSdm := (role == "sdm" || role == "baum" || c.Query("role") == "sdm" || c.Query("role") == "baum")
 
 		query := &GetAllCuti.GetAllCutiQuery{
 			Nip:          nip,

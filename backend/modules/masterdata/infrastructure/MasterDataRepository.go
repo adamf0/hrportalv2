@@ -37,16 +37,22 @@ func (r *MasterDataRepository) GetAllProdi(ctx context.Context) ([]domain.Prodi,
 	if r == nil || r.db == nil {
 		return []domain.Prodi{}, nil
 	}
-	var list []domain.Prodi
-	err := r.db.WithContext(ctx).Find(&list).Error
+	var rawList []domain.Prodi
+	err := r.db.WithContext(ctx).Where("LOWER(nama_prodi) NOT LIKE '%isi nama ps%'").Find(&rawList).Error
 	if err != nil {
 		return nil, err
 	}
-	for i := range list {
-		list[i].ID = list[i].KodeProdi
-		list[i].FakultasID = list[i].KodeFakultas
-		list[i].Kode = list[i].KodeProdi
-		list[i].Nama = list[i].NamaProdi
+	var list []domain.Prodi
+	for i := range rawList {
+		namaLower := strings.ToLower(rawList[i].NamaProdi)
+		if strings.Contains(namaLower, "isi nama ps") {
+			continue
+		}
+		rawList[i].ID = rawList[i].KodeProdi
+		rawList[i].FakultasID = rawList[i].KodeFakultas
+		rawList[i].Kode = rawList[i].KodeProdi
+		rawList[i].Nama = rawList[i].NamaProdi
+		list = append(list, rawList[i])
 	}
 	return list, nil
 }

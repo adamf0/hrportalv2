@@ -57,30 +57,6 @@ class LeaveBloc extends ChangeNotifier {
       }
     } catch (_) {}
 
-    if (jenisCutiList.isEmpty) {
-      jenisCutiList = [
-        {"id": 1, "name": "Tahunan", "quota": 12},
-        {"id": 2, "name": "Sakit", "quota": 30},
-        {"id": 3, "name": "Melahirkan", "quota": 90},
-        {"id": 4, "name": "Menunaikan Ibadah Haji", "quota": 40},
-        {"id": 5, "name": "Menunaikan Ibadah Umroh", "quota": 12},
-        {"id": 6, "name": "Diluar Tanggungan", "quota": 0},
-        {"id": 7, "name": "Alasan Penting (Pernikahan)", "quota": 3},
-        {
-          "id": 8,
-          "name": "Alasan Penting (Keluarga Meninggal Dunia)",
-          "quota": 3
-        },
-        {"id": 9, "name": "Alasan Penting (Menikahkan Anak)", "quota": 2},
-        {
-          "id": 10,
-          "name": "Alasan Penting (Mengkhitan / Baptis Anak)",
-          "quota": 2
-        },
-        {"id": 11, "name": "Alasan Penting (Istri Melahirkan)", "quota": 2},
-      ];
-    }
-
     final List<CutiTypeSummary> summaries = [];
 
     for (var jc in jenisCutiList) {

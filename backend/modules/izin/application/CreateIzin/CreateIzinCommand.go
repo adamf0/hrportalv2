@@ -5,9 +5,12 @@ import (
 	common "hrportal_backend/common/domain"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/izin/domain"
+	"hrportal_backend/modules/notification/application/CreateNotification"
+	"strconv"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/mehdihadeli/go-mediatr"
 )
 
 type CreateIzinCommand struct {
@@ -66,6 +69,18 @@ func (h *CreateIzinCommandHandler) Handle(ctx context.Context, cmd *CreateIzinCo
 	if err := h.Repo.Create(ctx, izin); err != nil {
 		return common.FailureValue[*domain.Izin](common.FailureError("Izin.CreateFailed", err.Error())), nil
 	}
+
+	targets := []string{*izin.Verifikasi}
+	title := "Pengajuan Izin Baru"
+	body := "Pegawai NIP " + izin.Nip + " mengajukan Izin baru. Mohon verifikasi."
+	payload := map[string]string{"type": "izin", "id": strconv.Itoa(int(izin.ID)), "status": izin.Status}
+	_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+		TargetNips: targets,
+		Title:      title,
+		Body:       body,
+		Type:       "izin",
+		Payload:    payload,
+	})
 
 	return common.SuccessValue(izin), nil
 }

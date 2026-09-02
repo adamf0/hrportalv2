@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'sqlite_auth_storage.dart';
 import 'fcm_service.dart';
@@ -19,6 +20,7 @@ class SsoHelper {
   static const _appAuth = FlutterAppAuth();
 
   static String lastTokenRefreshTime = "Belum Refreshed";
+  static Completer<String?>? _refreshCompleter;
 
   static void updateTokenRefreshTime() {
     final now = DateTime.now();
@@ -186,71 +188,104 @@ class SsoHelper {
     final token = session['token'] as String?;
     if (token == null || token.isEmpty) return null;
 
-    if (_isTokenExpired(token)) {
-      final username = session['username'] as String?;
-      final refreshToken = await LocalStorageMobile.read('refresh');
-
-      // 1. Refresh Token Exchange via Golang Backend API
-      if (refreshToken != null && refreshToken.isNotEmpty) {
-        print(
-            "JWT Token expired. Attempting background token refresh via Golang API...");
-        try {
-          final responseData = await ApiClient.post(
-            Uri.parse("${ApiClient.baseUrl}/api/account/refresh-token"),
-            body: {
-              "refresh_token": refreshToken,
-            },
-            scope: 'global',
-          );
-
-          if (responseData is Map<String, dynamic> &&
-              responseData['token'] != null) {
-            final newToken = responseData['token'] as String;
-            final newRefresh =
-                responseData['refresh'] as String? ?? refreshToken;
-
-            await saveSession(
-              username: username ?? '',
-              password: '',
-              token: newToken,
-              name: session['name'] ?? '',
-              nidn: session['nidn'] ?? '',
-              nip: session['nip'] ?? '',
-              email: session['email'] ?? '',
-              role: session['role'] ?? 'Dosen',
-              groups: List<String>.from(session['groups'] ?? []),
-            );
-            await LocalStorageMobile.write('refresh', newRefresh);
-
-            await FcmService.showCustomNotification(
-              title: 'Sesi Keamanan Diperbarui',
-              body: 'Token JWT Anda berhasil diperbarui secara otomatis.',
-            );
-            updateTokenRefreshTime();
-            print("Background token refresh SUCCESS via Golang API.");
-            return newToken;
-          }
-        } catch (e) {
-          print("Background token refresh via Golang API failed: $e");
-        }
+    if (!_isTokenExpired(token)) {
+      if (lastTokenRefreshTime == "Aktif") {
+        updateTokenRefreshTime();
       }
+      return token;
+    }
 
-      // 2. Refresh Token Expired: FORCE CLEAR LOCAL DB & DISCARD ALL TOKENS!
-      print(
-          "Token & Refresh Token EXPIRED. Force clearing local DB and local session...");
+    if (_refreshCompleter != null && !_refreshCompleter!.isCompleted) {
+      print("[SsoHelper] Token refresh already in progress. Waiting for existing request...");
+      return await _refreshCompleter!.future;
+    }
+
+    _refreshCompleter = Completer<String?>();
+    try {
+      final newToken = await _performTokenRefresh(session);
+      _refreshCompleter!.complete(newToken);
+      return newToken;
+    } catch (e) {
+      print("[SsoHelper] Token refresh error: $e");
+      _refreshCompleter!.complete(null);
+      return null;
+    } finally {
+      _refreshCompleter = null;
+    }
+  }
+
+  static Future<String?> _performTokenRefresh(Map<String, dynamic> session) async {
+    final username = session['username'] as String?;
+    final refreshToken = await LocalStorageMobile.read('refresh');
+
+    if (refreshToken == null || refreshToken.isEmpty) {
+      print("[SsoHelper] No refresh token found. Clearing session...");
       await clearSession();
       await FcmService.showCustomNotification(
         title: 'Sesi Berakhir',
-        body:
-            'Sesi login telah kadaluarsa. Akun dan token telah dibersihkan secara aman dari DB lokal.',
+        body: 'Sesi login telah kadaluarsa. Silakan login kembali.',
       );
       return null;
     }
 
-    if (lastTokenRefreshTime == "Aktif") {
-      updateTokenRefreshTime();
+    print("[SsoHelper] JWT Token expired. Attempting direct refresh via Golang API...");
+    try {
+      final response = await http
+          .post(
+            Uri.parse("${ApiClient.baseUrl}/api/account/refresh-token"),
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'Thunder Client (https://www.thunderclient.com)',
+              'Accept': '*/*',
+            },
+            body: jsonEncode({"refresh_token": refreshToken}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        if (responseData is Map<String, dynamic> && responseData['token'] != null) {
+          final newToken = responseData['token'] as String;
+          final newRefresh = responseData['refresh'] as String? ?? refreshToken;
+
+          await saveSession(
+            username: username ?? '',
+            password: session['password'] ?? '',
+            token: newToken,
+            name: session['name'] ?? '',
+            nidn: session['nidn'] ?? '',
+            nip: session['nip'] ?? '',
+            email: session['email'] ?? '',
+            role: session['role'] ?? 'Dosen',
+            groups: List<String>.from(session['groups'] ?? []),
+          );
+          await LocalStorageMobile.write('refresh', newRefresh);
+
+          await FcmService.showCustomNotification(
+            title: 'Sesi Keamanan Diperbarui',
+            body: 'Token JWT Anda berhasil diperbarui secara otomatis.',
+          );
+          updateTokenRefreshTime();
+          print("[SsoHelper] Background token refresh SUCCESS via Golang API.");
+          return newToken;
+        }
+      } else if (response.statusCode == 400 || response.statusCode == 401) {
+        print("[SsoHelper] Server rejected refresh token (${response.statusCode}). Force clearing session...");
+        await clearSession();
+        await FcmService.showCustomNotification(
+          title: 'Sesi Berakhir',
+          body: 'Sesi login telah kadaluarsa. Akun dan token telah dibersihkan secara aman dari DB lokal.',
+        );
+        return null;
+      } else {
+        print("[SsoHelper] Refresh request returned HTTP ${response.statusCode}. Preserving local session.");
+        return session['token'] as String?;
+      }
+    } catch (e) {
+      print("[SsoHelper] Network/timeout error during token refresh ($e). Preserving local session.");
+      return session['token'] as String?;
     }
-    return token;
+    return null;
   }
 
   static Map<String, dynamic> _decodeJwt(String token) {

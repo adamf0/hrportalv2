@@ -8,9 +8,10 @@ import { MasterLiburPage } from './pages/MasterLiburPage';
 import { IzinPage } from './pages/IzinPage';
 import { CutiPage } from './pages/CutiPage';
 import { SppdPage } from './pages/SppdPage';
+import { SlipGajiPage } from './pages/SlipGajiPage';
 import { ReportPage } from './pages/ReportPage';
 
-const VALID_TABS = ['dashboard', 'libur', 'izin', 'cuti', 'sppd', 'laporan'];
+const VALID_TABS = ['dashboard', 'cuti', 'izin', 'sppd', 'slip-gaji', 'libur', 'laporan'];
 
 const getInitialTab = () => {
   const path = window.location.pathname.replace(/^\//, '').toLowerCase();
@@ -33,6 +34,7 @@ export const App = () => {
   const [activeTab, setActiveTab] = useState(getInitialTab);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [periodType, setPeriodType] = useState('cutoff'); // 'cutoff' (16-15) or 'calendar' (01-31)
 
   const handleTabChange = (tab) => {
     if (!VALID_TABS.includes(tab)) return;
@@ -59,7 +61,7 @@ export const App = () => {
     if (!loading) {
       if (isAuthenticated) {
         const path = window.location.pathname.replace(/^\//, '').toLowerCase();
-        if (path === 'login' || path === '' || !VALID_TABS.includes(path)) {
+        if (path === 'login' || path === 'presensi' || path === 'screener' || path === '' || !VALID_TABS.includes(path)) {
           setActiveTab('dashboard');
           localStorage.setItem('hrportal_active_tab', 'dashboard');
           window.history.pushState(null, '', '/dashboard');
@@ -80,13 +82,14 @@ export const App = () => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'var(--bg-app)',
-          color: 'var(--color-primary)',
+          backgroundColor: '#ffffff',
+          color: '#111827',
           fontSize: '1.1rem',
-          fontWeight: 600,
+          fontWeight: 700,
+          fontFamily: 'Plus Jakarta Sans, sans-serif',
         }}
       >
-        Memuat HR Portal SDM...
+        Memuat HR Portal UNPAK...
       </div>
     );
   }
@@ -98,19 +101,21 @@ export const App = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardPage onNavigate={handleTabChange} />;
-      case 'libur':
-        return <MasterLiburPage />;
-      case 'izin':
-        return <IzinPage />;
+        return <DashboardPage onNavigate={handleTabChange} globalPeriodType={periodType} onPeriodTypeChange={setPeriodType} />;
       case 'cuti':
         return <CutiPage />;
+      case 'izin':
+        return <IzinPage />;
       case 'sppd':
         return <SppdPage />;
+      case 'slip-gaji':
+        return <SlipGajiPage />;
+      case 'libur':
+        return <MasterLiburPage />;
       case 'laporan':
-        return <ReportPage />;
+        return <ReportPage globalPeriodType={periodType} onPeriodTypeChange={setPeriodType} />;
       default:
-        return <DashboardPage onNavigate={handleTabChange} />;
+        return <DashboardPage onNavigate={handleTabChange} globalPeriodType={periodType} onPeriodTypeChange={setPeriodType} />;
     }
   };
 
@@ -129,6 +134,9 @@ export const App = () => {
         className={`main-content-wrapper ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}
       >
         <Navbar
+          activeTab={activeTab}
+          periodType={periodType}
+          onPeriodTypeChange={setPeriodType}
           onToggleMobileSidebar={() => {
             if (window.innerWidth < 1024) {
               setIsMobileSidebarOpen(!isMobileSidebarOpen);

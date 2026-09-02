@@ -61,27 +61,30 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 
 	query := r.db.WithContext(ctx).Debug().Model(&domain.Sppd{})
 
-	if isSdm && (tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "") {
-		query = query.Where("tanggal_berangkat >= ? and tanggal_kembali <= ?", *tanggal_mulai, *tanggal_akhir)
+	if isSdm {
+		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
+			query = query.Where("tanggal_berangkat >= ? and tanggal_kembali <= ?", *tanggal_mulai, *tanggal_akhir)
+		}
+		if nip == "" && nidn == "" {
+			query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui sdm", "proses sdm", "%sdm%")
+		}
+	} else if verifikasi {
+		if nip != "" && nidn != "" {
+			query = query.Where("verifikasi = ? or verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
+		} else if nip != "" {
+			query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
+		} else if nidn != "" {
+			query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
+		} else {
+			query = query.Where("verifikasi IS NOT NULL AND verifikasi != ''")
+		}
 	} else if nip != "" || nidn != "" {
 		if nip != "" && nidn != "" {
-			if verifikasi {
-				query = query.Where("verifikasi = ? or verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
-			} else {
-				query = query.Where("nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
-			}
+			query = query.Where("nip = ? OR nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
 		} else if nip != "" {
-			if verifikasi {
-				query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
-			} else {
-				query = query.Where("nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
-			}
+			query = query.Where("nip = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
 		} else {
-			if verifikasi {
-				query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
-			} else {
-				query = query.Where("nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
-			}
+			query = query.Where("nidn = ? OR id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
 		}
 	}
 

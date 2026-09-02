@@ -505,7 +505,15 @@ func accountFromToken(tokenStr string) *Account {
 		}
 
 		for _, g := range allGroups {
-			if g == "sdm" || g == "baum" || g == "adm_hr" || g == "inherit_sdm" || g == "inherit_baum" || g == "adm_pusat" {
+			if g == "tendik" {
+				role = "tendik"
+				level = "tendik"
+				break
+			} else if g == "dosen" {
+				role = "dosen"
+				level = "dosen"
+				break
+			} else if g == "sdm" || g == "baum" || g == "adm_hr" || g == "inherit_sdm" || g == "inherit_baum" {
 				role = "sdm"
 				level = "sdm"
 				break
@@ -600,7 +608,7 @@ func RBACMiddleware() fiber.Handler {
 			}
 		}
 
-		if user == nil {
+		if user == nil || (user.Role == "" && user.Level == "" && user.SID == "") {
 			// Fallback decode directly from token
 			user = accountFromToken(token)
 		}
@@ -608,6 +616,12 @@ func RBACMiddleware() fiber.Handler {
 		if user == nil {
 			return c.Status(401).
 				JSON(commoninfra.NewResponseError(logCommonRbac, "Unauthenticated or invalid token"))
+		}
+
+		activeRole := strings.ToLower(strings.TrimSpace(c.Get("X-Active-Role")))
+		if activeRole != "" && (activeRole == "sdm" || activeRole == "baum" || activeRole == "dosen" || activeRole == "tendik") {
+			user.Role = activeRole
+			user.Level = activeRole
 		}
 
 		c.Request().PostArgs().Set("role", user.Role)
@@ -667,14 +681,18 @@ func fetchWhoAmI(token, whoamiURL string, c *fiber.Ctx) (*Account, error) {
 	body, _ := io.ReadAll(resp.Body)
 	log.Printf("[RBAC] Whoami response status: %d, body: %s", resp.StatusCode, string(body))
 
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("whoami status %d: %s", resp.StatusCode, string(body))
+	if strings.TrimSpace(string(body)) == "null" {
+		return nil, errors.New("whoami response is null")
 	}
 
 	var user Account
 	if err := json.Unmarshal(body, &user); err != nil {
 		log.Printf("[RBAC] Failed to parse whoami response: %v", err)
 		return nil, err
+	}
+
+	if user.Role == "" && user.Level == "" && user.SID == "" {
+		return nil, errors.New("whoami returned empty user struct")
 	}
 
 	log.Printf("[RBAC] Whoami user: %+v", user)

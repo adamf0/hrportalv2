@@ -15,6 +15,7 @@ import (
 	"hrportal_backend/modules/attendance/application/DeleteEmptyAttendance"
 	"hrportal_backend/modules/attendance/application/GetAttendanceHistory"
 	"hrportal_backend/modules/attendance/domain"
+	"hrportal_backend/modules/notification/application/CreateNotification"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
@@ -272,23 +273,6 @@ func ModuleAttendance(app *fiber.App) {
 		// Trigger FCM Notification & WebSocket Broadcast for Check-Out Success (Only when CREATED, not updated)
 		if res.Value != nil && res.Value.IsCreated {
 			absenData := res.Value
-			targetNips := []string{}
-			if absenData.Nip != "" {
-				targetNips = append(targetNips, absenData.Nip)
-			}
-			if absenData.Nidn != "" && absenData.Nidn != absenData.Nip {
-				targetNips = append(targetNips, absenData.Nidn)
-			}
-			if len(targetNips) > 0 {
-				helper.GlobalFcmManager.DispatchNotification(
-					targetNips,
-					"Presensi Keluar Berhasil",
-					"Sistem sudah mencatat absen keluar Anda",
-					"attendance",
-					map[string]string{"type": "check-out", "id": strconv.Itoa(int(absenData.ID))},
-				)
-			}
-
 			keluarStr := ""
 			if absenData.AbsenKeluar != nil {
 				keluarStr = absenData.AbsenKeluar.Format("2006-01-02 15:04:05")
@@ -313,14 +297,14 @@ func ModuleAttendance(app *fiber.App) {
 		}
 
 		if nip != "" {
-			helper.GlobalFcmManager.DispatchNotification(
-				[]string{nip},
-				"Presensi Otomatis Gagal",
-				reason,
-				"attendance_fail",
-				map[string]string{"type": "fail"},
-			)
-			return c.JSON(fiber.Map{"status": "ok", "message": "Notification dispatched"})
+			_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+				TargetNips: []string{nip},
+				Title:      "Presensi Otomatis Gagal",
+				Body:       reason,
+				Type:       "attendance_fail",
+				Payload:    map[string]string{"type": "fail"},
+			})
+			return c.JSON(fiber.Map{"status": "ok", "message": "Notification command dispatched"})
 		}
 		return c.Status(400).JSON(fiber.Map{"error": "Missing nip"})
 	})

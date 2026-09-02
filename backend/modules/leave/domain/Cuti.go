@@ -16,6 +16,7 @@ type Cuti struct {
 	Fakultas       string     `gorm:"column:fakultas" json:"fakultas"`
 	Prodi          string     `gorm:"column:prodi" json:"prodi"`
 	JenisCutiID    uint       `gorm:"column:id_jenis_cuti" json:"jenis_cuti_id"`
+	JenisCuti      string     `gorm:"-" json:"jenis_cuti"`
 	TanggalMulai   string     `gorm:"column:tanggal_mulai;index" json:"tanggal_mulai"`
 	TanggalSelesai string     `gorm:"column:tanggal_akhir;index" json:"tanggal_selesai"`
 	JumlahHari     int        `gorm:"column:lama_cuti" json:"jumlah_hari"`

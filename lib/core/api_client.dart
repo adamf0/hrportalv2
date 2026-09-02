@@ -86,11 +86,11 @@ class ApiClient {
     //     return 'http://10.0.2.2:3000';
     //   }
     // } catch (_) {}
-    return 'http://217.216.75.192:3000';
+    return 'http://10.0.2.2:3000';
   }
 
   static String get baseUrlUnpak {
-    return 'https://hrportal.unpak.ac.id/api/v2';
+    return 'http://10.0.2.2:4000/api/v2';
   }
 
   /// Global key for displaying Toast/SnackBar for API notifications
@@ -133,6 +133,11 @@ class ApiClient {
     final formattedMsg = '[$pageTitle] $message';
     debugPrint(
         '[API Toast Notification - ${type.name.toUpperCase()}]: $formattedMsg');
+
+    // Do not pop UI SnackBar toasts for silent background or global service requests
+    if (pageContext == 'global' || pageContext == 'background') {
+      return;
+    }
 
     // Deduplicate: Don't show exact same toast within 5 seconds
     final now = DateTime.now();
@@ -293,6 +298,17 @@ class ApiClient {
       Map<String, String>? headers) async {
     final Map<String, String> finalHeaders =
         headers != null ? Map.from(headers) : {};
+
+    if (!finalHeaders.containsKey('User-Agent') &&
+        !finalHeaders.containsKey('user-agent')) {
+      finalHeaders['User-Agent'] =
+          'Thunder Client (https://www.thunderclient.com)';
+    }
+    if (!finalHeaders.containsKey('Accept') &&
+        !finalHeaders.containsKey('accept')) {
+      finalHeaders['Accept'] = '*/*';
+    }
+
     try {
       final token = await SsoHelper.getValidToken();
       if (token != null &&
@@ -355,7 +371,7 @@ class ApiClient {
           '[API Loading State Log] Request: POST $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
-      showNetworkToast(msg);
+      showNetworkToast(msg, scope: reqScope);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
       if (!isExempt &&
@@ -367,7 +383,7 @@ class ApiClient {
       const msg =
           'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
-      showNetworkToast(msg);
+      showNetworkToast(msg, scope: reqScope);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
       if (!isExempt &&
@@ -378,7 +394,7 @@ class ApiClient {
           '[API Loading State Log] Request: POST $url | State: END (FormatException)');
       const msg = 'Format data dari server mengalami kesalahan.';
       debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
-      showToast(msg);
+      showToast(msg, scope: reqScope);
       throw ApiException(msg);
     } catch (e, stackTrace) {
       if (!isExempt &&
@@ -390,7 +406,7 @@ class ApiClient {
       if (e is ApiException) rethrow;
       final msg = 'Terjadi kesalahan tidak terduga: $e';
       debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');
-      showToast(msg);
+      showToast(msg, scope: reqScope);
       throw ApiException(msg);
     }
   }
@@ -545,7 +561,7 @@ class ApiClient {
           '[API Loading State Log] Request: GET $url | State: END (SocketException)');
       const msg = 'Koneksi internet terputus. Periksa jaringan Anda.';
       debugPrint('[API Exception Log] SocketException: $e\n$stackTrace');
-      showNetworkToast(msg);
+      showNetworkToast(msg, scope: reqScope);
       throw ApiException(msg);
     } on TimeoutException catch (e, stackTrace) {
       if (!isExempt &&
@@ -557,7 +573,7 @@ class ApiClient {
       const msg =
           'Koneksi server mengalami batas waktu (timeout). Silakan coba lagi.';
       debugPrint('[API Exception Log] TimeoutException: $e\n$stackTrace');
-      showNetworkToast(msg);
+      showNetworkToast(msg, scope: reqScope);
       throw ApiException(msg);
     } on FormatException catch (e, stackTrace) {
       if (!isExempt &&
@@ -568,7 +584,7 @@ class ApiClient {
           '[API Loading State Log] Request: GET $url | State: END (FormatException)');
       const msg = 'Format data dari server mengalami kesalahan.';
       debugPrint('[API Exception Log] FormatException: $e\n$stackTrace');
-      showToast(msg);
+      showToast(msg, scope: reqScope);
       throw ApiException(msg);
     } catch (e, stackTrace) {
       if (!isExempt &&
@@ -580,7 +596,7 @@ class ApiClient {
       if (e is ApiException) rethrow;
       final msg = 'Terjadi kesalahan tidak terduga: $e';
       debugPrint('[API Unpredicted Exception Log]: $e\n$stackTrace');
-      showToast(msg);
+      showToast(msg, scope: reqScope);
       throw ApiException(msg);
     }
   }

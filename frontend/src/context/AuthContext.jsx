@@ -28,27 +28,31 @@ export const decodeJwt = (token) => {
   }
 };
 
-export const isSdmAuthorized = (userInfo) => {
-  if (!userInfo || typeof userInfo !== 'object') return false;
-  const { level, role, name, groups = [], realmRoles = [] } = userInfo;
-  const normLevel = (level || '').toLowerCase();
-  const normRole = (role || '').toLowerCase();
-  const normName = (name || '').toLowerCase();
-
-  // Local admin / sdm check
-  if (
-    normLevel === 'sdm' ||
-    normLevel === 'admin' ||
-    normLevel === 'baum' ||
-    normRole === 'sdm' ||
-    normRole === 'admin' ||
-    normName === 'sdm'
-  ) {
-    return true;
+export const getUserRole = (userInfo) => {
+  // Check if active_role override exists in localStorage
+  const activeOverride = localStorage.getItem('active_role');
+  if (activeOverride && ['sdm', 'baum', 'dosen', 'tendik'].includes(activeOverride.toLowerCase())) {
+    return activeOverride.toLowerCase();
   }
 
-  // Keycloak SSO Group or Realm Role checks (sdm, baum, inherit_sdm, inherit_baum, adm_pusat)
-  const allowedGroups = ['sdm', 'baum', 'inherit_sdm', 'inherit_baum', 'adm_pusat'];
+  if (!userInfo || typeof userInfo !== 'object') return 'tendik';
+  const { level, role, groups = [], realmRoles = [] } = userInfo;
+  const normLevel = (level || '').toLowerCase();
+  const normRole = (role || '').toLowerCase();
+
+  if (normLevel === 'sdm' || normLevel === 'admin' || normRole === 'sdm' || normRole === 'admin') {
+    return 'sdm';
+  }
+  if (normLevel === 'baum' || normRole === 'baum') {
+    return 'baum';
+  }
+  if (normLevel === 'dosen' || normRole === 'dosen') {
+    return 'dosen';
+  }
+  if (normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai') {
+    return 'tendik';
+  }
+
   const safeGroups = Array.isArray(groups) ? groups : [];
   const safeRoles = Array.isArray(realmRoles) ? realmRoles : [];
   const allGroups = [
@@ -56,7 +60,93 @@ export const isSdmAuthorized = (userInfo) => {
     ...safeRoles.map((r) => (typeof r === 'string' ? r.toLowerCase() : '')),
   ];
 
-  return allGroups.some((g) => allowedGroups.includes(g));
+  if (allGroups.some((g) => ['sdm', 'inherit_sdm', 'adm_pusat'].includes(g))) {
+    return 'sdm';
+  }
+  if (allGroups.some((g) => ['baum', 'inherit_baum'].includes(g))) {
+    return 'baum';
+  }
+  if (allGroups.some((g) => g.includes('dosen'))) {
+    return 'dosen';
+  }
+  return 'tendik';
+};
+
+export const getAvailableRoles = (userInfo) => {
+  let userObj = userInfo;
+  if (!userObj || typeof userObj !== 'object') {
+    try {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) userObj = JSON.parse(savedUser);
+    } catch (e) {}
+  }
+
+  let profileObj = null;
+  try {
+    const savedProf = localStorage.getItem('profile');
+    if (savedProf) profileObj = JSON.parse(savedProf);
+  } catch (e) {}
+
+  const collectGroups = [];
+
+  if (userObj) {
+    if (Array.isArray(userObj.groups)) collectGroups.push(...userObj.groups);
+    else if (typeof userObj.groups === 'string') collectGroups.push(...userObj.groups.split(/[\s,]+/));
+
+    if (Array.isArray(userObj.realmRoles)) collectGroups.push(...userObj.realmRoles);
+    if (userObj.level) collectGroups.push(userObj.level);
+    if (userObj.role) collectGroups.push(userObj.role);
+  }
+
+  if (profileObj) {
+    if (Array.isArray(profileObj.groups)) collectGroups.push(...profileObj.groups);
+    else if (typeof profileObj.groups === 'string') collectGroups.push(...profileObj.groups.split(/[\s,]+/));
+
+    if (Array.isArray(profileObj.realmRoles)) collectGroups.push(...profileObj.realmRoles);
+    if (profileObj.level) collectGroups.push(profileObj.level);
+    if (profileObj.role) collectGroups.push(profileObj.role);
+  }
+
+  const normGroups = collectGroups.map((g) => (typeof g === 'string' ? g.toLowerCase().trim().replace(/^\//, '') : ''));
+
+  const availableSet = new Set();
+
+  normGroups.forEach((g) => {
+    if (!g) return;
+    if (g.includes('sdm') || g.includes('adm_pusat') || g.includes('admin') || g === 'sdm') {
+      availableSet.add('sdm');
+    }
+    if (g.includes('baum') || g === 'baum') {
+      availableSet.add('baum');
+    }
+    if (g.includes('dosen') || g === 'dosen') {
+      availableSet.add('dosen');
+    }
+    if (g.includes('tendik') || g.includes('pegawai') || g === 'tendik') {
+      availableSet.add('tendik');
+    }
+  });
+
+  if (availableSet.size === 0) {
+    availableSet.add('tendik');
+  }
+
+  return Array.from(availableSet);
+};
+
+export const canSwitchRole = (userInfo) => {
+  const roles = getAvailableRoles(userInfo);
+  return roles.length > 1;
+};
+
+export const isUserAuthorized = (userInfo) => {
+  if (!userInfo || typeof userInfo !== 'object') return false;
+  // Allow all logged in users (SDM, Dosen, Tendik) to access HR Portal Panel
+  return true;
+};
+
+export const isSdmAuthorized = (userInfo) => {
+  return getUserRole(userInfo) === 'sdm';
 };
 
 export const AuthProvider = ({ children }) => {
@@ -73,6 +163,9 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('refresh');
     localStorage.removeItem('user');
+    localStorage.removeItem('profile');
+    localStorage.removeItem('whoami');
+    localStorage.removeItem('user_profile');
     window.location.href = '/login';
   };
 
@@ -86,7 +179,6 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Validate & hydrate session from localStorage
     const initAuth = async () => {
       const savedToken = localStorage.getItem('token');
       const savedUser = localStorage.getItem('user');
@@ -94,8 +186,6 @@ export const AuthProvider = ({ children }) => {
         try {
           const parsedUser = JSON.parse(savedUser);
           if (parsedUser) {
-            if (!parsedUser.level) parsedUser.level = 'sdm';
-            if (!parsedUser.role) parsedUser.role = 'sdm';
             setUser(parsedUser);
             setToken(savedToken);
           }
@@ -120,19 +210,23 @@ export const AuthProvider = ({ children }) => {
 
   const fetchWhoAmI = async (authToken) => {
     try {
-      const res = await apiClient.get('/account/whoami');
+      const res = await apiClient.get('/api/v2/account/whoami');
       if (res) {
+        localStorage.removeItem('whoami');
+        localStorage.removeItem('user_profile');
+        localStorage.setItem('profile', JSON.stringify(res));
         setUser((currentUser) => {
           const baseUser = currentUser || {};
+          const detectedRole = res.level || res.role || baseUser.role || 'tendik';
           const updatedUser = {
             ...baseUser,
-            name: res.name || baseUser.name || 'SDM User',
+            name: res.name || baseUser.name || 'Pengguna HR Portal',
             email: res.email || baseUser.email || '',
             username: res.nip || res.sid || baseUser.username || '',
             nip: res.nip || baseUser.nip || '',
             nidn: res.nidn || baseUser.nidn || '',
-            role: res.level || res.role || baseUser.role || 'sdm',
-            level: res.level || baseUser.level || 'sdm',
+            role: detectedRole,
+            level: detectedRole,
             fakultas: res.fakultas || baseUser.fakultas || '',
             prodi: res.prodi || baseUser.prodi || '',
             unit: res.unit || baseUser.unit || '',
@@ -149,7 +243,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const loginRegular = async (usernameInput, passwordInput) => {
+  const loginRegular = async (usernameInput, passwordInput, selectedRole = 'sdm') => {
     try {
       const res = await apiClient.postForm('/api/v2/account/login', {
         username: usernameInput,
@@ -164,25 +258,19 @@ export const AuthProvider = ({ children }) => {
       }
 
       const decoded = decodeJwt(authToken);
+      const roleAssigned = decoded.level || res.level || selectedRole || 'sdm';
       const userInfo = {
         name: decoded.name || res.name || usernameInput,
         email: decoded.email || res.email || '',
         username: usernameInput,
         nip: res.nip || usernameInput,
         nidn: res.nidn || '-',
-        role: decoded.level || res.level || 'sdm',
-        level: decoded.level || res.level || 'sdm',
+        role: roleAssigned,
+        level: roleAssigned,
       };
 
       if (decoded.employeeid) {
         userInfo.employeeId = decoded.employeeid || userInfo.nip;
-      }
-
-      if (!isSdmAuthorized(userInfo)) {
-        return { 
-          success: false, 
-          error: 'Akses Ditolak: Akun Anda tidak memiliki hak akses Administrator SDM (SDM/BAUM/ADM_HR).' 
-        };
       }
 
       saveAuthSession(authToken, refreshToken, userInfo);
@@ -247,25 +335,21 @@ export const AuthProvider = ({ children }) => {
       const groups = Array.isArray(decoded.group) ? decoded.group : [];
       const realmRoles = decoded.realm_access?.roles || [];
 
+      const tempUser = { groups, realmRoles, level: decoded.level || decoded.role };
+      const role = getUserRole(tempUser);
+
       const userInfo = {
         name,
         email,
         username: employeeId,
         nip: employeeId,
         nidn: '-',
-        role: 'sdm',
-        level: 'sdm',
+        role: role,
+        level: role,
         groups,
         realmRoles,
         isSso: true,
       };
-
-      if (!isSdmAuthorized(userInfo)) {
-        return {
-          success: false,
-          error: 'Akses Ditolak: Akun SSO Anda tidak berada dalam grup SDM / BAUM / ADM_HR / INHERIT_SDM / INHERIT_BAUM.',
-        };
-      }
 
       saveAuthSession(accessToken, refreshToken, userInfo);
       fetchWhoAmI(accessToken);
@@ -287,25 +371,21 @@ export const AuthProvider = ({ children }) => {
       const groups = Array.isArray(decoded.group) ? decoded.group : [];
       const realmRoles = decoded.realm_access?.roles || [];
 
+      const tempUser = { groups, realmRoles, level: decoded.level || decoded.role };
+      const role = getUserRole(tempUser);
+
       const userInfo = {
         name,
         email,
         username: employeeId,
         nip: employeeId,
         nidn: '-',
-        role: 'sdm',
-        level: 'sdm',
+        role: role,
+        level: role,
         groups,
         realmRoles,
         isSso: true,
       };
-
-      if (!isSdmAuthorized(userInfo)) {
-        return {
-          success: false,
-          error: 'Akses Ditolak: Akun SSO Anda tidak berada dalam grup SDM / BAUM / ADM_HR / INHERIT_SDM / INHERIT_BAUM.',
-        };
-      }
 
       saveAuthSession(accessToken, '', userInfo);
       fetchWhoAmI(accessToken);
@@ -320,16 +400,55 @@ export const AuthProvider = ({ children }) => {
     const origin = window.location.origin;
     const redirectUri = `${origin}/login`;
     const url = `${SSO_CONFIG.authUrl}?client_id=${SSO_CONFIG.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid`;
-    console.log('Redirecting to UNPAK Keycloak SSO:', url);
     window.location.href = url;
   };
+
+  const [activeRoleOverride, setActiveRoleOverride] = useState(() => localStorage.getItem('active_role') || null);
+
+  const switchRole = (newRole) => {
+    const norm = (newRole || 'tendik').toLowerCase();
+    setActiveRoleOverride(norm);
+    localStorage.setItem('active_role', norm);
+
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, role: norm, level: norm };
+      localStorage.setItem('user', JSON.stringify(updated));
+      return updated;
+    });
+
+    try {
+      const savedProf = localStorage.getItem('profile');
+      if (savedProf) {
+        const prof = JSON.parse(savedProf);
+        prof.level = norm;
+        prof.role = norm;
+        localStorage.setItem('profile', JSON.stringify(prof));
+      }
+    } catch (e) {}
+
+    window.dispatchEvent(new CustomEvent('role-changed', { detail: norm }));
+  };
+
+  const userRole = activeRoleOverride || getUserRole(user);
+  const isSdm = userRole === 'sdm';
+  const isBaum = userRole === 'baum';
+  const isDosen = userRole === 'dosen';
+  const isTendik = userRole === 'tendik';
 
   const value = {
     user,
     token,
     loading,
     isAuthenticated: !!token && !!user,
-    isSdm: isSdmAuthorized(user),
+    userRole,
+    isSdm,
+    isBaum,
+    isDosen,
+    isTendik,
+    availableRoles: getAvailableRoles(user),
+    canSwitchRole: canSwitchRole(user),
+    switchRole,
     loginRegular,
     exchangeSsoCode,
     loginWithSsoToken,

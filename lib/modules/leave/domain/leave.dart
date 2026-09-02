@@ -102,14 +102,35 @@ class SppdMember {
   });
 
   factory SppdMember.fromJson(Map<String, dynamic> json) {
+    final nipVal = json['nip']?.toString() ?? '';
+    final nidnVal = json['nidn']?.toString() ?? '';
+    String nameVal = json['nama']?.toString() ?? json['name']?.toString() ?? '';
+    if (nameVal.trim().isEmpty) {
+      if (nipVal.isNotEmpty) {
+        nameVal = nipVal;
+      } else if (nidnVal.isNotEmpty) {
+        nameVal = nidnVal;
+      }
+    }
     return SppdMember(
-      nip: json['nip']?.toString() ?? json['id']?.toString() ?? '',
-      nidn: json['nidn']?.toString() ?? '',
-      nama: json['nama']?.toString() ?? json['name']?.toString() ?? '',
+      nip: nipVal,
+      nidn: nidnVal,
+      nama: nameVal.trim(),
       unit: json['unit']?.toString() ?? json['role']?.toString() ?? '',
       fakultas: json['fakultas']?.toString() ?? '',
       prodi: json['prodi']?.toString() ?? '',
     );
+  }
+
+  String get displayName {
+    if (nama.isNotEmpty && nama != nip && nama != nidn) {
+      if (nip.isNotEmpty) return '$nama (NIP: $nip)';
+      if (nidn.isNotEmpty) return '$nama (NIDN: $nidn)';
+      return nama;
+    }
+    if (nip.isNotEmpty) return 'NIP: $nip';
+    if (nidn.isNotEmpty) return 'NIDN: $nidn';
+    return nama;
   }
 
   factory SppdMember.fromSupervisor(Supervisor s) {

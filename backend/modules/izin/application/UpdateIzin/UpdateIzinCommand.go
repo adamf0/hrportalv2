@@ -5,10 +5,13 @@ import (
 	common "hrportal_backend/common/domain"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/izin/domain"
+	"hrportal_backend/modules/notification/application/CreateNotification"
 	reportInfra "hrportal_backend/modules/report/infrastructure"
+	"strconv"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/mehdihadeli/go-mediatr"
 	"gorm.io/gorm"
 )
 
@@ -115,6 +118,75 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	if tx != nil {
 		if err := tx.Commit().Error; err != nil {
 			return common.FailureValue[*domain.Izin](common.FailureError("Izin.CommitFailed", err.Error())), nil
+		}
+	}
+
+	status := izin.Status
+	atasanNip := ""
+	if izin.Verifikasi != nil && *izin.Verifikasi != "" {
+		atasanNip = *izin.Verifikasi
+	}
+
+	switch status {
+	case "terima atasan":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{izin.Nip},
+			Title:      "Pengajuan Izin Disetujui Atasan",
+			Body:       "Pengajuan Izin Anda telah disetujui Atasan. Menunggu verifikasi SDM.",
+			Type:       "izin",
+			Payload:    map[string]string{"id": strconv.Itoa(int(izin.ID)), "status": status},
+		})
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{"SDM_BROADCAST"},
+			Title:      "Verifikasi SDM Izin",
+			Body:       "Pengajuan Izin NIP " + izin.Nip + " telah disetujui Atasan. Mohon verifikasi final SDM.",
+			Type:       "izin",
+			Payload:    map[string]string{"id": strconv.Itoa(int(izin.ID)), "status": status},
+		})
+
+	case "tolak atasan":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{izin.Nip},
+			Title:      "Pengajuan Izin Ditolak Atasan",
+			Body:       "Pengajuan Izin Anda ditolak oleh Atasan.",
+			Type:       "izin",
+			Payload:    map[string]string{"id": strconv.Itoa(int(izin.ID)), "status": status},
+		})
+
+	case "terima sdm":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{izin.Nip},
+			Title:      "Pengajuan Izin Disetujui SDM",
+			Body:       "Selamat! Pengajuan Izin Anda telah disetujui oleh SDM.",
+			Type:       "izin",
+			Payload:    map[string]string{"id": strconv.Itoa(int(izin.ID)), "status": status},
+		})
+		if atasanNip != "" {
+			_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+				TargetNips: []string{atasanNip},
+				Title:      "Status Final Izin",
+				Body:       "Pengajuan Izin NIP " + izin.Nip + " telah disetujui oleh SDM.",
+				Type:       "izin",
+				Payload:    map[string]string{"id": strconv.Itoa(int(izin.ID)), "status": status},
+			})
+		}
+
+	case "tolak sdm":
+		_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+			TargetNips: []string{izin.Nip},
+			Title:      "Pengajuan Izin Ditolak SDM",
+			Body:       "Pengajuan Izin Anda ditolak oleh SDM.",
+			Type:       "izin",
+			Payload:    map[string]string{"id": strconv.Itoa(int(izin.ID)), "status": status},
+		})
+		if atasanNip != "" {
+			_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](ctx, &CreateNotification.CreateNotificationCommand{
+				TargetNips: []string{atasanNip},
+				Title:      "Status Final Izin",
+				Body:       "Pengajuan Izin NIP " + izin.Nip + " ditolak oleh SDM.",
+				Type:       "izin",
+				Payload:    map[string]string{"id": strconv.Itoa(int(izin.ID)), "status": status},
+			})
 		}
 	}
 

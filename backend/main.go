@@ -53,7 +53,10 @@ import (
 	holidayInfrastructure "hrportal_backend/modules/holiday/infrastructure"
 	holidayPresentation "hrportal_backend/modules/holiday/presentation"
 
+	notificationDomain "hrportal_backend/modules/notification/domain"
+	notificationInfrastructure "hrportal_backend/modules/notification/infrastructure"
 	notificationPresentation "hrportal_backend/modules/notification/presentation"
+	payrollPresentation "hrportal_backend/modules/payroll/presentation"
 	storagePresentation "hrportal_backend/modules/storage/presentation"
 )
 
@@ -227,7 +230,7 @@ func main() {
 		var err error
 		db, err = tryConnectDB("DB_HRPORTAL", "unpak_hrportal")
 		if err == nil && db != nil {
-			commonhelper.GlobalFcmManager.SetDB(db)
+			_ = db.AutoMigrate(&notificationDomain.NotificationModel{}, &notificationDomain.FcmTokenModel{})
 		} else {
 			log.Printf("[DATABASE ERROR] Failed to connect to MySQL database! err: %v", err)
 		}
@@ -293,6 +296,10 @@ func main() {
 		return masterdataInfrastructure.RegisterModuleMasterData(db)
 	})
 
+	mustStart("Notification Module", func() error {
+		return notificationInfrastructure.RegisterModuleNotification(db)
+	})
+
 	if len(startupErrors) > 0 {
 		log.Printf("Startup warnings/errors encountered: %v", startupErrors)
 	}
@@ -300,7 +307,7 @@ func main() {
 	accountPresentation.ModuleAccount(app)
 	attendancePresentation.ModuleAttendance(app)
 	leavePresentation.ModuleLeave(app)
-	masterdataPresentation.ModuleMasterData(app)
+	masterdataPresentation.ModuleMasterData(app, db, dbSimpegNew)
 	sppdPresentation.ModuleSppd(app)
 	izinPresentation.ModuleIzin(app)
 	ceremonyAttendancePresentation.ModuleCeremonyAttendance(app)
@@ -308,6 +315,7 @@ func main() {
 	reportPresentation.ModuleReport(app)
 	holidayPresentation.ModuleHoliday(app, db)
 	notificationPresentation.ModuleNotification(app)
+	payrollPresentation.ModulePayroll(app, db, dbSimpeg)
 	storagePresentation.ModuleStorage(app)
 
 	// WebSocket Real-time Feed for SDM Dashboard (Live Izin, Cuti, SPPD updates)

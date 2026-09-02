@@ -12,12 +12,16 @@ export const apiClient = {
 
   getHeaders(isFormData = false) {
     const token = this.getToken();
+    const activeRole = localStorage.getItem('active_role') || 'tendik';
     const headers = {};
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';
     }
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (activeRole) {
+      headers['X-Active-Role'] = activeRole;
     }
     return headers;
   },
@@ -26,14 +30,7 @@ export const apiClient = {
     if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
       return endpoint;
     }
-    // Route login and whoami requests to https://hrportal.unpak.ac.id/api/v2
-    const lower = endpoint.toLowerCase();
-    if (lower.includes('/account/login') || lower.includes('/login') || lower.includes('/whoami')) {
-      // Clean path if it has /api/v2 prefix
-      const cleanPath = endpoint.replace(/^\/api\/v2/, '').replace(/^\/api/, '');
-      return `${UNPAK_AUTH_API}${cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath}`;
-    }
-    // All other endpoints go to localhost:3000
+    // All endpoints including whoami go to local Go backend (/api/v2/account/whoami)
     return `${LOCAL_API_BASE}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
   },
 
@@ -121,19 +118,49 @@ export const apiClient = {
   },
 
   post(endpoint, body = {}) {
+    if (body instanceof FormData) {
+      return this.request(endpoint, {
+        method: 'POST',
+        body: body,
+        isFormData: true,
+      });
+    }
+    const form = new URLSearchParams();
+    if (typeof body === 'object' && body !== null) {
+      Object.entries(body).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          form.append(k, v);
+        }
+      });
+      return this.request(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+      });
+    }
     return this.request(endpoint, {
       method: 'POST',
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: String(body),
     });
   },
 
   postForm(endpoint, formData) {
+    if (formData instanceof FormData) {
+      return this.request(endpoint, {
+        method: 'POST',
+        body: formData,
+        isFormData: true,
+      });
+    }
     const form = new URLSearchParams();
-    Object.entries(formData).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) {
-        form.append(k, v);
-      }
-    });
+    if (typeof formData === 'object' && formData !== null) {
+      Object.entries(formData).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          form.append(k, v);
+        }
+      });
+    }
     return this.request(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -142,19 +169,49 @@ export const apiClient = {
   },
 
   put(endpoint, body = {}) {
+    if (body instanceof FormData) {
+      return this.request(endpoint, {
+        method: 'PUT',
+        body: body,
+        isFormData: true,
+      });
+    }
+    const form = new URLSearchParams();
+    if (typeof body === 'object' && body !== null) {
+      Object.entries(body).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          form.append(k, v);
+        }
+      });
+      return this.request(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+      });
+    }
     return this.request(endpoint, {
       method: 'PUT',
-      body: JSON.stringify(body),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: String(body),
     });
   },
 
   putForm(endpoint, formData) {
+    if (formData instanceof FormData) {
+      return this.request(endpoint, {
+        method: 'PUT',
+        body: formData,
+        isFormData: true,
+      });
+    }
     const form = new URLSearchParams();
-    Object.entries(formData).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) {
-        form.append(k, v);
-      }
-    });
+    if (typeof formData === 'object' && formData !== null) {
+      Object.entries(formData).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          form.append(k, v);
+        }
+      });
+    }
     return this.request(endpoint, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
