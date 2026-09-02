@@ -184,8 +184,15 @@ export const CutiPage = () => {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchCutiList();
-  }, []);
+    const handleRoleChanged = () => {
+      setCurrentPage(1);
+      fetchCutiList();
+    };
+    window.addEventListener('role-changed', handleRoleChanged);
+    return () => window.removeEventListener('role-changed', handleRoleChanged);
+  }, [userRole]);
 
   const [editingId, setEditingId] = useState(null);
 
@@ -246,8 +253,8 @@ export const CutiPage = () => {
       if (editingId) {
         await apiClient.putForm(`/api/leave/${editingId}`, {
           jenis_cuti_id: jenisCuti,
-          tanggal_mulai: tanggalMulai,
-          tanggal_selesai: tanggalSelesai,
+          tanggal_mulai: formatInputDate(tanggalMulai),
+          tanggal_selesai: formatInputDate(tanggalSelesai),
           jumlah_hari: lamaCutiHari,
           alasan: alasan.trim(),
           nip_atasan: nipAtasan,
@@ -264,8 +271,8 @@ export const CutiPage = () => {
           fakultas: user?.fakultas || '',
           prodi: user?.prodi || '',
           jenis_cuti_id: jenisCuti,
-          tanggal_mulai: tanggalMulai,
-          tanggal_selesai: tanggalSelesai,
+          tanggal_mulai: formatInputDate(tanggalMulai),
+          tanggal_selesai: formatInputDate(tanggalSelesai),
           jumlah_hari: lamaCutiHari,
           alasan: alasan.trim(),
           nip_atasan: nipAtasan,
@@ -343,6 +350,23 @@ export const CutiPage = () => {
     );
 
     if (!matchesSearch) return false;
+
+    // Filter status for SDM / BAUM mode: only show terima atasan, terima sdm, tolak sdm
+    if (isSdmOrBaum) {
+      const st = (item.status || '').toLowerCase().trim();
+      const isAllowedSdmStatus = 
+        st.includes('terima atasan') ||
+        st.includes('terima sdm') ||
+        st.includes('tolak sdm') ||
+        st.includes('disetujui atasan') ||
+        st.includes('disetujui sdm') ||
+        st.includes('ditolak sdm') ||
+        st.includes('acc atasan') ||
+        st.includes('acc sdm') ||
+        st.includes('proses sdm');
+
+      if (!isAllowedSdmStatus) return false;
+    }
 
     // In Tendik/Dosen mode, when on Verifikasi Atasan tab, match supervisor verifikasi NIP/username
     if (!isSdmOrBaum && activeTab === 'verifikasi') {

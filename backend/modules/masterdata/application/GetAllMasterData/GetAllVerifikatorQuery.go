@@ -26,3 +26,21 @@ func (h *GetAllVerifikatorQueryHandler) Handle(ctx context.Context, query *GetAl
 	}
 	return common.SuccessValue(list), nil
 }
+
+type GetAllPeopleQuery struct{}
+
+type GetAllPeopleQueryHandler struct {
+	repo domain.IMasterDataRepository
+}
+
+func NewGetAllPeopleQueryHandler(repo domain.IMasterDataRepository) *GetAllPeopleQueryHandler {
+	return &GetAllPeopleQueryHandler{repo: repo}
+}
+
+func (h *GetAllPeopleQueryHandler) Handle(ctx context.Context, query *GetAllPeopleQuery) (common.ResultValue[[]domain.Verifikator], error) {
+	list, err := h.repo.GetPeople(ctx)
+	if err != nil {
+		return common.FailureValue[[]domain.Verifikator](common.FailureError("MasterData.PeopleFailed", err.Error())), nil
+	}
+	return common.SuccessValue(list), nil
+}

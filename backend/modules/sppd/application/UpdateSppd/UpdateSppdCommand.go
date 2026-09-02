@@ -128,6 +128,9 @@ func (h *UpdateSppdCommandHandler) Handle(ctx context.Context, cmd *UpdateSppdCo
 	if cmd.Catatan != nil {
 		sppd.Catatan = cmd.Catatan
 	}
+	sppd.TanggalBerangkat = common.FormatDateOnly(sppd.TanggalBerangkat)
+	sppd.TanggalKembali = common.FormatDateOnly(sppd.TanggalKembali)
+	sppd.UpdatedAt = &now
 	if cmd.Intisari != nil {
 		sppd.Intisari = cmd.Intisari
 	}

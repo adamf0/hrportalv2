@@ -105,6 +105,38 @@ export const SppdPage = () => {
     fetchSupervisors();
   }, []);
 
+  const [peopleOptions, setPeopleOptions] = useState([]);
+
+  useEffect(() => {
+    const fetchPeople = async () => {
+      try {
+        const res = await apiClient.get('/api/masterdata/people');
+        let list = [];
+        if (Array.isArray(res)) {
+          list = res;
+        } else if (res?.data && Array.isArray(res.data)) {
+          list = res.data;
+        }
+        const options = list.map((item) => {
+          const nipStr = item.nip || item.Nip || item.value || '';
+          const nameStr = item.nama || item.Nama || item.label || item.name || 'Pegawai';
+          const jabatanStr = item.unit || item.struktural || item.jabatan || item.subtitle || '';
+          return {
+            value: nipStr,
+            nip: nipStr,
+            label: nameStr,
+            name: nameStr,
+            subtitle: jabatanStr.startsWith('NIP:') ? jabatanStr : (jabatanStr ? `NIP: ${nipStr} • ${jabatanStr}` : `NIP: ${nipStr}`),
+          };
+        });
+        setPeopleOptions(options);
+      } catch (err) {
+        console.error('Error fetching people masterdata from backend:', err);
+      }
+    };
+    fetchPeople();
+  }, []);
+
   // Form State (DEFAULT NULL AS REQUESTED)
   const [jenisSppd, setJenisSppd] = useState(null);
   const [tanggalBerangkat, setTanggalBerangkat] = useState('');
@@ -142,8 +174,42 @@ export const SppdPage = () => {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchSppdList();
-  }, []);
+    const handleRoleChanged = () => {
+      setCurrentPage(1);
+      fetchSppdList();
+    };
+    window.addEventListener('role-changed', handleRoleChanged);
+    return () => window.removeEventListener('role-changed', handleRoleChanged);
+  }, [userRole]);
+
+  const [selectedAnggotaOption, setSelectedAnggotaOption] = useState(null);
+
+  const handleSelectAnggotaMember = (selectedVal) => {
+    if (!selectedVal) return;
+    const allOptions = [...peopleOptions, ...supervisorOptions];
+    const foundOpt = allOptions.find((o) => String(o.value) === String(selectedVal));
+    if (!foundOpt) return;
+
+    const exists = anggotaList.some((m) => String(m.nip || m.nama) === String(foundOpt.nip || foundOpt.name));
+    if (exists) {
+      showToast(`${foundOpt.name} sudah ada dalam daftar anggota rombongan.`, 'warning');
+      setSelectedAnggotaOption(null);
+      return;
+    }
+
+    setAnggotaList([
+      ...anggotaList,
+      {
+        nip: foundOpt.nip || '',
+        nama: foundOpt.name || foundOpt.label || '',
+        unit: foundOpt.subtitle || '',
+      },
+    ]);
+    showToast(`Berhasil menambahkan ${foundOpt.name} ke rombongan.`, 'success');
+    setSelectedAnggotaOption(null);
+  };
 
   const handleAddMember = () => {
     if (!anggotaNama.trim()) return;
@@ -212,8 +278,8 @@ export const SppdPage = () => {
       if (editingId) {
         await apiClient.putForm(`/api/sppd/${editingId}`, {
           jenis_sppd_id: jenisSppd,
-          tanggal_berangkat: tanggalBerangkat,
-          tanggal_kembali: tanggalKembali,
+          tanggal_berangkat: formatInputDate(tanggalBerangkat),
+          tanggal_kembali: formatInputDate(tanggalKembali),
           tujuan: tujuan.trim(),
           keterangan: `Atasan: ${verifikasi} | ${keterangan.trim()}`,
           verifikasi: verifikasi,
@@ -229,8 +295,8 @@ export const SppdPage = () => {
           fakultas: user?.fakultas || '',
           prodi: user?.prodi || '',
           jenis_sppd_id: jenisSppd,
-          tanggal_berangkat: tanggalBerangkat,
-          tanggal_kembali: tanggalKembali,
+          tanggal_berangkat: formatInputDate(tanggalBerangkat),
+          tanggal_kembali: formatInputDate(tanggalKembali),
           tujuan: tujuan.trim(),
           keterangan: `Atasan: ${verifikasi} | ${keterangan.trim()}`,
           verifikasi: verifikasi,
@@ -307,6 +373,23 @@ export const SppdPage = () => {
     );
 
     if (!matchesSearch) return false;
+
+    // Filter status for SDM / BAUM mode: only show terima atasan, terima sdm, tolak sdm
+    if (isSdmOrBaum) {
+      const st = (item.status || '').toLowerCase().trim();
+      const isAllowedSdmStatus = 
+        st.includes('terima atasan') ||
+        st.includes('terima sdm') ||
+        st.includes('tolak sdm') ||
+        st.includes('disetujui atasan') ||
+        st.includes('disetujui sdm') ||
+        st.includes('ditolak sdm') ||
+        st.includes('acc atasan') ||
+        st.includes('acc sdm') ||
+        st.includes('proses sdm');
+
+      if (!isAllowedSdmStatus) return false;
+    }
 
     // In Tendik/Dosen mode, when on Verifikasi Atasan tab, match supervisor verifikasi NIP/username
     if (!isSdmOrBaum && activeTab === 'verifikasi') {
@@ -473,26 +556,73 @@ export const SppdPage = () => {
                 <textarea className="bm-input" rows={2} placeholder="Maksud tugas dinas..." value={keterangan} onChange={(e) => setKeterangan(e.target.value)} />
               </div>
 
-              {/* Anggota Rombongan */}
+              {/* Anggota Rombongan Tim (Searchable Select from Backend Masterdata) */}
               <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#4f46e5', marginBottom: '8px' }}>
                   Anggota Rombongan Tim (Opsional)
                 </label>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                  <input type="text" className="bm-input" placeholder="Nama Anggota" value={anggotaNama} onChange={(e) => setAnggotaNama(e.target.value)} style={{ flex: 2 }} />
-                  <input type="text" className="bm-input" placeholder="NIP Anggota" value={anggotaNip} onChange={(e) => setAnggotaNip(e.target.value)} style={{ flex: 1 }} />
-                  <button type="button" onClick={handleAddMember} style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#e0e7ff', color: '#4338ca', fontWeight: 700, cursor: 'pointer' }}>
-                    +
-                  </button>
+
+                {/* Searchable Select from Backend Masterdata */}
+                <div style={{ marginBottom: '10px' }}>
+                  <SearchableSelect
+                    options={peopleOptions.length > 0 ? peopleOptions : supervisorOptions}
+                    value={selectedAnggotaOption}
+                    onChange={(val) => handleSelectAnggotaMember(val)}
+                    placeholder="Search & pilih nama / NIP anggota rombongan..."
+                    searchPlaceholder="Ketik nama atau NIP pegawai..."
+                  />
                 </div>
+
+                {/* Badges List Anggota Terpilih */}
                 {anggotaList.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {anggotaList.map((m, i) => (
-                      <span key={i} style={{ padding: '4px 10px', borderRadius: '8px', background: '#f9fafb', border: '1px solid #e5e7eb', fontSize: '0.75rem', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {m.nama} ({m.nip || 'N/A'})
-                        <button type="button" onClick={() => handleRemoveMember(i)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 800 }}>×</button>
-                      </span>
-                    ))}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '10px' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4b5563' }}>
+                      Daftar Anggota Terpilih ({anggotaList.length} orang):
+                    </span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {anggotaList.map((m, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            background: '#e0e7ff',
+                            border: '1px solid #c7d2fe',
+                            fontSize: '0.75rem',
+                            color: '#3730a3',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                          }}
+                        >
+                          👤 {m.nama} {m.nip ? `(${m.nip})` : ''}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMember(i)}
+                            style={{
+                              background: '#ef4444',
+                              border: 'none',
+                              color: '#ffffff',
+                              borderRadius: '9999px',
+                              width: '16px',
+                              height: '16px',
+                              fontSize: '0.75rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              lineHeight: 1,
+                              fontWeight: 800,
+                              marginLeft: '2px',
+                            }}
+                            title="Hapus Anggota"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

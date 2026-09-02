@@ -104,33 +104,7 @@ func registerMasterDataRoutes(group fiber.Router, db *gorm.DB, dbSimpegNew *gorm
 		var units []MasterUnit
 		err := targetDB.Table("master_units").Find(&units).Error
 		if err != nil || len(units) == 0 {
-			type UnitResult struct {
-				NamaUnit string `json:"nama_unit"`
-				Nama     string `json:"nama"`
-				KodeUnit string `json:"kode_unit"`
-			}
-			var fallbackUnits []UnitResult
-			errFallback := db.Table("connect_payroll_m_pegawai").
-				Select("DISTINCT unit as nama_unit, unit as nama, unit as kode_unit").
-				Where("unit IS NOT NULL AND unit != ''").
-				Scan(&fallbackUnits).Error
-
-			if errFallback == nil && len(fallbackUnits) > 0 {
-				return c.JSON(fallbackUnits)
-			}
-
-			defaultUnits := []fiber.Map{
-				{"id": 1, "kode_unit": "FT", "nama_unit": "Fakultas Teknik", "nama": "Fakultas Teknik", "unit": "Fakultas Teknik"},
-				{"id": 2, "kode_unit": "FEB", "nama_unit": "Fakultas Ekonomi & Bisnis", "nama": "Fakultas Ekonomi & Bisnis", "unit": "Fakultas Ekonomi & Bisnis"},
-				{"id": 3, "kode_unit": "FKIP", "nama_unit": "Fakultas Keguruan & Ilmu Pendidikan", "nama": "Fakultas Keguruan & Ilmu Pendidikan", "unit": "Fakultas Keguruan & Ilmu Pendidikan"},
-				{"id": 4, "kode_unit": "FH", "nama_unit": "Fakultas Hukum", "nama": "Fakultas Hukum", "unit": "Fakultas Hukum"},
-				{"id": 5, "kode_unit": "FMIPA", "nama_unit": "Fakultas MIPA", "nama": "Fakultas MIPA", "unit": "Fakultas MIPA"},
-				{"id": 6, "kode_unit": "FISIB", "nama_unit": "Fakultas Ilmu Sosial & Ilmu Budaya", "nama": "Fakultas Ilmu Sosial & Ilmu Budaya", "unit": "Fakultas Ilmu Sosial & Ilmu Budaya"},
-				{"id": 7, "kode_unit": "SV", "nama_unit": "Sekolah Vokasi", "nama": "Sekolah Vokasi", "unit": "Sekolah Vokasi"},
-				{"id": 8, "kode_unit": "SPS", "nama_unit": "Sekolah Pascasarjana", "nama": "Sekolah Pascasarjana", "unit": "Sekolah Pascasarjana"},
-				{"id": 9, "kode_unit": "SDM", "nama_unit": "Biro SDM & Kepegawaian", "nama": "Biro SDM & Kepegawaian", "unit": "Biro SDM & Kepegawaian"},
-			}
-			return c.JSON(defaultUnits)
+			return c.JSON(units)
 		}
 
 		for i := range units {
@@ -185,7 +159,7 @@ func registerMasterDataRoutes(group fiber.Router, db *gorm.DB, dbSimpegNew *gorm
 	})
 
 	group.Get("/verifikator", func(c *fiber.Ctx) error {
-		q := &query.GetAllVerifikatorQuery{Type: c.Query("type")}
+		q := &query.GetAllVerifikatorQuery{}
 		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
 		if err != nil {
 			return infrastructure.HandleError(c, err)
@@ -196,33 +170,21 @@ func registerMasterDataRoutes(group fiber.Router, db *gorm.DB, dbSimpegNew *gorm
 		return c.JSON(res.Value)
 	})
 
-	group.Get("/supervisors", func(c *fiber.Ctx) error {
-		q := &query.GetAllVerifikatorQuery{Type: c.Query("type")}
-		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-		return c.JSON(res.Value)
-	})
-
-	group.Get("/atasan", func(c *fiber.Ctx) error {
-		q := &query.GetAllVerifikatorQuery{Type: c.Query("type")}
-		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-		return c.JSON(res.Value)
-	})
+	// group.Get("/atasan", func(c *fiber.Ctx) error {
+	// 	q := &query.GetAllVerifikatorQuery{}
+	// 	res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
+	// 	if err != nil {
+	// 		return infrastructure.HandleError(c, err)
+	// 	}
+	// 	if !res.IsSuccess {
+	// 		return infrastructure.HandleError(c, res.Error)
+	// 	}
+	// 	return c.JSON(res.Value)
+	// })
 
 	group.Get("/people", func(c *fiber.Ctx) error {
-		q := &query.GetAllVerifikatorQuery{Type: c.Query("type")}
-		res, err := mediatr.Send[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
+		q := &query.GetAllPeopleQuery{}
+		res, err := mediatr.Send[*query.GetAllPeopleQuery, common.ResultValue[[]domain.Verifikator]](c.UserContext(), q)
 		if err != nil {
 			return infrastructure.HandleError(c, err)
 		}

@@ -9,49 +9,97 @@ import (
 )
 
 type MasterDataRepository struct {
-	db *gorm.DB
+	db          *gorm.DB
+	dbSimak     *gorm.DB
+	dbSimpeg    *gorm.DB
+	dbSimpegNew *gorm.DB
 }
 
-func NewMasterDataRepository(db *gorm.DB) domain.IMasterDataRepository {
-	return &MasterDataRepository{db: db}
+func NewMasterDataRepository(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB, dbSimpegNew *gorm.DB) domain.IMasterDataRepository {
+	return &MasterDataRepository{db: db, dbSimak: dbSimak, dbSimpeg: dbSimpeg, dbSimpegNew: dbSimpegNew}
 }
 
 func (r *MasterDataRepository) GetAllFakultas(ctx context.Context) ([]domain.Fakultas, error) {
-	if r == nil || r.db == nil {
+	if r == nil {
 		return []domain.Fakultas{}, nil
 	}
-	var list []domain.Fakultas
-	err := r.db.WithContext(ctx).Find(&list).Error
-	if err != nil {
-		return nil, err
+	targetDB := r.dbSimak
+	if targetDB == nil {
+		targetDB = r.db
 	}
+	if targetDB == nil {
+		return []domain.Fakultas{}, nil
+	}
+
+	var list []domain.Fakultas
+	// Try table m_fakultas on SIMAK DB
+	err := targetDB.WithContext(ctx).Table("m_fakultas").Find(&list).Error
+	if err != nil || len(list) == 0 {
+		// Fallback to connect_m_fakultas or default table
+		err = r.db.WithContext(ctx).Table("connect_m_fakultas").Find(&list).Error
+	}
+	if err != nil && len(list) == 0 {
+		err = r.db.WithContext(ctx).Find(&list).Error
+	}
+
 	for i := range list {
-		list[i].ID = list[i].KodeFakultas
-		list[i].Kode = list[i].KodeFakultas
-		list[i].Nama = list[i].NamaFakultas
+		if list[i].KodeFakultas != "" {
+			list[i].ID = list[i].KodeFakultas
+			list[i].Kode = list[i].KodeFakultas
+		}
+		if list[i].NamaFakultas != "" {
+			list[i].Nama = list[i].NamaFakultas
+		}
 	}
 	return list, nil
 }
 
 func (r *MasterDataRepository) GetAllProdi(ctx context.Context) ([]domain.Prodi, error) {
-	if r == nil || r.db == nil {
+	if r == nil {
 		return []domain.Prodi{}, nil
 	}
-	var rawList []domain.Prodi
-	err := r.db.WithContext(ctx).Where("LOWER(nama_prodi) NOT LIKE '%isi nama ps%'").Find(&rawList).Error
-	if err != nil {
-		return nil, err
+	targetDB := r.dbSimak
+	if targetDB == nil {
+		targetDB = r.db
 	}
+	if targetDB == nil {
+		return []domain.Prodi{}, nil
+	}
+
+	var rawList []domain.Prodi
+	// Try table r_prodi on SIMAK DB
+	err := targetDB.WithContext(ctx).Table("r_prodi").
+		Where("LOWER(nama_prodi) NOT LIKE '%isi nama ps%'").
+		Find(&rawList).Error
+
+	if err != nil || len(rawList) == 0 {
+		// Fallback to connect_r_prodi or default table
+		err = r.db.WithContext(ctx).Table("connect_r_prodi").
+			Where("LOWER(nama_prodi) NOT LIKE '%isi nama ps%'").
+			Find(&rawList).Error
+	}
+	if err != nil && len(rawList) == 0 {
+		err = r.db.WithContext(ctx).
+			Where("LOWER(nama_prodi) NOT LIKE '%isi nama ps%'").
+			Find(&rawList).Error
+	}
+
 	var list []domain.Prodi
 	for i := range rawList {
 		namaLower := strings.ToLower(rawList[i].NamaProdi)
 		if strings.Contains(namaLower, "isi nama ps") {
 			continue
 		}
-		rawList[i].ID = rawList[i].KodeProdi
-		rawList[i].FakultasID = rawList[i].KodeFakultas
-		rawList[i].Kode = rawList[i].KodeProdi
-		rawList[i].Nama = rawList[i].NamaProdi
+		if rawList[i].KodeProdi != "" {
+			rawList[i].ID = rawList[i].KodeProdi
+			rawList[i].Kode = rawList[i].KodeProdi
+		}
+		if rawList[i].KodeFakultas != "" {
+			rawList[i].FakultasID = rawList[i].KodeFakultas
+		}
+		if rawList[i].NamaProdi != "" {
+			rawList[i].Nama = rawList[i].NamaProdi
+		}
 		list = append(list, rawList[i])
 	}
 	return list, nil
@@ -84,31 +132,74 @@ func (r *MasterDataRepository) GetAllJenisSppd(ctx context.Context) ([]domain.Je
 	return list, err
 }
 
-func (r *MasterDataRepository) GetVerifikators(ctx context.Context, verifikatorType string) ([]domain.Verifikator, error) {
-	if r == nil || r.db == nil {
+func (r *MasterDataRepository) GetPeople(ctx context.Context) ([]domain.Verifikator, error) {
+	if r == nil {
 		return []domain.Verifikator{}, nil
 	}
-	var list []domain.Verifikator
-	query := r.db.WithContext(ctx).Table("connect_payroll_m_pegawai").
-		Where("CHAR_LENGTH(nip) >= 3").
-		Where("struktural != ''")
 
-	err := query.Find(&list).Error
-	if err != nil {
-		return nil, err
+	var rawPeople []struct {
+		Nip      string `gorm:"column:nip"`
+		Nama     string `gorm:"column:nama"`
+		NamaUnit string `gorm:"column:nama_unit"`
 	}
 
-	if verifikatorType == "sppd" || verifikatorType == "verifikator" {
-		var filtered []domain.Verifikator
-		for _, v := range list {
-			strukturalLower := strings.ToLower(v.Struktural)
-			if strings.Contains(strukturalLower, "wakil rektor bid sdm dan keuangan") ||
-				strings.Contains(strukturalLower, "wakil dekan 2") ||
-				strings.Contains(strukturalLower, "wakil dekan ii") {
-				filtered = append(filtered, v)
-			}
+	targetDB := r.dbSimpegNew
+	if targetDB == nil {
+		targetDB = r.db
+	}
+
+	if len(rawPeople) == 0 && targetDB != nil {
+		_ = targetDB.WithContext(ctx).
+			Table("pegawais").
+			Select("nip, nama, '' as nama_unit").
+			Where("nip IS NOT NULL AND nip != ''").
+			Order("nama asc").
+			// Limit(2000).
+			Scan(&rawPeople).Error
+	}
+
+	var list []domain.Verifikator
+	seen := make(map[string]bool)
+	for _, p := range rawPeople {
+		nipClean := strings.TrimSpace(p.Nip)
+		namaClean := strings.TrimSpace(p.Nama)
+		if nipClean == "" || namaClean == "" || seen[nipClean] {
+			continue
 		}
-		return filtered, nil
+		seen[nipClean] = true
+		unitStr := p.NamaUnit
+		list = append(list, domain.Verifikator{
+			Nip:        nipClean,
+			Nama:       namaClean,
+			Struktural: unitStr,
+		})
+	}
+	return list, nil
+}
+
+func (r *MasterDataRepository) GetVerifikators(ctx context.Context, verifikatorType string) ([]domain.Verifikator, error) {
+	if r == nil {
+		return []domain.Verifikator{}, nil
+	}
+
+	targetDB := r.dbSimpeg
+	if targetDB == nil {
+		targetDB = r.db
+	}
+	if targetDB == nil {
+		return []domain.Verifikator{}, nil
+	}
+
+	var list []domain.Verifikator
+
+	err := targetDB.WithContext(ctx).Table("payroll_m_pegawai").
+		Where("CHAR_LENGTH(nip) >= 3").
+		Where("LENGTH(TRIM(struktural)) > 0").
+		Order("nama asc").
+		Find(&list).Error
+
+	if err != nil {
+		return []domain.Verifikator{}, err
 	}
 
 	return list, nil

@@ -65,9 +65,7 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 		if tanggal_mulai != nil && *tanggal_mulai != "" && tanggal_akhir != nil && *tanggal_akhir != "" {
 			query = query.Where("tanggal_berangkat >= ? and tanggal_kembali <= ?", *tanggal_mulai, *tanggal_akhir)
 		}
-		if nip == "" && nidn == "" {
-			query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui sdm", "proses sdm", "%sdm%")
-		}
+		query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui atasan", "disetujui sdm", "ditolak sdm", "acc atasan", "acc sdm", "proses sdm", "%sdm%")
 	} else if verifikasi {
 		if nip != "" && nidn != "" {
 			query = query.Where("verifikasi = ? or verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)

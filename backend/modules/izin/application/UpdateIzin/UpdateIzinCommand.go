@@ -85,6 +85,7 @@ func (h *UpdateIzinCommandHandler) Handle(ctx context.Context, cmd *UpdateIzinCo
 	if cmd.Catatan != nil {
 		izin.Catatan = cmd.Catatan
 	}
+	izin.TanggalPengajuan = common.FormatDateOnly(izin.TanggalPengajuan)
 	izin.UpdatedAt = &now
 
 	var db *gorm.DB

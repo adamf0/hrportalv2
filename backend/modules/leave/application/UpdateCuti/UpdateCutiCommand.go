@@ -86,6 +86,8 @@ func (h *UpdateCutiCommandHandler) Handle(ctx context.Context, cmd *UpdateCutiCo
 	if cmd.CatatanAtasan != nil {
 		cuti.CatatanAtasan = cmd.CatatanAtasan
 	}
+	cuti.TanggalMulai = common.FormatDateOnly(cuti.TanggalMulai)
+	cuti.TanggalSelesai = common.FormatDateOnly(cuti.TanggalSelesai)
 	cuti.UpdatedAt = &now
 
 	var db *gorm.DB

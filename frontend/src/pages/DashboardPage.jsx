@@ -30,7 +30,8 @@ import {
   Smile,
   Globe,
   ExternalLink,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Smartphone
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
@@ -372,7 +373,13 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
   useEffect(() => {
     fetchDashboardData();
     fetchActiveKuesioners();
-  }, []);
+    const handleRoleChanged = () => {
+      fetchDashboardData();
+      fetchActiveKuesioners();
+    };
+    window.addEventListener('role-changed', handleRoleChanged);
+    return () => window.removeEventListener('role-changed', handleRoleChanged);
+  }, [userRole]);
 
   // --- Helper Date Range Filter ---
   const isDateInPeriod = (dateInput) => {
@@ -628,6 +635,49 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      {/* MOBILE APP ANNOUNCEMENT BANNER */}
+      <div
+        className="bm-card"
+        style={{
+          padding: '16px 22px',
+          background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+          border: '1px solid #bfdbfe',
+          borderRadius: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          boxShadow: '0 4px 14px rgba(59, 130, 246, 0.08)',
+        }}
+      >
+        <div
+          style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: '#2563eb',
+            color: '#ffffff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            boxShadow: '0 4px 10px rgba(37, 99, 235, 0.25)',
+          }}
+        >
+          <Smartphone size={22} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1e3a8a', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Informasi Aplikasi Mobile</span>
+            <span style={{ padding: '2px 8px', borderRadius: '9999px', background: '#2563eb', color: '#ffffff', fontSize: '0.7rem', fontWeight: 800 }}>
+              Pengumuman
+            </span>
+          </div>
+          <p style={{ fontSize: '0.85rem', color: '#1e40af', marginTop: '3px', fontWeight: 600, lineHeight: 1.4 }}>
+            Sistem akan mendapatkan versi android dan ios dalam waktu belum di tentukan. Pengajuan, presensi &amp; presensi upacara menjadi lebih mudah.
+          </p>
+        </div>
+      </div>
+
       {/* 3D HEADER GREETING BANNER */}
       <div
         className="bm-card animate-glow"

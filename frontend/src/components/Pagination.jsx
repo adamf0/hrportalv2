@@ -38,28 +38,38 @@ export const Pagination = ({
         flexWrap: 'wrap',
         gap: '16px',
         padding: '16px 20px',
-        borderTop: '1px solid var(--border-light)',
+        borderTop: '1px solid #e2e8f0',
         background: '#ffffff',
-        borderBottomLeftRadius: 'var(--radius-lg)',
-        borderBottomRightRadius: 'var(--radius-lg)',
+        borderBottomLeftRadius: '12px',
+        borderBottomRightRadius: '12px',
       }}
     >
-      {/* Summary & Page Size */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+      {/* Summary & Page Size Selector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.85rem', color: '#64748b' }}>
         <span>
-          Menampilkan <strong style={{ color: 'var(--text-main)' }}>{startItem}</strong>–
-          <strong style={{ color: 'var(--text-main)' }}>{endItem}</strong> dari{' '}
-          <strong style={{ color: 'var(--text-main)' }}>{totalItems}</strong> data
+          Menampilkan <strong style={{ color: '#0f172a', fontWeight: 800 }}>{startItem}</strong>–
+          <strong style={{ color: '#0f172a', fontWeight: 800 }}>{endItem}</strong> dari{' '}
+          <strong style={{ color: '#0f172a', fontWeight: 800 }}>{totalItems}</strong> data
         </span>
 
         {onItemsPerPageChange && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '0.8rem' }}>Baris per halaman:</span>
+            <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Baris per halaman:</span>
             <select
-              className="form-select"
               value={itemsPerPage}
               onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
-              style={{ padding: '4px 8px', fontSize: '0.8rem', width: 'auto' }}
+              style={{
+                padding: '4px 10px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#0f172a',
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '6px',
+                outline: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+              }}
             >
               {itemsPerPageOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -74,6 +84,7 @@ export const Pagination = ({
       {/* Navigation Buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
         <button
+          type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
           style={{
@@ -83,11 +94,11 @@ export const Pagination = ({
             width: '32px',
             height: '32px',
             borderRadius: '6px',
-            border: '1px solid var(--border-light)',
+            border: '1px solid #e2e8f0',
             background: currentPage <= 1 ? '#f8fafc' : '#ffffff',
-            color: currentPage <= 1 ? '#cbd5e1' : 'var(--text-main)',
+            color: currentPage <= 1 ? '#cbd5e1' : '#334155',
             cursor: currentPage <= 1 ? 'not-allowed' : 'pointer',
-            transition: 'all 0.15s',
+            transition: 'all 0.15s ease',
           }}
           title="Halaman Sebelumnya"
         >
@@ -97,7 +108,7 @@ export const Pagination = ({
         {getPageNumbers().map((p, idx) => {
           if (p === '...') {
             return (
-              <span key={`dots-${idx}`} style={{ padding: '0 4px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              <span key={`dots-${idx}`} style={{ padding: '0 4px', color: '#94a3b8', fontSize: '0.85rem' }}>
                 ...
               </span>
             );
@@ -107,6 +118,7 @@ export const Pagination = ({
           return (
             <button
               key={p}
+              type="button"
               onClick={() => onPageChange(p)}
               style={{
                 display: 'flex',
@@ -116,13 +128,14 @@ export const Pagination = ({
                 height: '32px',
                 padding: '0 8px',
                 borderRadius: '6px',
-                border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--border-light)',
-                background: isActive ? 'var(--color-primary)' : '#ffffff',
-                color: isActive ? '#ffffff' : 'var(--text-main)',
-                fontWeight: isActive ? 700 : 500,
+                border: isActive ? '1px solid #10b981' : '1px solid #e2e8f0',
+                background: isActive ? '#10b981' : '#ffffff',
+                color: isActive ? '#ffffff' : '#334155',
+                fontWeight: isActive ? 800 : 600,
                 fontSize: '0.85rem',
                 cursor: 'pointer',
-                transition: 'all 0.15s',
+                boxShadow: isActive ? '0 2px 4px rgba(16, 185, 129, 0.25)' : 'none',
+                transition: 'all 0.15s ease',
               }}
             >
               {p}
@@ -131,6 +144,7 @@ export const Pagination = ({
         })}
 
         <button
+          type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
           style={{
@@ -140,11 +154,11 @@ export const Pagination = ({
             width: '32px',
             height: '32px',
             borderRadius: '6px',
-            border: '1px solid var(--border-light)',
+            border: '1px solid #e2e8f0',
             background: currentPage >= totalPages ? '#f8fafc' : '#ffffff',
-            color: currentPage >= totalPages ? '#cbd5e1' : 'var(--text-main)',
+            color: currentPage >= totalPages ? '#cbd5e1' : '#334155',
             cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer',
-            transition: 'all 0.15s',
+            transition: 'all 0.15s ease',
           }}
           title="Halaman Berikutnya"
         >

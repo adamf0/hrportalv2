@@ -137,8 +137,15 @@ export const IzinPage = () => {
   };
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchIzinList();
-  }, []);
+    const handleRoleChanged = () => {
+      setCurrentPage(1);
+      fetchIzinList();
+    };
+    window.addEventListener('role-changed', handleRoleChanged);
+    return () => window.removeEventListener('role-changed', handleRoleChanged);
+  }, [userRole]);
 
   const [editingId, setEditingId] = useState(null);
 
@@ -192,7 +199,7 @@ export const IzinPage = () => {
       if (editingId) {
         await apiClient.putForm(`/api/izin/${editingId}`, {
           id_jenis_izin: jenisIzin,
-          tanggal_pengajuan: tanggalPengajuan,
+          tanggal_pengajuan: formatInputDate(tanggalPengajuan),
           tujuan: tujuan.trim(),
           verifikasi: verifikasi,
           file_lampiran: fileLampiran,
@@ -207,7 +214,7 @@ export const IzinPage = () => {
           fakultas: user?.fakultas || '',
           prodi: user?.prodi || '',
           id_jenis_izin: jenisIzin,
-          tanggal_pengajuan: tanggalPengajuan,
+          tanggal_pengajuan: formatInputDate(tanggalPengajuan),
           tujuan: tujuan.trim(),
           verifikasi: verifikasi,
           file_lampiran: fileLampiran,
@@ -283,6 +290,23 @@ export const IzinPage = () => {
     );
 
     if (!matchesSearch) return false;
+
+    // Filter status for SDM / BAUM mode: only show terima atasan, terima sdm, tolak sdm
+    if (isSdmOrBaum) {
+      const st = (item.status || '').toLowerCase().trim();
+      const isAllowedSdmStatus = 
+        st.includes('terima atasan') ||
+        st.includes('terima sdm') ||
+        st.includes('tolak sdm') ||
+        st.includes('disetujui atasan') ||
+        st.includes('disetujui sdm') ||
+        st.includes('ditolak sdm') ||
+        st.includes('acc atasan') ||
+        st.includes('acc sdm') ||
+        st.includes('proses sdm');
+
+      if (!isAllowedSdmStatus) return false;
+    }
 
     // In Tendik/Dosen mode, when on Verifikasi Atasan tab, match supervisor verifikasi NIP/username
     if (!isSdmOrBaum && activeTab === 'verifikasi') {

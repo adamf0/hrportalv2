@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func RegisterModuleMasterData(db *gorm.DB) error {
-	repo := NewMasterDataRepository(db)
+func RegisterModuleMasterData(db *gorm.DB, dbSimak *gorm.DB, dbSimpeg *gorm.DB, dbSimpegNew *gorm.DB) error {
+	repo := NewMasterDataRepository(db, dbSimak, dbSimpeg, dbSimpegNew)
 
 	err := mediatr.RegisterRequestHandler[*query.GetAllFakultasQuery, common.ResultValue[[]domain.Fakultas]](
 		query.NewGetAllFakultasQueryHandler(repo),
@@ -49,6 +49,13 @@ func RegisterModuleMasterData(db *gorm.DB) error {
 
 	err = mediatr.RegisterRequestHandler[*query.GetAllVerifikatorQuery, common.ResultValue[[]domain.Verifikator]](
 		query.NewGetAllVerifikatorQueryHandler(repo),
+	)
+	if err != nil {
+		return err
+	}
+
+	err = mediatr.RegisterRequestHandler[*query.GetAllPeopleQuery, common.ResultValue[[]domain.Verifikator]](
+		query.NewGetAllPeopleQueryHandler(repo),
 	)
 	if err != nil {
 		return err

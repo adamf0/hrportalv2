@@ -293,7 +293,7 @@ func main() {
 	})
 
 	mustStart("MasterData Module", func() error {
-		return masterdataInfrastructure.RegisterModuleMasterData(db)
+		return masterdataInfrastructure.RegisterModuleMasterData(db, dbSimak, dbSimpeg, dbSimpegNew)
 	})
 
 	mustStart("Notification Module", func() error {
