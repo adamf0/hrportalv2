@@ -10,9 +10,10 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+RUN [ -f /app/firebase-service-account.json ] || echo '{}' > /app/firebase-service-account.json
 
 # Build Notification Service binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/notificationservice ./cmd/notificationservice/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/notificationservice ./cmd/notificationservice
 
 # Production Stage
 FROM alpine:3.19

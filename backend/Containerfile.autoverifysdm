@@ -13,9 +13,10 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+RUN [ -f /app/firebase-service-account.json ] || echo '{}' > /app/firebase-service-account.json
 
 # Build SDM Auto-Verify Worker binary
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/autoverifysdm ./cmd/autoverifysdm/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/autoverifysdm ./cmd/autoverifysdm
 
 # Production Stage
 FROM alpine:3.19

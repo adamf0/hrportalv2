@@ -13,6 +13,7 @@ RUN go mod download
 
 # Copy source code
 COPY . .
+RUN [ -f /app/firebase-service-account.json ] || echo '{}' > /app/firebase-service-account.json
 
 # Build API binary
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/bin/hrportal_api ./main.go
