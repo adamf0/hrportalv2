@@ -1,0 +1,10 @@
+.git
+.gitignore
+.DS_Store
+bin/
+app
+server
+exports/
+scratch/
+*.log
+*.tmp

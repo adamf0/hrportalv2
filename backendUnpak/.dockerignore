@@ -1,0 +1,11 @@
+.git
+.gitignore
+.DS_Store
+bin/
+app
+app_local
+server
+exports/
+scratch/
+*.log
+*.tmp
