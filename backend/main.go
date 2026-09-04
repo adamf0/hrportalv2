@@ -177,43 +177,34 @@ func main() {
 
 	isCors := os.Getenv("ALLOW_CORS")
 	origins := os.Getenv("ALLOWED_ORIGINS")
+	_ = isCors
 
-	if isCors == "0" {
-		app.Use(cors.New(cors.Config{
-			AllowOrigins:     "http://localhost:4000",
-			AllowMethods:     "GET,POST,PUT,PATCH,DELETE",
-			AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-			AllowCredentials: true,
-		}))
-	} else {
-		app.Use(cors.New(cors.Config{
-			AllowOriginsFunc: func(origin string) bool {
-				if origin == "" {
-					return true
-				}
+	app.Use(cors.New(cors.Config{
+		AllowOriginsFunc: func(origin string) bool {
+			if origin == "" {
+				return true
+			}
+			if origins != "" {
 				allowed := strings.Split(origins, ",")
 				for _, o := range allowed {
 					if strings.TrimSpace(o) == origin {
 						return true
 					}
 				}
-				return true
-			},
-			AllowMethods:     "GET,POST,PUT,PATCH,DELETE",
-			AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
-			AllowCredentials: true,
-		}))
-	}
+			}
+			return true
+		},
+		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, X-Active-Role, X-Role, X-Requested-With, X-Custom-Header",
+		AllowCredentials: true,
+	}))
 
 	app.Use(helmet.New(helmet.Config{
 		XSSProtection:             "1; mode=block",
 		ContentTypeNosniff:        "nosniff",
-		XFrameOptions:             "DENY",
+		XFrameOptions:             "SAMEORIGIN",
 		ReferrerPolicy:            "no-referrer",
-		ContentSecurityPolicy:     "default-src 'self'",
-		CrossOriginEmbedderPolicy: "require-corp",
-		CrossOriginOpenerPolicy:   "same-origin",
-		CrossOriginResourcePolicy: "same-origin",
+		CrossOriginResourcePolicy: "cross-origin",
 	}))
 
 	app.Use(commonpresentation.LoggerMiddleware)
