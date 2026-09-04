@@ -58,7 +58,7 @@ export const CutiPage = () => {
   useEffect(() => {
     const fetchMasterJenisCuti = async () => {
       try {
-        const res = await apiClient.get('/api/masterdata/jenis-cuti');
+        const res = await apiClient.get('/api/v2/masterdata/jenis-cuti');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
@@ -105,7 +105,7 @@ export const CutiPage = () => {
   useEffect(() => {
     const fetchSupervisors = async () => {
       try {
-        const res = await apiClient.get('/api/masterdata/verifikator');
+        const res = await apiClient.get('/api/v2/masterdata/verifikator');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
@@ -170,7 +170,7 @@ export const CutiPage = () => {
     setLoading(true);
     try {
       const isVerifTab = activeTab === 'verifikasi';
-      const url = isVerifTab ? '/api/leave/verifikasi' : '/api/leave';
+      const url = isVerifTab ? '/api/v2/leave/verifikasi' : '/api/v2/leave';
       const res = await apiClient.get(url);
       let list = [];
       if (Array.isArray(res)) {
@@ -223,7 +223,7 @@ export const CutiPage = () => {
   const handleDeleteCuti = async (id) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus pengajuan cuti ini?')) return;
     try {
-      await apiClient.delete(`/api/leave/${id}`);
+      await apiClient.delete(`/api/v2/leave/${id}`);
       showToast('Pengajuan cuti berhasil dihapus.', 'success');
       fetchCutiList();
     } catch (err) {
@@ -254,7 +254,7 @@ export const CutiPage = () => {
     setSubmitting(true);
     try {
       if (editingId) {
-        await apiClient.putForm(`/api/leave/${editingId}`, {
+        await apiClient.putForm(`/api/v2/leave/${editingId}`, {
           jenis_cuti_id: jenisCuti,
           tanggal_mulai: formatInputDate(tanggalMulai),
           tanggal_selesai: formatInputDate(tanggalSelesai),
@@ -266,7 +266,7 @@ export const CutiPage = () => {
         });
         showToast('Pengajuan cuti berhasil diperbarui!', 'success');
       } else {
-        await apiClient.postForm('/api/leave/submit', {
+        await apiClient.postForm('/api/v2/leave/submit', {
           nip: user?.nip || user?.username || '',
           nidn: user?.nidn || '',
           nama: user?.name || '',
@@ -303,7 +303,7 @@ export const CutiPage = () => {
     setActionLoading(true);
 
     try {
-      await apiClient.putForm(`/api/leave/${cutiItem.id}`, {
+      await apiClient.putForm(`/api/v2/leave/${cutiItem.id}`, {
         status: statusToSet,
         role: isSdmOrBaum ? 'sdm' : 'atasan',
       });
@@ -327,7 +327,7 @@ export const CutiPage = () => {
     setActionLoading(true);
 
     try {
-      await apiClient.putForm(`/api/leave/${selectedCutiForReject.id}`, {
+      await apiClient.putForm(`/api/v2/leave/${selectedCutiForReject.id}`, {
         status: statusToSet,
         catatan_atasan: alasanPenolakan.trim(),
         role: isSdmOrBaum ? 'sdm' : 'atasan',

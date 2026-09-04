@@ -136,11 +136,11 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     setLoading(true);
     try {
       const [attRes, cutiRes, izinRes, sppdRes, holRes] = await Promise.allSettled([
-        apiClient.get('/api/attendance/history'),
-        apiClient.get('/api/leave'),
-        apiClient.get('/api/izin'),
-        apiClient.get('/api/sppd/history'),
-        apiClient.get('/api/holiday'),
+        apiClient.get('/api/v2/attendance/history'),
+        apiClient.get('/api/v2/leave'),
+        apiClient.get('/api/v2/izin'),
+        apiClient.get('/api/v2/sppd/history'),
+        apiClient.get('/api/v2/holiday'),
       ]);
 
       const attData = attRes.status === 'fulfilled' ? (Array.isArray(attRes.value) ? attRes.value : (attRes.value?.data || [])) : [];
@@ -548,7 +548,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         note: isLate ? noteParam : 'Tepat waktu',
       };
 
-      await apiClient.post('/api/attendance/check-in', payload);
+      await apiClient.post('/api/v2/attendance/check-in', payload);
       showToast(`Absen Masuk Berhasil Recorded! IP: ${ipAddress}`, 'success');
       setShowLateModal(false);
       setLateReason('');
@@ -595,7 +595,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         note: noteParam || (isEarly ? 'Pulang cepat kurang dari 30 menit' : 'Absen keluar reguler'),
       };
 
-      await apiClient.post('/api/attendance/check-out', payload);
+      await apiClient.post('/api/v2/attendance/check-out', payload);
       showToast(`Absen Keluar Berhasil Recorded! IP: ${ipAddress}`, 'success');
       setShowEarlyExitModal(false);
       setEarlyExitReason('');

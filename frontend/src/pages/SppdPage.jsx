@@ -53,7 +53,7 @@ export const SppdPage = () => {
   useEffect(() => {
     const fetchMasterJenisSppd = async () => {
       try {
-        const res = await apiClient.get('/api/masterdata/jenis-sppd');
+        const res = await apiClient.get('/api/v2/masterdata/jenis-sppd');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
@@ -79,7 +79,7 @@ export const SppdPage = () => {
   useEffect(() => {
     const fetchSupervisors = async () => {
       try {
-        const res = await apiClient.get('/api/masterdata/verifikator');
+        const res = await apiClient.get('/api/v2/masterdata/verifikator');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
@@ -111,7 +111,7 @@ export const SppdPage = () => {
   useEffect(() => {
     const fetchPeople = async () => {
       try {
-        const res = await apiClient.get('/api/masterdata/people');
+        const res = await apiClient.get('/api/v2/masterdata/people');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
@@ -160,7 +160,7 @@ export const SppdPage = () => {
     setLoading(true);
     try {
       const isVerifTab = activeTab === 'verifikasi';
-      const url = isVerifTab ? '/api/sppd/verifikasi' : '/api/sppd/history';
+      const url = isVerifTab ? '/api/v2/sppd/verifikasi' : '/api/v2/sppd/history';
       const res = await apiClient.get(url);
       let list = [];
       if (Array.isArray(res)) {
@@ -253,7 +253,7 @@ export const SppdPage = () => {
   const handleDeleteSppd = async (id) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus pengajuan SPPD ini?')) return;
     try {
-      await apiClient.delete(`/api/sppd/${id}`);
+      await apiClient.delete(`/api/v2/sppd/${id}`);
       showToast('Pengajuan SPPD berhasil dihapus.', 'success');
       fetchSppdList();
     } catch (err) {
@@ -279,7 +279,7 @@ export const SppdPage = () => {
     setSubmitting(true);
     try {
       if (editingId) {
-        await apiClient.putForm(`/api/sppd/${editingId}`, {
+        await apiClient.putForm(`/api/v2/sppd/${editingId}`, {
           jenis_sppd_id: jenisSppd,
           tanggal_berangkat: formatInputDate(tanggalBerangkat),
           tanggal_kembali: formatInputDate(tanggalKembali),
@@ -290,7 +290,7 @@ export const SppdPage = () => {
         });
         showToast('Pengajuan SPPD berhasil diperbarui!', 'success');
       } else {
-        await apiClient.postForm('/api/sppd/create', {
+        await apiClient.postForm('/api/v2/sppd/create', {
           nip: user?.nip || user?.username || '',
           nidn: user?.nidn || '',
           nama: user?.name || '',
@@ -326,7 +326,7 @@ export const SppdPage = () => {
     setActionLoading(true);
 
     try {
-      await apiClient.putForm(`/api/sppd/${sppdItem.id}`, {
+      await apiClient.putForm(`/api/v2/sppd/${sppdItem.id}`, {
         status: statusToSet,
         role: isSdmOrBaum ? 'sdm' : 'atasan',
       });
@@ -350,7 +350,7 @@ export const SppdPage = () => {
     setActionLoading(true);
 
     try {
-      await apiClient.putForm(`/api/sppd/${selectedSppdForReject.id}`, {
+      await apiClient.putForm(`/api/v2/sppd/${selectedSppdForReject.id}`, {
         status: statusToSet,
         catatan: alasanPenolakan.trim(),
         role: isSdmOrBaum ? 'sdm' : 'atasan',

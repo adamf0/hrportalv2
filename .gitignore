@@ -43,6 +43,8 @@ app.*.map.json
 /android/app/release
 
 /backend/.env
+/backend/.env.production
+/backend/.env.development
 /backend/firebase-service-account.json
 .agents
 *.txt
@@ -63,8 +65,12 @@ backend/podman-compose.yml
 backend/mariadb/
 mariadb/
 .env
+.env.production
+.env.development
 *.env
 backend/.env
+backend/.env.production
+backend/.env.development
 
 # Node & Frontend dependencies/build
 node_modules/

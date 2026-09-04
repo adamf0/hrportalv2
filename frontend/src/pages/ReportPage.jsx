@@ -107,7 +107,7 @@ export const ReportPage = ({ globalPeriodType = 'cutoff', onPeriodTypeChange }) 
       try {
         let fakData = [];
         try {
-          const resFak = await apiClient.get('/api/masterdata/fakultas');
+          const resFak = await apiClient.get('/api/v2/masterdata/fakultas');
           fakData = Array.isArray(resFak) ? resFak : (resFak?.data || resFak?.list_data || []);
         } catch (e) {
           const v2Fak = await apiClient.get('/api/v2/masterdata/fakultas').catch(() => []);
@@ -116,7 +116,7 @@ export const ReportPage = ({ globalPeriodType = 'cutoff', onPeriodTypeChange }) 
 
         let prodData = [];
         try {
-          const resProd = await apiClient.get('/api/masterdata/prodi');
+          const resProd = await apiClient.get('/api/v2/masterdata/prodi');
           prodData = Array.isArray(resProd) ? resProd : (resProd?.data || resProd?.list_data || []);
         } catch (e) {
           const v2Prod = await apiClient.get('/api/v2/masterdata/prodi').catch(() => []);
@@ -125,7 +125,7 @@ export const ReportPage = ({ globalPeriodType = 'cutoff', onPeriodTypeChange }) 
 
         let uData = [];
         try {
-          const resUnit = await apiClient.get('/api/masterdata/unit');
+          const resUnit = await apiClient.get('/api/v2/masterdata/unit');
           uData = Array.isArray(resUnit) ? resUnit : (resUnit?.data || resUnit?.list_data || []);
         } catch (e) {
           const v2Unit = await apiClient.get('/api/v2/masterdata/unit').catch(() => []);
@@ -188,9 +188,9 @@ export const ReportPage = ({ globalPeriodType = 'cutoff', onPeriodTypeChange }) 
     const { startStr, endStr } = getPeriodDates();
     try {
       const [reportRes, holidayRes, ceremonyRes] = await Promise.allSettled([
-        apiClient.get('/api/laporan/all', { tanggal_mulai: startStr, tanggal_akhir: endStr }),
-        apiClient.get('/api/holiday', { year: selectedYear }),
-        apiClient.get('/api/ceremony-attendance'),
+        apiClient.get('/api/v2/laporan/all', { tanggal_mulai: startStr, tanggal_akhir: endStr }),
+        apiClient.get('/api/v2/holiday', { year: selectedYear }),
+        apiClient.get('/api/v2/ceremony-attendance'),
       ]);
 
       let empList = [];

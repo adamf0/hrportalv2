@@ -37,7 +37,7 @@ export const SlipGajiPage = () => {
   const fetchPayroll = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(`/api/payroll?bulan=${selectedMonth}&tahun=${selectedYear}`);
+      const res = await apiClient.get(`/api/v2/payroll?bulan=${selectedMonth}&tahun=${selectedYear}`);
       let data = null;
       if (res && res.data) {
         data = Array.isArray(res.data) ? res.data[0] : res.data;
@@ -49,7 +49,7 @@ export const SlipGajiPage = () => {
         setPayrollData(data);
       }
     } catch (err) {
-      console.warn('Backend /api/payroll note:', err);
+      console.warn('Backend /api/v2/payroll note:', err);
     } finally {
       setLoading(false);
     }

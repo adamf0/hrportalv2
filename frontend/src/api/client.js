@@ -1,5 +1,4 @@
-const UNPAK_AUTH_API = '/unpak-api'; // proxied to https://hrportal.unpak.ac.id/api/v2
-const LOCAL_API_BASE = '';           // proxied to http://localhost:3000
+const LOCAL_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export const apiClient = {
   getToken() {
@@ -30,8 +29,12 @@ export const apiClient = {
     if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
       return endpoint;
     }
-    // All endpoints including whoami go to local Go backend (/api/v2/account/whoami)
-    return `${LOCAL_API_BASE}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    let path = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+    if (path.startsWith('/api/') && !path.startsWith('/api/v2/')) {
+      path = path.replace('/api/', '/api/v2/');
+    }
+    const baseUrl = (LOCAL_API_BASE || '').replace(/\/+$/, '');
+    return `${baseUrl}${path}`;
   },
 
   async request(endpoint, options = {}) {

@@ -52,7 +52,7 @@ export const IzinPage = () => {
   useEffect(() => {
     const fetchMasterJenisIzin = async () => {
       try {
-        const res = await apiClient.get('/api/masterdata/jenis-izin');
+        const res = await apiClient.get('/api/v2/masterdata/jenis-izin');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
@@ -78,7 +78,7 @@ export const IzinPage = () => {
   useEffect(() => {
     const fetchSupervisors = async () => {
       try {
-        const res = await apiClient.get('/api/masterdata/verifikator');
+        const res = await apiClient.get('/api/v2/masterdata/verifikator');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
@@ -123,7 +123,7 @@ export const IzinPage = () => {
     setLoading(true);
     try {
       const isVerifTab = activeTab === 'verifikasi';
-      const url = isVerifTab ? '/api/izin/verifikasi' : '/api/izin';
+      const url = isVerifTab ? '/api/v2/izin/verifikasi' : '/api/v2/izin';
       const res = await apiClient.get(url);
       let list = [];
       if (Array.isArray(res)) {
@@ -174,7 +174,7 @@ export const IzinPage = () => {
   const handleDeleteIzin = async (id) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus pengajuan izin ini?')) return;
     try {
-      await apiClient.delete(`/api/izin/${id}`);
+      await apiClient.delete(`/api/v2/izin/${id}`);
       showToast('Pengajuan izin berhasil dihapus.', 'success');
       fetchIzinList();
     } catch (err) {
@@ -200,7 +200,7 @@ export const IzinPage = () => {
     setSubmitting(true);
     try {
       if (editingId) {
-        await apiClient.putForm(`/api/izin/${editingId}`, {
+        await apiClient.putForm(`/api/v2/izin/${editingId}`, {
           id_jenis_izin: jenisIzin,
           tanggal_pengajuan: formatInputDate(tanggalPengajuan),
           tujuan: tujuan.trim(),
@@ -209,7 +209,7 @@ export const IzinPage = () => {
         });
         showToast('Pengajuan izin berhasil diperbarui!', 'success');
       } else {
-        await apiClient.postForm('/api/izin', {
+        await apiClient.postForm('/api/v2/izin', {
           nip: user?.nip || user?.username || '',
           nidn: user?.nidn || '',
           nama: user?.name || '',
@@ -243,7 +243,7 @@ export const IzinPage = () => {
     setActionLoading(true);
 
     try {
-      await apiClient.putForm(`/api/izin/${izinItem.id}`, {
+      await apiClient.putForm(`/api/v2/izin/${izinItem.id}`, {
         status: statusToSet,
         role: isSdmOrBaum ? 'sdm' : 'atasan',
       });
@@ -267,7 +267,7 @@ export const IzinPage = () => {
     setActionLoading(true);
 
     try {
-      await apiClient.putForm(`/api/izin/${selectedIzinForReject.id}`, {
+      await apiClient.putForm(`/api/v2/izin/${selectedIzinForReject.id}`, {
         status: statusToSet,
         catatan: alasanPenolakan.trim(),
         role: isSdmOrBaum ? 'sdm' : 'atasan',

@@ -45,7 +45,7 @@ export const MasterLiburPage = () => {
   const fetchHolidays = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/api/holiday');
+      const res = await apiClient.get('/api/v2/holiday');
       let list = [];
       if (Array.isArray(res)) {
         list = res;
@@ -106,7 +106,7 @@ export const MasterLiburPage = () => {
     setSubmitting(true);
     try {
       if (editingHoliday) {
-        await apiClient.put(`/api/holiday/${editingHoliday.id}`, {
+        await apiClient.put(`/api/v2/holiday/${editingHoliday.id}`, {
           nama: nama.trim(),
           tanggal: tanggal,
           tipe: tipe,
@@ -114,7 +114,7 @@ export const MasterLiburPage = () => {
         });
         showToast('Berhasil mengupdate hari libur', 'success');
       } else {
-        await apiClient.post('/api/holiday', {
+        await apiClient.post('/api/v2/holiday', {
           nama: nama.trim(),
           tanggal: tanggal,
           tipe: tipe,
@@ -134,7 +134,7 @@ export const MasterLiburPage = () => {
   const handleDeleteHoliday = async (id) => {
     if (!window.confirm('Apakah Anda yakin ingin menghapus data hari libur ini?')) return;
     try {
-      await apiClient.delete(`/api/holiday/${id}`);
+      await apiClient.delete(`/api/v2/holiday/${id}`);
       showToast('Data hari libur berhasil dihapus', 'success');
       fetchHolidays();
     } catch (err) {

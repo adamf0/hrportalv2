@@ -310,24 +310,13 @@ export const AuthProvider = ({ children }) => {
         redirect_uri: redirectUri,
       });
 
-      let response;
-      try {
-        response = await fetch('/unpak-sso-token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: body.toString(),
-        });
-      } catch (e) {
-        response = await fetch(SSO_CONFIG.tokenUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: body.toString(),
-        });
-      }
+      const response = await fetch(SSO_CONFIG.tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      });
 
       if (!response.ok) {
         const errText = await response.text();

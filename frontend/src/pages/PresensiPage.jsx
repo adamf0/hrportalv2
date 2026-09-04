@@ -46,7 +46,7 @@ export const PresensiPage = () => {
   const fetchAttendanceHistory = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/api/attendance/history');
+      const res = await apiClient.get('/api/v2/attendance/history');
       let items = [];
       if (Array.isArray(res)) {
         items = res;
@@ -119,7 +119,7 @@ export const PresensiPage = () => {
   const executeCheckIn = async (reason) => {
     setSubmitting(true);
     try {
-      await apiClient.post('/api/attendance/check-in', {
+      await apiClient.post('/api/v2/attendance/check-in', {
         nip: user?.nip || user?.username || '',
         nidn: user?.nidn || '',
         nama: user?.name || '',
@@ -144,7 +144,7 @@ export const PresensiPage = () => {
   const executeCheckOut = async (reason) => {
     setSubmitting(true);
     try {
-      await apiClient.post('/api/attendance/check-out', {
+      await apiClient.post('/api/v2/attendance/check-out', {
         nip: user?.nip || user?.username || '',
         nidn: user?.nidn || '',
         note: reason || 'Absen Keluar',
