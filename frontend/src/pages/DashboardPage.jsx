@@ -268,7 +268,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
   const fetchActiveKuesioners = async () => {
     try {
       const jwt = localStorage.getItem('token') || localStorage.getItem('sso_token') || localStorage.getItem('jwt_token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuaXAiOiIxMDQxMTAwNjUyMCIsIm5hbWEiOiJBREFNIEZVUlFPTiJ9.sign';
-      const response = await fetch('https://stagging-api-simonev-lpm.unpak.ac.id/api/v2/kuesioners/active', {
+      const response = await fetch('https://api-simonev-lpm.unpak.ac.id/api/v2/kuesioners/active', {
         headers: {
           'Authorization': `Bearer ${jwt}`,
           'Accept': 'application/json',
