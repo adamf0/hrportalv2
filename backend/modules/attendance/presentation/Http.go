@@ -176,7 +176,7 @@ func ModuleAttendance(app *fiber.App) {
 		}
 	}))
 
-	group := app.Group("/api/attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerAttendanceRoutes := func(group fiber.Router) {
 
 	group.Post("/check-in", func(c *fiber.Ctx) error {
 		lat, _ := strconv.ParseFloat(c.FormValue("latitude"), 64)
@@ -355,4 +355,11 @@ func ModuleAttendance(app *fiber.App) {
 			"deleted_count": res.Value,
 		})
 	})
+	}
+
+	groupV2 := app.Group("/api/v2/attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerAttendanceRoutes(groupV2)
+
+	groupV1 := app.Group("/api/attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerAttendanceRoutes(groupV1)
 }

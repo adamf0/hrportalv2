@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/leave/domain"
 
@@ -63,12 +64,9 @@ func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn 
 		}
 		query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui atasan", "disetujui sdm", "ditolak sdm", "acc atasan", "acc sdm", "proses sdm", "%sdm%")
 	} else if verifikasi {
-		if nip != "" && nidn != "" {
-			query = query.Where("verifikasi = ? OR verifikasi = ?", nip, nidn)
-		} else if nip != "" {
-			query = query.Where("verifikasi = ?", nip)
-		} else if nidn != "" {
-			query = query.Where("verifikasi = ?", nidn)
+		if nip != "" || nidn != "" {
+			verifIDs := commonhelper.ResolveVerifikatorIDs(ctx, r.db, nip, nidn)
+			query = query.Where("verifikasi IN ?", verifIDs)
 		} else {
 			query = query.Where("verifikasi IS NOT NULL AND verifikasi != ''")
 		}
@@ -82,24 +80,9 @@ func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn 
 		}
 	}
 
-	err := query.Order("tanggal_mulai desc").Find(&items).Error
+	err := query.Order("created_at desc").Find(&items).Error
 	if err != nil {
 		return nil, err
-	}
-
-	var jenisList []domain.JenisCuti
-	if errJenis := r.db.WithContext(ctx).Table("jenis_cuti").Find(&jenisList).Error; errJenis == nil {
-		jMap := make(map[uint]string)
-		for _, j := range jenisList {
-			if j.Nama != "" {
-				jMap[j.ID] = j.Nama
-			}
-		}
-		for i := range items {
-			if name, ok := jMap[items[i].JenisCutiID]; ok {
-				items[i].JenisCuti = name
-			}
-		}
 	}
 
 	return items, nil

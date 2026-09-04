@@ -12,9 +12,7 @@ import (
 	"hrportal_backend/modules/payroll/domain"
 )
 
-func ModulePayroll(app *fiber.App) {
-	group := app.Group("/api/payroll", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
-
+func registerPayrollRoutes(group fiber.Router) {
 	group.Get("/", func(c *fiber.Ctx) error {
 		nip := strings.TrimSpace(c.Query("nip"))
 		if nip == "" {
@@ -53,4 +51,12 @@ func ModulePayroll(app *fiber.App) {
 			"data":    res.Value,
 		})
 	})
+}
+
+func ModulePayroll(app *fiber.App) {
+	groupV2 := app.Group("/api/v2/payroll", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerPayrollRoutes(groupV2)
+
+	groupV1 := app.Group("/api/payroll", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerPayrollRoutes(groupV1)
 }

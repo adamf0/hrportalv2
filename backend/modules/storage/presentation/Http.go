@@ -11,10 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-func ModuleStorage(app *fiber.App) {
-	storageSvc := storage.InitStorageService()
-
-	group := app.Group("/api/storage", commonpresentation.JWTMiddleware())
+func registerStorageRoutes(group fiber.Router, storageSvc storage.IStorageService) {
 
 	// 1. Generate Presigned PUT URL for uploading file from Flutter/Web
 	group.All("/presign-upload", func(c *fiber.Ctx) error {
@@ -160,4 +157,14 @@ func ModuleStorage(app *fiber.App) {
 			"bytes":      len(bodyBytes),
 		})
 	})
+}
+
+func ModuleStorage(app *fiber.App) {
+	storageSvc := storage.InitStorageService()
+
+	groupV2 := app.Group("/api/v2/storage", commonpresentation.JWTMiddleware())
+	registerStorageRoutes(groupV2, storageSvc)
+
+	groupV1 := app.Group("/api/storage", commonpresentation.JWTMiddleware())
+	registerStorageRoutes(groupV1, storageSvc)
 }

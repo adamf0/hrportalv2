@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/izin/domain"
 
@@ -63,12 +64,9 @@ func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, ve
 		}
 		query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui atasan", "disetujui sdm", "ditolak sdm", "acc atasan", "acc sdm", "proses sdm", "%sdm%")
 	} else if verifikasi {
-		if nip != "" && nidn != "" {
-			query = query.Where("verifikasi = ? OR verifikasi = ?", nip, nidn)
-		} else if nip != "" {
-			query = query.Where("verifikasi = ?", nip)
-		} else if nidn != "" {
-			query = query.Where("verifikasi = ?", nidn)
+		if nip != "" || nidn != "" {
+			verifIDs := commonhelper.ResolveVerifikatorIDs(ctx, r.db, nip, nidn)
+			query = query.Where("verifikasi IN ?", verifIDs)
 		} else {
 			query = query.Where("verifikasi IS NOT NULL AND verifikasi != ''")
 		}
@@ -82,7 +80,7 @@ func (r *IzinRepository) GetAll(ctx context.Context, nip string, nidn string, ve
 		}
 	}
 
-	err := query.Order("tanggal_pengajuan desc").Find(&izins).Error
+	err := query.Order("created_at desc").Find(&izins).Error
 	if err != nil {
 		return nil, err
 	}

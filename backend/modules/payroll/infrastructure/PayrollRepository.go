@@ -2,6 +2,9 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
+	"strings"
+
 	"hrportal_backend/modules/payroll/domain"
 
 	"gorm.io/gorm"
@@ -31,6 +34,35 @@ func (r *PayrollRepository) GetSlipGaji(ctx context.Context, tahunStr string, bu
 		Where("(bulan = ? OR bulan = ? OR bulan = ?)", bulanNum, bulanStr, namaBulanStr).
 		Where("(TRIM(nip) = ? OR nip = ?)", nip, nip).
 		First(&slipGaji).Error
+
+	// Jika data tidak ditemukan, kueri ke e_pribadi berdasarkan nidn untuk mendapatkan NIP lalu kueri ulang ke payroll_publishb
+	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
+		var resolvedNip string
+
+		// Kueri e_pribadi berdasarkan nidn atau nip
+		errEP := targetDB.WithContext(ctx).Table("e_pribadi").
+			Select("nip").
+			Where("nidn = ? OR nip = ?", nip, nip).
+			Scan(&resolvedNip).Error
+
+		if errEP != nil || strings.TrimSpace(resolvedNip) == "" {
+			// Fallback ke pegawais jika tabel e_pribadi berbeda
+			_ = targetDB.WithContext(ctx).Table("pegawais").
+				Select("nip").
+				Where("nidn = ? OR nip = ?", nip, nip).
+				Scan(&resolvedNip).Error
+		}
+
+		resolvedNip = strings.TrimSpace(resolvedNip)
+		if resolvedNip != "" && resolvedNip != nip {
+			// Kueri ulang ke payroll_publishb menggunakan NIP hasil pencarian dari e_pribadi
+			err = targetDB.WithContext(ctx).Table("payroll_publishb").
+				Where("tahun = ?", tahunStr).
+				Where("(bulan = ? OR bulan = ? OR bulan = ?)", bulanNum, bulanStr, namaBulanStr).
+				Where("(TRIM(nip) = ? OR nip = ?)", resolvedNip, resolvedNip).
+				First(&slipGaji).Error
+		}
+	}
 
 	if err != nil {
 		return nil, err

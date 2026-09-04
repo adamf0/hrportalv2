@@ -6,6 +6,7 @@ const AuthContext = createContext(null);
 export const SSO_CONFIG = {
   authUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/auth',
   tokenUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/token',
+  logoutUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout',
   clientId: 'unpak_link_gate',
   redirectUri: window.location.origin + '/login',
 };
@@ -29,29 +30,10 @@ export const decodeJwt = (token) => {
 };
 
 export const getUserRole = (userInfo) => {
-  // Check if active_role override exists in localStorage
-  const activeOverride = localStorage.getItem('active_role');
-  if (activeOverride && ['sdm', 'baum', 'dosen', 'tendik'].includes(activeOverride.toLowerCase())) {
-    return activeOverride.toLowerCase();
-  }
-
   if (!userInfo || typeof userInfo !== 'object') return 'tendik';
   const { level, role, groups = [], realmRoles = [] } = userInfo;
   const normLevel = (level || '').toLowerCase();
   const normRole = (role || '').toLowerCase();
-
-  if (normLevel === 'sdm' || normLevel === 'admin' || normRole === 'sdm' || normRole === 'admin') {
-    return 'sdm';
-  }
-  if (normLevel === 'baum' || normRole === 'baum') {
-    return 'baum';
-  }
-  if (normLevel === 'dosen' || normRole === 'dosen') {
-    return 'dosen';
-  }
-  if (normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai') {
-    return 'tendik';
-  }
 
   const safeGroups = Array.isArray(groups) ? groups : [];
   const safeRoles = Array.isArray(realmRoles) ? realmRoles : [];
@@ -60,16 +42,34 @@ export const getUserRole = (userInfo) => {
     ...safeRoles.map((r) => (typeof r === 'string' ? r.toLowerCase() : '')),
   ];
 
-  if (allGroups.some((g) => ['sdm', 'inherit_sdm', 'adm_pusat'].includes(g))) {
-    return 'sdm';
+  let detectedRole = 'tendik';
+
+  if (normLevel === 'sdm' || normRole === 'sdm') {
+    detectedRole = 'sdm';
+  } else if (normLevel === 'baum' || normRole === 'baum') {
+    detectedRole = 'baum';
+  } else if (normLevel === 'dosen' || normRole === 'dosen') {
+    detectedRole = 'dosen';
+  } else if (normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai') {
+    detectedRole = 'tendik';
+  } else if (allGroups.some((g) => ['sdm', 'inherit_sdm', 'adm_hr'].includes(g) || g.includes('sdm_'))) {
+    detectedRole = 'sdm';
+  } else if (allGroups.some((g) => ['baum', 'inherit_baum'].includes(g) || g.includes('baum_'))) {
+    detectedRole = 'baum';
+  } else if (allGroups.some((g) => g.includes('dosen'))) {
+    detectedRole = 'dosen';
   }
-  if (allGroups.some((g) => ['baum', 'inherit_baum'].includes(g))) {
-    return 'baum';
+
+  // Validate active_role override against available roles
+  const activeOverride = localStorage.getItem('active_role');
+  if (activeOverride && ['sdm', 'baum', 'dosen', 'tendik'].includes(activeOverride.toLowerCase())) {
+    const available = getAvailableRoles(userInfo);
+    if (available.includes(activeOverride.toLowerCase())) {
+      return activeOverride.toLowerCase();
+    }
   }
-  if (allGroups.some((g) => g.includes('dosen'))) {
-    return 'dosen';
-  }
-  return 'tendik';
+
+  return detectedRole;
 };
 
 export const getAvailableRoles = (userInfo) => {
@@ -113,16 +113,16 @@ export const getAvailableRoles = (userInfo) => {
 
   normGroups.forEach((g) => {
     if (!g) return;
-    if (g.includes('sdm') || g.includes('adm_pusat') || g.includes('admin') || g === 'sdm') {
+    if (g === 'sdm' || g === 'inherit_sdm' || g === 'adm_hr' || g.includes('sdm_') || g.endsWith('_sdm')) {
       availableSet.add('sdm');
     }
-    if (g.includes('baum') || g === 'baum') {
+    if (g === 'baum' || g === 'inherit_baum' || g.includes('baum_') || g.endsWith('_baum')) {
       availableSet.add('baum');
     }
-    if (g.includes('dosen') || g === 'dosen') {
+    if (g === 'dosen' || g.includes('dosen')) {
       availableSet.add('dosen');
     }
-    if (g.includes('tendik') || g.includes('pegawai') || g === 'tendik') {
+    if (g === 'tendik' || g.includes('tendik') || g.includes('pegawai')) {
       availableSet.add('tendik');
     }
   });
@@ -158,21 +158,35 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const logout = () => {
+    const savedIdToken = localStorage.getItem('id_token') || '';
+    const isSsoUser = user?.isSso || !!savedIdToken || (user && user.groups && user.groups.length > 0);
+
     setUser(null);
     setToken('');
     localStorage.removeItem('token');
     localStorage.removeItem('refresh');
+    localStorage.removeItem('id_token');
     localStorage.removeItem('user');
     localStorage.removeItem('profile');
     localStorage.removeItem('whoami');
     localStorage.removeItem('user_profile');
-    window.location.href = '/login';
+    localStorage.removeItem('active_role');
+
+    if (isSsoUser) {
+      const redirectUri = encodeURIComponent(window.location.origin + '/login');
+      let keycloakLogoutUrl = `${SSO_CONFIG.logoutUrl}?client_id=${SSO_CONFIG.clientId}&post_logout_redirect_uri=${redirectUri}`;
+      if (savedIdToken) {
+        keycloakLogoutUrl += `&id_token_hint=${encodeURIComponent(savedIdToken)}`;
+      }
+      window.location.href = keycloakLogoutUrl;
+    } else {
+      window.location.href = '/login';
+    }
   };
 
   useEffect(() => {
     const handleLogout = () => {
-      setUser(null);
-      setToken('');
+      logout();
     };
     window.addEventListener('auth-logout', handleLogout);
     return () => window.removeEventListener('auth-logout', handleLogout);
@@ -198,12 +212,15 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  const saveAuthSession = (authToken, refreshToken, userInfo) => {
+  const saveAuthSession = (authToken, refreshToken, userInfo, idToken = '') => {
     setToken(authToken);
     setUser(userInfo);
     localStorage.setItem('token', authToken);
     if (refreshToken) {
       localStorage.setItem('refresh', refreshToken);
+    }
+    if (idToken) {
+      localStorage.setItem('id_token', idToken);
     }
     localStorage.setItem('user', JSON.stringify(userInfo));
   };
@@ -351,7 +368,7 @@ export const AuthProvider = ({ children }) => {
         isSso: true,
       };
 
-      saveAuthSession(accessToken, refreshToken, userInfo);
+      saveAuthSession(accessToken, refreshToken, userInfo, idToken);
       fetchWhoAmI(accessToken);
       return { success: true, user: userInfo };
     } catch (err) {
@@ -387,7 +404,7 @@ export const AuthProvider = ({ children }) => {
         isSso: true,
       };
 
-      saveAuthSession(accessToken, '', userInfo);
+      saveAuthSession(accessToken, '', userInfo, idToken);
       fetchWhoAmI(accessToken);
       return { success: true, user: userInfo };
     } catch (err) {

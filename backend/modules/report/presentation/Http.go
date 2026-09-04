@@ -19,8 +19,7 @@ import (
 	"github.com/mehdihadeli/go-mediatr"
 )
 
-func ModuleReport(app *fiber.App) {
-	group := app.Group("/api/laporan", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+func registerReportRoutes(group fiber.Router) {
 
 	group.Get("/summary", func(c *fiber.Ctx) error {
 		nidn := c.Query("nidn")
@@ -193,4 +192,12 @@ func ModuleReport(app *fiber.App) {
 		c.Set("Content-Type", "text/csv; charset=utf-8")
 		return c.SendFile(job.FilePath)
 	})
+}
+
+func ModuleReport(app *fiber.App) {
+	groups := []string{"/api/v2/laporan", "/api/laporan", "/api/v2/report", "/api/report"}
+	for _, path := range groups {
+		g := app.Group(path, commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+		registerReportRoutes(g)
+	}
 }

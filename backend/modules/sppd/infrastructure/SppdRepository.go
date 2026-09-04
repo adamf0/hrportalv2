@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 
+	commonhelper "hrportal_backend/common/helper"
 	commoninfra "hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/sppd/domain"
 
@@ -67,12 +68,9 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 		}
 		query = query.Where("LOWER(status) IN (?, ?, ?, ?, ?, ?, ?, ?, ?) OR LOWER(status) LIKE ?", "terima atasan", "terima sdm", "tolak sdm", "disetujui atasan", "disetujui sdm", "ditolak sdm", "acc atasan", "acc sdm", "proses sdm", "%sdm%")
 	} else if verifikasi {
-		if nip != "" && nidn != "" {
-			query = query.Where("verifikasi = ? or verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ? OR nidn = ?)", nip, nidn, nip, nidn)
-		} else if nip != "" {
-			query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip = ?)", nip, nip)
-		} else if nidn != "" {
-			query = query.Where("verifikasi = ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nidn = ?)", nidn, nidn)
+		if nip != "" || nidn != "" {
+			verifIDs := commonhelper.ResolveVerifikatorIDs(ctx, r.db, nip, nidn)
+			query = query.Where("verifikasi IN ? or id IN (SELECT id_sppd FROM sppd_anggota WHERE nip IN ? OR nidn IN ?)", verifIDs, verifIDs, verifIDs)
 		} else {
 			query = query.Where("verifikasi IS NOT NULL AND verifikasi != ''")
 		}
@@ -86,7 +84,7 @@ func (r *SppdRepository) GetHistoryByNip(ctx context.Context, nip string, nidn s
 		}
 	}
 
-	err := query.Preload("Anggota").Preload("Files").Count(&total).Order("tanggal_berangkat desc").Find(&items).Error
+	err := query.Preload("Anggota").Preload("Files").Count(&total).Order("created_at desc").Find(&items).Error
 	if err != nil {
 		return nil, err
 	}

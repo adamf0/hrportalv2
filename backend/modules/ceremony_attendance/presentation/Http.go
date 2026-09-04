@@ -17,8 +17,7 @@ import (
 	"github.com/mehdihadeli/go-mediatr"
 )
 
-func ModuleCeremonyAttendance(app *fiber.App) {
-	group := app.Group("/api/ceremony-attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+func registerCeremonyAttendanceRoutes(group fiber.Router) {
 
 	group.Post("/", func(c *fiber.Ctx) error {
 		command := CreateAbsenUpacara.CreateAbsenUpacaraCommand{
@@ -135,4 +134,12 @@ func ModuleCeremonyAttendance(app *fiber.App) {
 
 		return sseAdapter.Send(c, pagedData)
 	})
+}
+
+func ModuleCeremonyAttendance(app *fiber.App) {
+	groupV2 := app.Group("/api/v2/ceremony-attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerCeremonyAttendanceRoutes(groupV2)
+
+	groupV1 := app.Group("/api/ceremony-attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerCeremonyAttendanceRoutes(groupV1)
 }

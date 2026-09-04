@@ -112,9 +112,16 @@ func MarkNotificationDoneHandler(c *fiber.Ctx) error {
 
 func ModuleNotification(app *fiber.App) {
 	app.Post("/api/account/fcm-token", RegisterFcmTokenHandler)
+	app.Post("/api/v2/account/fcm-token", RegisterFcmTokenHandler)
 	app.Get("/api/account/notifications", GetNotificationsHandler)
+	app.Get("/api/v2/account/notifications", GetNotificationsHandler)
 	app.Post("/api/account/notifications/mark-done", MarkNotificationDoneHandler)
+	app.Post("/api/v2/account/notifications/mark-done", MarkNotificationDoneHandler)
+
 	app.Post("/api/notification/fcm-token", RegisterFcmTokenHandler)
+	app.Post("/api/v2/notification/fcm-token", RegisterFcmTokenHandler)
 	app.Get("/api/notification/notifications", GetNotificationsHandler)
+	app.Get("/api/v2/notification/notifications", GetNotificationsHandler)
 	app.Post("/api/notification/mark-done", MarkNotificationDoneHandler)
+	app.Post("/api/v2/notification/mark-done", MarkNotificationDoneHandler)
 }

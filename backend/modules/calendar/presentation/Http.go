@@ -11,9 +11,7 @@ import (
 	"github.com/mehdihadeli/go-mediatr"
 )
 
-func ModuleCalendar(app *fiber.App) {
-	group := app.Group("/api/calendar", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
-
+func registerCalendarRoutes(group fiber.Router) {
 	group.Get("/stream", func(c *fiber.Ctx) error {
 		query := &GetAllCalendar.GetAllCalendarQuery{
 			Nip:       c.FormValue("nip"),
@@ -53,4 +51,12 @@ func ModuleCalendar(app *fiber.App) {
 		}
 		return c.JSON(res.Value)
 	})
+}
+
+func ModuleCalendar(app *fiber.App) {
+	groupV2 := app.Group("/api/v2/calendar", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerCalendarRoutes(groupV2)
+
+	groupV1 := app.Group("/api/calendar", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerCalendarRoutes(groupV1)
 }

@@ -15,8 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func ModuleHoliday(app *fiber.App, db *gorm.DB) {
-	group := app.Group("/api/holiday", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+func registerHolidayRoutes(group fiber.Router, db *gorm.DB) {
 
 	group.Get("/", func(c *fiber.Ctx) error {
 		return getHolidaysHandler(c)
@@ -83,6 +82,14 @@ func ModuleHoliday(app *fiber.App, db *gorm.DB) {
 		}
 		return c.JSON(fiber.Map{"status": "ok", "message": "Hari libur berhasil dihapus"})
 	})
+}
+
+func ModuleHoliday(app *fiber.App, db *gorm.DB) {
+	groupV2 := app.Group("/api/v2/holiday", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerHolidayRoutes(groupV2, db)
+
+	groupV1 := app.Group("/api/holiday", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerHolidayRoutes(groupV1, db)
 }
 
 func getHolidaysHandler(c *fiber.Ctx) error {

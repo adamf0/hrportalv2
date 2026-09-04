@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   CalendarClock, 
   Search, 
@@ -37,12 +37,13 @@ export const CutiPage = () => {
   const [cutiList, setCutiList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, activeTab, itemsPerPage]);
+  }, [searchQuery, statusFilter, activeTab, itemsPerPage]);
 
   useEffect(() => {
     if (isSdmOrBaum) {
@@ -168,7 +169,9 @@ export const CutiPage = () => {
   const fetchCutiList = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get('/api/leave');
+      const isVerifTab = activeTab === 'verifikasi';
+      const url = isVerifTab ? '/api/leave/verifikasi' : '/api/leave';
+      const res = await apiClient.get(url);
       let list = [];
       if (Array.isArray(res)) {
         list = res;
@@ -192,7 +195,7 @@ export const CutiPage = () => {
     };
     window.addEventListener('role-changed', handleRoleChanged);
     return () => window.removeEventListener('role-changed', handleRoleChanged);
-  }, [userRole]);
+  }, [userRole, activeTab]);
 
   const [editingId, setEditingId] = useState(null);
 
@@ -341,6 +344,53 @@ export const CutiPage = () => {
     }
   };
 
+  const getItemStatusCategory = (item) => {
+    const st = (item.status || '').toLowerCase().trim();
+    if (st.includes('terima') || st.includes('setuju') || st.includes('acc') || st.includes('approved')) {
+      return 'terima';
+    }
+    if (st.includes('tolak') || st.includes('reject')) {
+      return 'tolak';
+    }
+    return 'menunggu';
+  };
+
+  const statusCounts = useMemo(() => {
+    const baseList = cutiList.filter((item) => {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = (
+        (item.nama_pemohon || item.nama || '').toLowerCase().includes(q) ||
+        (item.nip || '').toLowerCase().includes(q) ||
+        (item.alasan || '').toLowerCase().includes(q)
+      );
+      if (!matchesSearch) return false;
+      if (isSdmOrBaum) {
+        const st = (item.status || '').toLowerCase().trim();
+        const isAllowedSdmStatus = 
+          st.includes('terima atasan') ||
+          st.includes('terima sdm') ||
+          st.includes('tolak sdm') ||
+          st.includes('disetujui atasan') ||
+          st.includes('disetujui sdm') ||
+          st.includes('ditolak sdm') ||
+          st.includes('acc atasan') ||
+          st.includes('acc sdm') ||
+          st.includes('proses sdm');
+        if (!isAllowedSdmStatus) return false;
+      }
+      return true;
+    });
+
+    const counts = { all: baseList.length, menunggu: 0, terima: 0, tolak: 0 };
+    baseList.forEach((item) => {
+      const cat = getItemStatusCategory(item);
+      if (counts[cat] !== undefined) {
+        counts[cat]++;
+      }
+    });
+    return counts;
+  }, [cutiList, searchQuery, isSdmOrBaum]);
+
   const filteredList = cutiList.filter((item) => {
     const q = searchQuery.toLowerCase();
     const matchesSearch = (
@@ -368,15 +418,76 @@ export const CutiPage = () => {
       if (!isAllowedSdmStatus) return false;
     }
 
-    // In Tendik/Dosen mode, when on Verifikasi Atasan tab, match supervisor verifikasi NIP/username
-    if (!isSdmOrBaum && activeTab === 'verifikasi') {
-      const userNip = (user?.nip || user?.username || '').toLowerCase();
-      const verifNip = (item.verifikasi || item.nip_atasan || '').toLowerCase();
-      return verifNip && verifNip === userNip;
+    if (statusFilter !== 'all') {
+      const cat = getItemStatusCategory(item);
+      if (cat !== statusFilter) return false;
     }
 
     return true;
   });
+
+  const renderStatusFilterTabs = () => (
+    <div
+      style={{
+        display: 'inline-flex',
+        gap: '4px',
+        background: '#f3f4f6',
+        padding: '4px',
+        borderRadius: '24px',
+        alignItems: 'center',
+        maxWidth: '100%',
+        overflowX: 'auto',
+        whiteSpace: 'nowrap',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}
+    >
+      {[
+        { key: 'all', label: 'Semua', activeBg: '#ffffff', activeColor: '#111827', badgeBg: '#e5e7eb' },
+        { key: 'menunggu', label: 'Menunggu', activeBg: '#fffbe6', activeColor: '#d97706', badgeBg: '#fef08a' },
+        { key: 'terima', label: 'Diterima', activeBg: '#ecfdf5', activeColor: '#059669', badgeBg: '#a7f3d0' },
+        { key: 'tolak', label: 'Ditolak', activeBg: '#fef2f2', activeColor: '#dc2626', badgeBg: '#fca5a5' },
+      ].map((tab) => {
+        const isActive = statusFilter === tab.key;
+        const count = statusCounts[tab.key] || 0;
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => { setStatusFilter(tab.key); setCurrentPage(1); }}
+            style={{
+              padding: '5px 12px',
+              borderRadius: '20px',
+              fontSize: '0.78rem',
+              fontWeight: isActive ? 700 : 500,
+              border: 'none',
+              background: isActive ? tab.activeBg : 'transparent',
+              color: isActive ? tab.activeColor : '#6b7280',
+              boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              flexShrink: 0,
+            }}
+          >
+            <span>{tab.label}</span>
+            <span style={{
+              fontSize: '0.7rem',
+              padding: '1px 6px',
+              borderRadius: '10px',
+              background: isActive ? tab.badgeBg : '#e5e7eb',
+              color: isActive ? tab.activeColor : '#4b5563',
+              fontWeight: 700,
+            }}>
+              {count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -407,11 +518,12 @@ export const CutiPage = () => {
 
         {/* Tab Switcher (Hided when active role is SDM / BAUM; Visible for Tendik / Dosen) */}
         {!isSdmOrBaum && (
-          <div style={{ display: 'flex', gap: '4px', background: '#f7f8f6', padding: '4px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', gap: '4px', background: '#f7f8f6', padding: '4px', borderRadius: '8px', border: '1px solid #e5e7eb', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'auto', scrollbarWidth: 'none' }}>
             <button
               onClick={() => setActiveTab('pengajuan')}
               style={{
-                padding: '8px 16px',
+                flex: '1 1 auto',
+                padding: '8px 14px',
                 borderRadius: '6px',
                 border: 'none',
                 background: activeTab === 'pengajuan' ? '#ffffff' : 'transparent',
@@ -419,6 +531,9 @@ export const CutiPage = () => {
                 fontWeight: activeTab === 'pengajuan' ? 700 : 500,
                 fontSize: '0.825rem',
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+                flexShrink: 0,
                 boxShadow: activeTab === 'pengajuan' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
               }}
             >
@@ -427,7 +542,8 @@ export const CutiPage = () => {
             <button
               onClick={() => setActiveTab('verifikasi')}
               style={{
-                padding: '8px 16px',
+                flex: '1 1 auto',
+                padding: '8px 14px',
                 borderRadius: '6px',
                 border: 'none',
                 background: activeTab === 'verifikasi' ? '#ffffff' : 'transparent',
@@ -435,6 +551,9 @@ export const CutiPage = () => {
                 fontWeight: activeTab === 'verifikasi' ? 700 : 500,
                 fontSize: '0.825rem',
                 cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+                flexShrink: 0,
                 boxShadow: activeTab === 'verifikasi' ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
               }}
             >
@@ -588,9 +707,12 @@ export const CutiPage = () => {
 
           {/* Riwayat Pengajuan Saya */}
           <div className="bm-card" style={{ padding: '24px' }}>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#111827', marginBottom: '16px' }}>
-              Riwayat Pengajuan Cuti
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#111827', margin: 0 }}>
+                Riwayat Pengajuan Cuti
+              </h2>
+              {renderStatusFilterTabs()}
+            </div>
 
             {loading ? (
               <div style={{ padding: '40px', textAlign: 'center', color: '#6b7280' }}>Memuat riwayat...</div>
@@ -615,8 +737,9 @@ export const CutiPage = () => {
 
                       <div style={{ fontSize: '0.825rem', color: '#7c3aed', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>📅 {formatIndonesianDateRange(item.tanggal_mulai || item.tanggal, item.tanggal_selesai || item.tanggal_akhir || item.tanggal_mulai || item.tanggal, false)}</span>
-                        <span style={{ background: '#f3e8ff', color: '#6d28d9', padding: '2px 8px', borderRadius: '9999px', fontSize: '0.725rem', fontWeight: 800 }}>
-                          {duration} Hari Cuti
+                        <span style={{ background: '#f3e8ff', color: '#7c3aed', padding: '3px 10px', borderRadius: '16px', fontSize: '0.75rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                          <Clock size={12} />
+                          <span>{duration} Hari</span>
                         </span>
                       </div>
 
@@ -677,13 +800,18 @@ export const CutiPage = () => {
       ) : (
         /* Tabel Verifikasi SDM Admin */
         <div className="bm-card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#111827' }}>
-              Verifikasi Permohonan Cuti Pegawai (SDM Admin)
-            </h2>
-            <div style={{ position: 'relative', minWidth: '240px' }}>
-              <Search size={15} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-              <input type="text" className="bm-input" placeholder="Cari nama/NIP..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ paddingLeft: '36px', height: '36px' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#111827', margin: 0 }}>
+                Verifikasi Permohonan Cuti Pegawai (SDM Admin)
+              </h2>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', width: '100%' }}>
+              {renderStatusFilterTabs()}
+              <div style={{ position: 'relative', minWidth: '200px', flex: '1 1 200px', maxWidth: '320px' }}>
+                <Search size={15} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input type="text" className="bm-input" placeholder="Cari nama/NIP..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} style={{ paddingLeft: '36px', height: '36px', width: '100%' }} />
+              </div>
             </div>
           </div>
 
@@ -714,10 +842,10 @@ export const CutiPage = () => {
                           {formatIndonesianDateRange(item.tanggal_mulai, item.tanggal_selesai, false)}
                         </div>
                       </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '9999px', background: '#f3e8ff', color: '#6d28d9', fontWeight: 800, fontSize: '0.775rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={12} />
-                          {duration} Hari
+                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap' }}>
+                        <span style={{ padding: '4px 10px', borderRadius: '16px', background: '#f3e8ff', color: '#7c3aed', fontWeight: 700, fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}>
+                          <Clock size={13} />
+                          <span>{duration} Hari</span>
                         </span>
                       </td>
                       <td style={{ padding: '14px 16px', color: '#4b5563' }}>{item.alasan}</td>

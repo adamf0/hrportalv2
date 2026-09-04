@@ -18,8 +18,7 @@ import (
 	"hrportal_backend/modules/izin/domain"
 )
 
-func ModuleIzin(app *fiber.App) {
-	group := app.Group("/api/izin", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+func registerIzinRoutes(group fiber.Router) {
 
 	group.Post("/", func(c *fiber.Ctx) error {
 		jenisIzinID, _ := strconv.Atoi(c.FormValue("id_jenis_izin"))
@@ -165,26 +164,7 @@ func ModuleIzin(app *fiber.App) {
 		return c.JSON(fiber.Map{"success": res.Value})
 	})
 
-	group.Get("/:id", func(c *fiber.Ctx) error {
-		id, _ := strconv.Atoi(c.Params("id"))
-
-		query := get.GetIzinQuery{
-			ID: uint(id),
-		}
-
-		res, err := mediatr.Send[*get.GetIzinQuery, common.ResultValue[*domain.Izin]](c.UserContext(), &query)
-		if err != nil {
-			return commoninfra.HandleError(c, err)
-		}
-
-		if !res.IsSuccess {
-			return commoninfra.HandleError(c, res.Error)
-		}
-
-		return c.JSON(res.Value)
-	})
-
-	group.Get("/", func(c *fiber.Ctx) error {
+	getIzinList := func(c *fiber.Ctx, forceVerif bool) error {
 		nip := c.FormValue("nip")
 		if nip == "" {
 			nip = c.Query("nip")
@@ -205,10 +185,12 @@ func ModuleIzin(app *fiber.App) {
 		}
 		isSdm := (role == "sdm" || role == "baum" || c.Query("role") == "sdm" || c.Query("role") == "baum")
 
+		isVerif := forceVerif || c.Query("verifikasi") == "haxor" || c.Query("verifikasi") == "true"
+
 		query := getAll.GetAllIzinsQuery{
 			Nidn:         nidn,
 			Nip:          nip,
-			Verifikasi:   c.Query("verifikasi") == "haxor" || c.Query("verifikasi") == "true",
+			Verifikasi:   isVerif,
 			IsSdm:        isSdm,
 			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
@@ -227,5 +209,40 @@ func ModuleIzin(app *fiber.App) {
 		sseAdapter := &commonpresentation.SSEAdapter[domain.Izin]{}
 
 		return sseAdapter.Send(c, pagedData)
+	}
+
+	group.Get("/verifikasi", func(c *fiber.Ctx) error {
+		return getIzinList(c, true)
 	})
+
+	group.Get("/:id", func(c *fiber.Ctx) error {
+		id, _ := strconv.Atoi(c.Params("id"))
+
+		query := get.GetIzinQuery{
+			ID: uint(id),
+		}
+
+		res, err := mediatr.Send[*get.GetIzinQuery, common.ResultValue[*domain.Izin]](c.UserContext(), &query)
+		if err != nil {
+			return commoninfra.HandleError(c, err)
+		}
+
+		if !res.IsSuccess {
+			return commoninfra.HandleError(c, res.Error)
+		}
+
+		return c.JSON(res.Value)
+	})
+
+	group.Get("/", func(c *fiber.Ctx) error {
+		return getIzinList(c, false)
+	})
+}
+
+func ModuleIzin(app *fiber.App) {
+	groupV2 := app.Group("/api/v2/izin", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerIzinRoutes(groupV2)
+
+	groupV1 := app.Group("/api/izin", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerIzinRoutes(groupV1)
 }

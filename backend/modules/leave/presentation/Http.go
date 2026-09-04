@@ -19,8 +19,7 @@ import (
 	"github.com/mehdihadeli/go-mediatr"
 )
 
-func ModuleLeave(app *fiber.App) {
-	group := app.Group("/api/leave", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+func registerLeaveRoutes(group fiber.Router) {
 
 	group.Post("/submit", func(c *fiber.Ctx) error {
 		jenisCutiID, _ := strconv.Atoi(c.FormValue("jenis_cuti_id"))
@@ -277,6 +276,45 @@ func ModuleLeave(app *fiber.App) {
 		return c.JSON(fiber.Map{"success": res.Value})
 	})
 
+	getLeaveList := func(c *fiber.Ctx, forceVerif bool) error {
+		nip := c.FormValue("nip")
+		nidn := c.FormValue("nidn")
+		role := c.FormValue("role")
+		if role == "" {
+			role = string(c.Request().PostArgs().Peek("role"))
+		}
+		isSdm := (role == "sdm" || role == "baum" || c.Query("role") == "sdm" || c.Query("role") == "baum")
+
+		isVerif := forceVerif || c.Query("verifikasi") == "haxor" || c.Query("verifikasi") == "true"
+
+		query := &GetAllCuti.GetAllCutiQuery{
+			Nip:          nip,
+			Nidn:         nidn,
+			Verifikasi:   isVerif,
+			IsSdm:        isSdm,
+			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
+			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
+		}
+
+		res, err := mediatr.Send[*GetAllCuti.GetAllCutiQuery, common.ResultValue[[]domain.Cuti]](c.UserContext(), query)
+		if err != nil {
+			return infrastructure.HandleError(c, err)
+		}
+
+		if !res.IsSuccess {
+			return infrastructure.HandleError(c, res.Error)
+		}
+
+		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
+		sseAdapter := &commonpresentation.SSEAdapter[domain.Cuti]{}
+
+		return sseAdapter.Send(c, pagedData)
+	}
+
+	group.Get("/verifikasi", func(c *fiber.Ctx) error {
+		return getLeaveList(c, true)
+	})
+
 	group.Get("/:id", func(c *fiber.Ctx) error {
 		id, _ := strconv.Atoi(c.Params("id"))
 
@@ -297,35 +335,14 @@ func ModuleLeave(app *fiber.App) {
 	})
 
 	group.Get("/", func(c *fiber.Ctx) error {
-		nip := c.FormValue("nip")
-		nidn := c.FormValue("nidn")
-		role := c.FormValue("role")
-		if role == "" {
-			role = string(c.Request().PostArgs().Peek("role"))
-		}
-		isSdm := (role == "sdm" || role == "baum" || c.Query("role") == "sdm" || c.Query("role") == "baum")
-
-		query := &GetAllCuti.GetAllCutiQuery{
-			Nip:          nip,
-			Nidn:         nidn,
-			Verifikasi:   c.Query("verifikasi") == "haxor",
-			IsSdm:        isSdm,
-			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
-			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
-		}
-
-		res, err := mediatr.Send[*GetAllCuti.GetAllCutiQuery, common.ResultValue[[]domain.Cuti]](c.UserContext(), query)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-
-		pagedData := common.NewPaged(res.Value, int64(len(res.Value)), 1, len(res.Value))
-		sseAdapter := &commonpresentation.SSEAdapter[domain.Cuti]{}
-
-		return sseAdapter.Send(c, pagedData)
+		return getLeaveList(c, false)
 	})
+}
+
+func ModuleLeave(app *fiber.App) {
+	groupV2 := app.Group("/api/v2/leave", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerLeaveRoutes(groupV2)
+
+	groupV1 := app.Group("/api/leave", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerLeaveRoutes(groupV1)
 }

@@ -19,8 +19,7 @@ import (
 	"hrportal_backend/modules/sppd/domain"
 )
 
-func ModuleSppd(app *fiber.App) {
-	group := app.Group("/api/sppd", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+func registerSppdRoutes(group fiber.Router) {
 
 	group.Post("/create", func(c *fiber.Ctx) error {
 		jenisSppdID, _ := strconv.Atoi(c.FormValue("jenis_sppd_id"))
@@ -174,7 +173,7 @@ func ModuleSppd(app *fiber.App) {
 		return c.JSON(fiber.Map{"success": res.Value})
 	})
 
-	group.Get("/history", func(c *fiber.Ctx) error {
+	getSppdList := func(c *fiber.Ctx, forceVerif bool) error {
 		nip := c.FormValue("nip")
 		nidn := c.FormValue("nidn")
 		role := c.FormValue("role")
@@ -183,10 +182,12 @@ func ModuleSppd(app *fiber.App) {
 		}
 		isSdm := (role == "sdm" || role == "baum" || c.Query("role") == "sdm" || c.Query("role") == "baum")
 
+		isVerif := forceVerif || c.Query("verifikasi") == "haxor" || c.Query("verifikasi") == "true"
+
 		query := &getHistory.GetSppdHistoryQuery{
 			Nip:          nip,
 			Nidn:         nidn,
-			Verifikasi:   c.Query("verifikasi") == "haxor",
+			Verifikasi:   isVerif,
 			IsSdm:        isSdm,
 			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
 			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
@@ -205,6 +206,22 @@ func ModuleSppd(app *fiber.App) {
 		sseAdapter := &commonpresentation.SSEAdapter[domain.Sppd]{}
 
 		return sseAdapter.Send(c, pagedData)
+	}
+
+	group.Get("/verifikasi", func(c *fiber.Ctx) error {
+		return getSppdList(c, true)
+	})
+
+	group.Get("/history/verifikasi", func(c *fiber.Ctx) error {
+		return getSppdList(c, true)
+	})
+
+	group.Get("/history", func(c *fiber.Ctx) error {
+		return getSppdList(c, false)
+	})
+
+	group.Get("/", func(c *fiber.Ctx) error {
+		return getSppdList(c, false)
 	})
 
 	group.Get("/:id", func(c *fiber.Ctx) error {
@@ -225,4 +242,12 @@ func ModuleSppd(app *fiber.App) {
 
 		return c.JSON(res.Value)
 	})
+}
+
+func ModuleSppd(app *fiber.App) {
+	groupV2 := app.Group("/api/v2/sppd", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerSppdRoutes(groupV2)
+
+	groupV1 := app.Group("/api/sppd", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())
+	registerSppdRoutes(groupV1)
 }
