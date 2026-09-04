@@ -47,61 +47,9 @@ export const SlipGajiPage = () => {
 
       if (data) {
         setPayrollData(data);
-      } else {
-        // Fallback structure if API returns null/empty
-        setPayrollData({
-          no_urut: '201610001',
-          nama: user?.name || 'Muhamad Saad Nurul Ishlah, M. Comp.',
-          gaji_pokok: 2349023,
-          suami_istri: 0,
-          anak: 0,
-          pangan: 132550,
-          struktural: 0,
-          fungsional: 1500000,
-          mengajar_s1: 270000,
-          mengajar_vokasi: 270000,
-          mengajar_vokasi_nonreg: 510000,
-          transpot: 600000,
-          khusus: 500000,
-          astek_dplk: 190019,
-          bpjs: 89631,
-          jumlah_pendapatan: 6411223,
-          astek: 414096.5,
-          dplk: 0,
-          koperasi: 0,
-          yayasan: 0,
-          zakat: 0,
-          jumlah_potongan: 414097,
-          pendapatan_bersih: 5997126,
-        });
       }
     } catch (err) {
       console.warn('Backend /api/payroll note:', err);
-      setPayrollData({
-        no_urut: '201610001',
-        nama: user?.name || 'Muhamad Saad Nurul Ishlah, M. Comp.',
-        gaji_pokok: 2349023,
-        suami_istri: 0,
-        anak: 0,
-        pangan: 132550,
-        struktural: 0,
-        fungsional: 1500000,
-        mengajar_s1: 270000,
-        mengajar_vokasi: 270000,
-        mengajar_vokasi_nonreg: 510000,
-        transpot: 600000,
-        khusus: 500000,
-        astek_dplk: 190019,
-        bpjs: 89631,
-        jumlah_pendapatan: 6411223,
-        astek: 414096.5,
-        dplk: 0,
-        koperasi: 0,
-        yayasan: 0,
-        zakat: 0,
-        jumlah_potongan: 414097,
-        pendapatan_bersih: 5997126,
-      });
     } finally {
       setLoading(false);
     }
@@ -195,211 +143,211 @@ export const SlipGajiPage = () => {
         id="official-slip-gaji"
         style={{
           width: '100%',
-          maxWidth: '680px',
+          maxWidth: '540px',
           background: '#ffffff',
-          border: '2px solid #000000',
-          padding: '24px 28px',
+          border: '1.5px solid #000000',
+          padding: '16px 20px',
           fontFamily: "'Times New Roman', Times, serif, Arial",
           color: '#000000',
-          boxShadow: '0 10px 25px rgba(0, 0, 0, 0.08)',
-          fontSize: '1rem',
-          lineHeight: 1.4,
+          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.06)',
+          fontSize: '0.85rem',
+          lineHeight: 1.3,
         }}
       >
         {/* Document Header Box */}
-        <div style={{ border: '2px solid #000000', textAlign: 'center', padding: '12px', marginBottom: '16px' }}>
-          <div style={{ fontSize: '1.15rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+        <div style={{ border: '1.5px solid #000000', textAlign: 'center', padding: '8px 10px', marginBottom: '12px' }}>
+          <div style={{ fontSize: '0.92rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.01em' }}>
             UNIT KERJA/FAKULTAS SEKOLAH VOKASI
           </div>
-          <div style={{ fontSize: '1.15rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+          <div style={{ fontSize: '0.92rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.01em' }}>
             UNIVERSITAS PAKUAN
           </div>
-          <div style={{ fontSize: '1.3rem', fontWeight: 'bold', textDecoration: 'underline', marginTop: '4px', letterSpacing: '0.04em' }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 'bold', textDecoration: 'underline', marginTop: '2px', letterSpacing: '0.02em' }}>
             GAJI dan TUNJANGAN
           </div>
-          <div style={{ fontSize: '1.1rem', fontWeight: 'bold', marginTop: '2px' }}>
+          <div style={{ fontSize: '0.88rem', fontWeight: 'bold', marginTop: '2px' }}>
             Bulan/Tahun : {selectedMonthName}/{selectedYear}
           </div>
         </div>
 
         {/* Pegawai Details Rows */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '12px', fontSize: '1rem', fontFamily: 'inherit' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px', fontSize: '0.85rem', fontFamily: 'inherit' }}>
           <tbody>
             <tr>
-              <td style={{ width: '110px', padding: '2px 0', fontWeight: 'bold' }}>No. Urut</td>
-              <td style={{ width: '15px' }}>:</td>
-              <td style={{ fontWeight: 'bold' }}>{p.no_urut || p.no_mesin || '201610001'}</td>
+              <td style={{ width: '90px', padding: '1px 0', fontWeight: 'bold' }}>No. Urut</td>
+              <td style={{ width: '12px' }}>:</td>
+              <td style={{ fontWeight: 'bold' }}>{p.no_urut || p.no_mesin || ''}</td>
               <td style={{ textAlign: 'right', fontWeight: 'bold' }}>Hari</td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Nama</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Nama</td>
               <td>:</td>
-              <td colSpan={2} style={{ fontWeight: 'bold' }}>{p.nama || user?.name || 'Muhamad Saad Nurul Ishlah, M. Comp.'}</td>
+              <td colSpan={2} style={{ fontWeight: 'bold' }}>{p.nama || user?.name || ''}</td>
             </tr>
           </tbody>
         </table>
 
         {/* Breakdown Items Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.975rem', fontFamily: 'inherit' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', fontFamily: 'inherit' }}>
           <tbody>
             {/* Income items */}
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Gaji Pokok</td>
-              <td style={{ width: '40px' }}>Rp.</td>
-              <td style={{ textAlign: 'right', width: '140px' }}>{formatRupiah(p.gaji_pokok ?? p.gajiPokok ?? 2349023)}</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Gaji Pokok</td>
+              <td style={{ width: '35px' }}>Rp.</td>
+              <td style={{ textAlign: 'right', width: '120px' }}>{formatRupiah(p.gaji_pokok ?? p.gajiPokok ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Suami/istri</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Suami/istri</td>
               <td>Rp.</td>
               <td style={{ textAlign: 'right' }}>{formatRupiah(p.suami_istri ?? p.tkeluarga ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Anak</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Anak</td>
               <td>Rp.</td>
               <td style={{ textAlign: 'right' }}>{formatRupiah(p.anak ?? p.tanak ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Pangan</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Pangan</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.pangan ?? p.tpangan ?? 132550)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.pangan ?? p.tpangan ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Struktural</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Struktural</td>
               <td>Rp.</td>
               <td style={{ textAlign: 'right' }}>{formatRupiah(p.struktural ?? p.tstruktural ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Fungsional</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Fungsional</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.fungsional ?? p.tfungsional ?? 1500000)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.fungsional ?? p.tfungsional ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td colSpan={4} style={{ padding: '2px 0', fontWeight: 'bold' }}>Mengajar :</td>
+              <td colSpan={4} style={{ padding: '1px 0', fontWeight: 'bold' }}>Mengajar :</td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0 2px 16px' }}>-S1</td>
+              <td style={{ padding: '1px 0 1px 12px' }}>-S1</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_s1 ?? p.mengajar ?? 270000)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_s1 ?? p.mengajar ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0 2px 16px' }}>-Vokasi</td>
+              <td style={{ padding: '1px 0 1px 12px' }}>-Vokasi</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_vokasi ?? p.d3regular ?? 270000)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_vokasi ?? p.d3regular ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0 2px 16px' }}>-Vokasi-NonReg</td>
+              <td style={{ padding: '1px 0 1px 12px' }}>-Vokasi-NonReg</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_vokasi_nonreg ?? p.d3nonregular ?? 510000)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_vokasi_nonreg ?? p.d3nonregular ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Transpot</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Transpot</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.transpot ?? 600000)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.transpot ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Khusus</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Khusus</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.khusus ?? p.tkhusus ?? 500000)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.khusus ?? p.tkhusus ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Astek/DPLK</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Astek/DPLK</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.astek_dplk ?? p.astekY ?? 190019)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.astek_dplk ?? p.astekY ?? 0)}</td>
               <td></td>
             </tr>
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '2px 0 6px 0', fontWeight: 'bold' }}>BPJS</td>
-              <td style={{ paddingBottom: '6px' }}>Rp.</td>
-              <td style={{ textAlign: 'right', paddingBottom: '6px' }}>{formatRupiah(p.bpjs ?? 89631)}</td>
+              <td style={{ padding: '1px 0 4px 0', fontWeight: 'bold' }}>BPJS</td>
+              <td style={{ paddingBottom: '4px' }}>Rp.</td>
+              <td style={{ textAlign: 'right', paddingBottom: '4px' }}>{formatRupiah(p.bpjs ?? 0)}</td>
               <td></td>
             </tr>
 
             {/* Jumlah Pendapatan Row */}
             <tr>
-              <td style={{ padding: '8px 0', fontWeight: 'bold', fontSize: '1.05rem' }}>Jumlah Pendapatan</td>
+              <td style={{ padding: '6px 0', fontWeight: 'bold', fontSize: '0.88rem' }}>Jumlah Pendapatan</td>
               <td></td>
               <td></td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '1.05rem' }}>
-                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.jumlah_pendapatan ?? p.gajikotor ?? 6411223)}
+              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '0.88rem' }}>
+                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.jumlah_pendapatan ?? p.gajikotor ?? 0)}
               </td>
             </tr>
 
             {/* Deductions items */}
             <tr>
-              <td style={{ padding: '4px 0 2px 0', fontWeight: 'bold' }}>Astek</td>
+              <td style={{ padding: '2px 0 1px 0', fontWeight: 'bold' }}>Astek</td>
               <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.astek ?? p.astekP ?? 414096.5)}</td>
+              <td style={{ textAlign: 'right' }}>{formatRupiah(p.astek ?? p.astekP ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>DPLK</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>DPLK</td>
               <td>Rp.</td>
               <td style={{ textAlign: 'right' }}>{formatRupiah(p.dplk ?? p.dplkP ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Koperasi</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Koperasi</td>
               <td>Rp.</td>
               <td style={{ textAlign: 'right' }}>{formatRupiah(p.koperasi ?? p.pkoperasi ?? 0)}</td>
               <td></td>
             </tr>
             <tr>
-              <td style={{ padding: '2px 0', fontWeight: 'bold' }}>Yayasan</td>
+              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Yayasan</td>
               <td>Rp.</td>
               <td style={{ textAlign: 'right' }}>{formatRupiah(p.yayasan ?? p.pyayasan ?? 0)}</td>
               <td></td>
             </tr>
             <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '2px 0 6px 0', fontWeight: 'bold' }}>Zakat 2.5%</td>
-              <td style={{ paddingBottom: '6px' }}>Rp.</td>
-              <td style={{ textAlign: 'right', paddingBottom: '6px' }}>{formatRupiah(p.zakat ?? p.pzakat ?? 0)}</td>
+              <td style={{ padding: '1px 0 4px 0', fontWeight: 'bold' }}>Zakat 2.5%</td>
+              <td style={{ paddingBottom: '4px' }}>Rp.</td>
+              <td style={{ textAlign: 'right', paddingBottom: '4px' }}>{formatRupiah(p.zakat ?? p.pzakat ?? 0)}</td>
               <td></td>
             </tr>
 
             {/* Summary Net Totals */}
             <tr>
-              <td style={{ padding: '6px 0 2px 0', fontWeight: 'bold', fontSize: '1.05rem' }}>Jumlah Potongan</td>
+              <td style={{ padding: '4px 0 1px 0', fontWeight: 'bold', fontSize: '0.88rem' }}>Jumlah Potongan</td>
               <td></td>
               <td></td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '1.05rem' }}>
-                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.jumlah_potongan ?? 414097)}
+              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '0.88rem' }}>
+                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.jumlah_potongan ?? 0)}
               </td>
             </tr>
 
             <tr>
-              <td style={{ padding: '2px 0 8px 0', fontWeight: 'bold', fontSize: '1.05rem' }}>Pendapatan Bersih</td>
+              <td style={{ padding: '1px 0 6px 0', fontWeight: 'bold', fontSize: '0.88rem' }}>Pendapatan Bersih</td>
               <td></td>
               <td></td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '1.05rem' }}>
-                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.pendapatan_bersih ?? p.gajibersih ?? 5997126)}
+              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '0.88rem' }}>
+                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.pendapatan_bersih ?? p.gajibersih ?? 0)}
               </td>
             </tr>
           </tbody>
         </table>
 
         {/* Signature Footer */}
-        <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-          <div style={{ textAlign: 'center', minWidth: '240px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <div style={{ textAlign: 'center', minWidth: '220px' }}>
+            <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '0.82rem' }}>
               Bogor, {selectedMonthName} {selectedYear}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '32px', fontWeight: 'bold', marginBottom: '60px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '24px', fontWeight: 'bold', marginBottom: '40px', fontSize: '0.82rem' }}>
               <span>Yang Menerima,</span>
               <span>Yang Menyerahkan,</span>
             </div>
-            <div style={{ fontWeight: 'bold', textDecoration: 'underline' }}>
-              ({p.nama || user?.name || 'Muhamad Saad Nurul Ishlah, M. Comp.'})
+            <div style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '0.82rem' }}>
+              ({p.nama || user?.name || ''})
             </div>
           </div>
         </div>

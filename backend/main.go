@@ -56,6 +56,7 @@ import (
 	notificationDomain "hrportal_backend/modules/notification/domain"
 	notificationInfrastructure "hrportal_backend/modules/notification/infrastructure"
 	notificationPresentation "hrportal_backend/modules/notification/presentation"
+	payrollInfrastructure "hrportal_backend/modules/payroll/infrastructure"
 	payrollPresentation "hrportal_backend/modules/payroll/presentation"
 	storagePresentation "hrportal_backend/modules/storage/presentation"
 )
@@ -300,6 +301,10 @@ func main() {
 		return notificationInfrastructure.RegisterModuleNotification(db)
 	})
 
+	mustStart("Payroll Module", func() error {
+		return payrollInfrastructure.RegisterModulePayroll(db, dbSimpeg)
+	})
+
 	if len(startupErrors) > 0 {
 		log.Printf("Startup warnings/errors encountered: %v", startupErrors)
 	}
@@ -315,7 +320,7 @@ func main() {
 	reportPresentation.ModuleReport(app)
 	holidayPresentation.ModuleHoliday(app, db)
 	notificationPresentation.ModuleNotification(app)
-	payrollPresentation.ModulePayroll(app, db, dbSimpeg)
+	payrollPresentation.ModulePayroll(app)
 	storagePresentation.ModuleStorage(app)
 
 	// WebSocket Real-time Feed for SDM Dashboard (Live Izin, Cuti, SPPD updates)

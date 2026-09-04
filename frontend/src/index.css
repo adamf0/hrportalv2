@@ -534,7 +534,6 @@ button[disabled] {
   }
 }
 
-/* FLUID TYPOGRAPHY UTILITIES CLAMP (rem, svw, rem) */
 @layer utilities {
   .text-fluid-xs { font-size: clamp(0.7rem, 0.65rem + 0.25svw, 0.8rem); }
   .text-fluid-sm { font-size: clamp(0.8rem, 0.75rem + 0.3svw, 0.9rem); }
@@ -545,3 +544,83 @@ button[disabled] {
   .text-fluid-2xl { font-size: clamp(1.65rem, 1.45rem + 1svw, 2.15rem); }
   .text-fluid-3xl { font-size: clamp(2.15rem, 1.85rem + 1.5svw, 2.85rem); }
 }
+
+/* ==========================================
+   PRINT STYLES FOR OFFICIAL DOCUMENTS (A4)
+   ========================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 8mm 10mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Disable animations and transitions on print */
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* Hide app shell layout & non-printable UI controls */
+  .sidebar-container,
+  .navbar-header,
+  .no-print,
+  .bm-card.no-print,
+  button,
+  header,
+  nav,
+  aside,
+  footer,
+  .toast-container {
+    display: none !important;
+  }
+
+  /* Reset main layout wrapper constraints */
+  .app-layout,
+  .main-content-wrapper,
+  .content-container {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    transform: none !important;
+  }
+
+  /* Target slip gaji document container (compact & scaled down) */
+  #official-slip-gaji {
+    width: 100% !important;
+    max-width: 520px !important;
+    margin: 10px auto !important;
+    padding: 14px 18px !important;
+    border: 1.5px solid #000000 !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    font-size: 0.8rem !important;
+    line-height: 1.25 !important;
+  }
+
+  #official-slip-gaji table,
+  #official-slip-gaji tr,
+  #official-slip-gaji td {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
