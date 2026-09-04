@@ -331,7 +331,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     const isUuidEmpty = !uuidKuesioner || uuidKuesioner.startsWith('00000000-0000') || uuidKuesioner === '00000000-0000-0000-0000-000000000000';
 
     if (isUuidEmpty) {
-      showToast('Generasi UUID Kuesioner via POST Form Data https://stagging-api-simonev-lpm.unpak.ac.id/api/v2/kuesioner...', 'info');
+      showToast('Generasi UUID Kuesioner via POST Form Data https://api-simonev-lpm.unpak.ac.id/api/v2/kuesioner...', 'info');
       try {
         const pad2 = (n) => String(n).padStart(2, '0');
         const now = new Date();
@@ -346,7 +346,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         formData.append('bank_soal', bankSoalVal);
         formData.append('resource', resourceVal);
 
-        const postRes = await fetch('https://stagging-api-simonev-lpm.unpak.ac.id/api/v2/kuesioner', {
+        const postRes = await fetch('https://api-simonev-lpm.unpak.ac.id/api/v2/kuesioner', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${jwt}`,
