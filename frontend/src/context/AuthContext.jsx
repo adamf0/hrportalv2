@@ -163,7 +163,13 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
     setToken('');
     localStorage.clear();
-    window.location.href = '/login';
+    try {
+      window.open('', '_self');
+      window.close();
+    } catch (e) {}
+    setTimeout(() => {
+      window.location.href = '/login';
+    }, 300);
   };
 
   useEffect(() => {
