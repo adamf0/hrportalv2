@@ -365,7 +365,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
       }
     }
 
-    const targetUrl = `https://stagging-simonev-lpm.unpak.ac.id/quesioner/${uuidKuesioner}?ctx=${jwt}`;
+    const targetUrl = `https://simonev-lpm.unpak.ac.id/quesioner/${uuidKuesioner}?ctx=${jwt}`;
     window.open(targetUrl, '_blank', 'noopener,noreferrer');
     showToast(`Membuka Simonev LPM: ${item.judul}`, 'success');
   };
