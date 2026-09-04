@@ -298,8 +298,8 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
           const rawDesc = k.Deskripsi || k.Content || k.deskripsi || k.description || '';
           const cleanDesc = stripHtml(rawDesc) || 'Evaluasi penjaminan mutu internal Universitas Pakuan.';
           const rawJudul = k.Judul || k.judul || k.nama || k.title || `Kuesioner Simonev LPM ${idx + 1}`;
-          const targetPertanyaan = k.TotalPertanyaan || (k.TargetPertanyaan ? k.TargetPertanyaan.length : 0);
-          const totalInput = (k.TotalInput || 0) > 0 || k.status === 'selesai' || false;
+          const targetPertanyaan = k?.TotalPertanyaan ?? 0;
+          const totalInput = k?.TotalInput ?? 0;
 
           return {
             id: k.UUID || k.id || k.UUIDKuesioner || `simonev-${idx + 1}`,
