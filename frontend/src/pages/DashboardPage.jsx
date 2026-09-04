@@ -356,6 +356,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         const postData = await postRes.json();
         if (postData && (postData.UUIDKuesioner || postData.uuidkuesioner || postData.uuid || postData.data?.UUIDKuesioner || postData.data?.uuidkuesioner || postData.data?.UUID)) {
           uuidKuesioner = postData.UUIDKuesioner || postData.uuidkuesioner || postData.uuid || postData.data?.UUIDKuesioner || postData.data?.uuidkuesioner || postData.data?.UUID;
+          setKuesionerList((prev) => prev.map((k) => k.id === item.id ? { ...k, uuidkuesioner: uuidKuesioner } : k));
         } else {
           uuidKuesioner = bankSoalVal;
         }
@@ -1021,7 +1022,8 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
               </div>
             )}
 
-            {(!todayAbsen || !todayAbsen.absen_masuk) ? (
+            {!loading &&
+            (!todayAbsen || !todayAbsen.absen_masuk) ? (
               <button
                 onClick={() => handleCheckIn()}
                 disabled={submitting || hasUnfilledKuesioner}

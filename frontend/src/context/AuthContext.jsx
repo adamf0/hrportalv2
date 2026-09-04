@@ -8,7 +8,9 @@ export const SSO_CONFIG = {
   tokenUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/token',
   logoutUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout',
   clientId: 'unpak_link_gate',
-  redirectUri: window.location.origin + '/login',
+  get redirectUri() {
+    return "http://gerbang.unpak.ac.id";
+  },
 };
 
 export const decodeJwt = (token) => {
@@ -173,7 +175,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('active_role');
 
     if (isSsoUser) {
-      const redirectUri = encodeURIComponent(window.location.origin + '/login');
+      const currentOrigin = window.location.origin;
+      const redirectUri = encodeURIComponent(`${currentOrigin}/login`);
       let keycloakLogoutUrl = `${SSO_CONFIG.logoutUrl}?client_id=${SSO_CONFIG.clientId}&post_logout_redirect_uri=${redirectUri}`;
       if (savedIdToken) {
         keycloakLogoutUrl += `&id_token_hint=${encodeURIComponent(savedIdToken)}`;
