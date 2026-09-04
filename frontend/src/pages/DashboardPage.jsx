@@ -1022,8 +1022,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
               </div>
             )}
 
-            {!loading &&
-            (!todayAbsen || !todayAbsen.absen_masuk) ? (
+            { (!loading && (!todayAbsen || !todayAbsen.absen_masuk)) ? (
               <button
                 onClick={() => handleCheckIn()}
                 disabled={submitting || hasUnfilledKuesioner}
@@ -1046,7 +1045,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
                 <CheckCircle2 size={22} />
                 <span>Absen Masuk</span>
               </button>
-            ) : (todayAbsen?.absen_masuk && !todayAbsen?.absen_keluar) ? (
+            ) : (!loading && todayAbsen?.absen_masuk && !todayAbsen?.absen_keluar) ? (
               <button
                 onClick={() => handleCheckOut()}
                 disabled={submitting || hasUnfilledKuesioner}
@@ -1073,7 +1072,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
                 <span>Absen Keluar</span>
               </button>
             ) : (
-              <div
+              (!loading? <div
                 style={{
                   padding: '18px',
                   borderRadius: '14px',
@@ -1090,7 +1089,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
               >
                 <CheckCircle2 size={20} color="#15803d" />
                 <span>Presensi Hari Ini Selesai (Masuk &amp; Keluar Recorded)</span>
-              </div>
+              </div> : "")
             )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem', color: '#64748b' }}>
