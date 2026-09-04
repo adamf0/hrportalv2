@@ -160,31 +160,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const logout = () => {
-    const savedIdToken = localStorage.getItem('id_token') || '';
-    const isSsoUser = user?.isSso || !!savedIdToken || (user && user.groups && user.groups.length > 0);
-
     setUser(null);
     setToken('');
-    localStorage.removeItem('token');
-    localStorage.removeItem('refresh');
-    localStorage.removeItem('id_token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('profile');
-    localStorage.removeItem('whoami');
-    localStorage.removeItem('user_profile');
-    localStorage.removeItem('active_role');
-
-    if (isSsoUser) {
-      const currentOrigin = window.location.origin;
-      const redirectUri = encodeURIComponent(`${currentOrigin}/login`);
-      let keycloakLogoutUrl = `${SSO_CONFIG.logoutUrl}?client_id=${SSO_CONFIG.clientId}&post_logout_redirect_uri=${redirectUri}`;
-      if (savedIdToken) {
-        keycloakLogoutUrl += `&id_token_hint=${encodeURIComponent(savedIdToken)}`;
-      }
-      window.location.href = keycloakLogoutUrl;
-    } else {
-      window.location.href = '/login';
-    }
+    localStorage.clear();
+    window.location.href = '/login';
   };
 
   useEffect(() => {
