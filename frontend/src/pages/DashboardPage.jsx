@@ -317,7 +317,8 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
           };
         });
 
-        setKuesionerList(mappedList);
+        // setKuesionerList(mappedList);
+        setKuesionerList([]);
       }
     } catch (err) {
       console.warn('Simonev API fetch note:', err);
