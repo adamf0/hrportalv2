@@ -211,12 +211,10 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     return false;
   };
 
-  // Helper peruntukan checker against profile.level (Peruntukan = localstorage.level)
+  // Helper peruntukan checker against profile.role / profile.level (Peruntukan = local.role)
   const isPeruntukanMatching = (k, profile) => {
     const p = (k.Peruntukan || k.peruntukan || '').toString().toLowerCase().trim();
-    if (!p || p === 'semua' || p === 'all' || p === 'umum' || p === 'pegawai') return true;
-
-    const userLevel = (profile.level || profile.role || userRole || user?.level || 'tendik').toString().toLowerCase().trim();
+    const userLevel = (profile.role || profile.level || userRole || user?.role || user?.level || 'dosen').toString().toLowerCase().trim();
 
     if (p === userLevel || p.includes(userLevel)) return true;
 
@@ -224,7 +222,6 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     if (Array.isArray(k.ListExt) && k.ListExt.length > 0) {
       return k.ListExt.some((ext) => {
         const extP = (ext.Peruntukan || ext.peruntukan || '').toString().toLowerCase().trim();
-        if (!extP || extP === 'semua' || extP === 'all' || extP === 'umum' || extP === 'pegawai') return true;
         return extP === userLevel || extP.includes(userLevel);
       });
     }
@@ -283,18 +280,21 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
       if (rawList && rawList.length > 0) {
         const profile = getUserProfile();
 
-        // Filter by Status active, Active Date Range, Peruntukan (profile.level), & KodeFakultas/KodeProdi
+        // Filter by Status active, Active Date Range, Peruntukan (profile.role / local.role), TotalPertanyaan != TotalInput & TotalPertanyaan > 0, & KodeFakultas/KodeProdi
         const activeFiltered = rawList.filter((k) => {
           const statusActive = (k.Status || k.status || 'active').toLowerCase() === 'active' && !k.DeletedAt;
           const dateActive = isKuesionerDateActive(k);
           const peruntukanMatch = isPeruntukanMatching(k, profile);
           const fakProdiMatch = isFakultasProdiMatching(k, profile);
-          return statusActive && dateActive && peruntukanMatch && fakProdiMatch;
+
+          const targetPertanyaan = k?.TotalPertanyaan ?? k?.total_pertanyaan ?? 0;
+          const totalInput = k?.TotalInput ?? k?.total_input ?? 0;
+          const questionsMatch = targetPertanyaan > 0 && targetPertanyaan != totalInput;
+
+          return statusActive && dateActive && peruntukanMatch && fakProdiMatch && questionsMatch;
         });
 
-        const listToMap = activeFiltered.length > 0 ? activeFiltered : rawList;
-
-        const mappedList = listToMap.map((k, idx) => {
+        const mappedList = activeFiltered.map((k, idx) => {
           const rawDesc = k.Deskripsi || k.Content || k.deskripsi || k.description || '';
           const cleanDesc = stripHtml(rawDesc) || 'Evaluasi penjaminan mutu internal Universitas Pakuan.';
           const rawJudul = k.Judul || k.judul || k.nama || k.title || `Kuesioner Simonev LPM ${idx + 1}`;
@@ -318,9 +318,12 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         });
 
         setKuesionerList(mappedList);
+      } else {
+        setKuesionerList([]);
       }
     } catch (err) {
       console.warn('Simonev API fetch note:', err);
+      setKuesionerList([]);
     }
   };
 
@@ -913,68 +916,89 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         </div>
 
         {/* Multi-Kuesioner Cards Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-          {kuesionerList.map((item) => {
-            const Icon = item.IconComponent || ClipboardList;
-            return (
-              <div
-                key={item.id}
-                className="bm-card-interactive"
-                style={{
-                  padding: '24px',
-                  borderRadius: '18px',
-                  background: item.isFilled ? '#f8fafc' : '#ffffff',
-                  border: item.isFilled ? '1px solid #e2e8f0' : '1px solid #93c5fd',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  gap: '16px',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div className="icon-bubble-3d" style={{ background: item.iconBg || 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: '#ffffff' }}>
-                      <Icon size={22} />
+        {kuesionerList.length === 0 ? (
+          <div
+            style={{
+              padding: '32px 24px',
+              textAlign: 'center',
+              background: '#ffffff',
+              borderRadius: '16px',
+              border: '1px dashed #cbd5e1',
+              color: '#64748b',
+            }}
+          >
+            <CheckCircle2 size={32} color="#10b981" style={{ margin: '0 auto 10px auto' }} />
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>
+              Tidak Ada Kuesioner Wajib Saat Ini
+            </div>
+            <div style={{ fontSize: '0.825rem', color: '#64748b', marginTop: '4px' }}>
+              Semua kuesioner LPM Universitas Pakuan yang sesuai peruntukan role Anda telah selesai diisi atau tidak aktif.
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            {kuesionerList.map((item) => {
+              const Icon = item.IconComponent || ClipboardList;
+              return (
+                <div
+                  key={item.id}
+                  className="bm-card-interactive"
+                  style={{
+                    padding: '24px',
+                    borderRadius: '18px',
+                    background: item.isFilled ? '#f8fafc' : '#ffffff',
+                    border: item.isFilled ? '1px solid #e2e8f0' : '1px solid #93c5fd',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div className="icon-bubble-3d" style={{ background: item.iconBg || 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)', color: '#ffffff' }}>
+                        <Icon size={22} />
+                      </div>
+                      <span
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: 800,
+                          background: item.isFilled ? '#dcfce7' : '#fef3c7',
+                          color: item.isFilled ? '#15803d' : '#b45309',
+                          border: item.isFilled ? '1px solid #86efac' : '1px solid #fde68a',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {item.isFilled ? 'Sudah Diisi ✓' : 'Belum Diisi • Wajib'}
+                      </span>
                     </div>
-                    <span
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: '9999px',
-                        fontSize: '0.75rem',
-                        fontWeight: 800,
-                        background: item.isFilled ? '#dcfce7' : '#fef3c7',
-                        color: item.isFilled ? '#15803d' : '#b45309',
-                        border: item.isFilled ? '1px solid #86efac' : '1px solid #fde68a',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {item.isFilled ? 'Sudah Diisi ✓' : 'Belum Diisi • Wajib'}
+
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {item.kategori}
                     </span>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', lineHeight: 1.3 }}>
+                      {item.judul}
+                    </h3>
+                    <p style={{ fontSize: '0.825rem', color: '#64748b', marginTop: '6px', lineHeight: 1.5 }}>
+                      {item.deskripsi}
+                    </p>
                   </div>
 
-                  <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                    {item.kategori}
-                  </span>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', marginTop: '4px', lineHeight: 1.3 }}>
-                    {item.judul}
-                  </h3>
-                  <p style={{ fontSize: '0.825rem', color: '#64748b', marginTop: '6px', lineHeight: 1.5 }}>
-                    {item.deskripsi}
-                  </p>
+                  <button
+                    disabled={item.isFilled}
+                    onClick={() => handleOpenKuesionerSimonev(item)}
+                    className="bm-btn-lpm"
+                  >
+                    <CheckSquare size={16} />
+                    <span>{item.isFilled ? 'Sudah Diisi Simonev ✓' : 'Isi Kuesioner Simonev'}</span>
+                  </button>
                 </div>
-
-                <button
-                  disabled={item.isFilled}
-                  onClick={() => handleOpenKuesionerSimonev(item)}
-                  className="bm-btn-lpm"
-                >
-                  <CheckSquare size={16} />
-                  <span>{item.isFilled ? 'Sudah Diisi Simonev ✓' : 'Isi Kuesioner Simonev'}</span>
-                </button>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* PRESENSI REAL-TIME DIGITAL CLOCK & CONDITIONAL BUTTON VISIBILITY */}
