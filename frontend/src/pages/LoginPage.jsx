@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 
 export const LoginPage = () => {
-  const { exchangeSsoCode, loginWithSsoToken, triggerSsoRedirect } = useAuth();
+  const { exchangeSsoCode, loginWithSsoToken, triggerSsoRedirect, isAuthenticated } = useAuth();
   const { showToast } = useToast();
 
   const [loading, setLoading] = useState(false);
@@ -27,6 +27,13 @@ export const LoginPage = () => {
       const code = params.get('code');
       const accessToken = params.get('access_token');
       const idToken = params.get('id_token');
+      const errorParam = params.get('error') || params.get('error_description');
+
+      if (errorParam) {
+        setErrorMessage(errorParam);
+        showToast(errorParam, 'error');
+        return;
+      }
 
       if (code && !hasExchangedRef.current) {
         hasExchangedRef.current = true;
@@ -59,11 +66,26 @@ export const LoginPage = () => {
           showToast(res.error || 'Gagal login via SSO', 'error');
         }
         setLoading(false);
+      } else if (!code && !accessToken && !hasExchangedRef.current) {
+        if (isAuthenticated) {
+          window.history.pushState(null, '', '/dashboard');
+          return;
+        }
+
+        const isLoggedOut = params.get('logged_out') === 'true' || sessionStorage.getItem('just_logged_out') === 'true';
+        if (params.get('logged_out')) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+
+        // Direct auto-redirect to Keycloak gerbang.unpak.ac.id without waiting for click
+        hasExchangedRef.current = true;
+        setLoading(true);
+        triggerSsoRedirect(isLoggedOut);
       }
     };
 
     handleSsoCallback();
-  }, []);
+  }, [isAuthenticated]);
 
   return (
     <div

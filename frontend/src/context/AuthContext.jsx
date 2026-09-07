@@ -159,17 +159,32 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [loading, setLoading] = useState(true);
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refresh') || localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        await fetch(SSO_CONFIG.logoutUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            client_id: SSO_CONFIG.clientId,
+            refresh_token: refreshToken,
+          }),
+        });
+      }
+    } catch (e) {
+      console.warn('Keycloak POST logout note:', e);
+    }
+
+    sessionStorage.setItem('just_logged_out', 'true');
     setUser(null);
     setToken('');
     localStorage.clear();
-    try {
-      window.open('', '_self');
-      window.close();
-    } catch (e) {}
-    setTimeout(() => {
-      window.location.href = '/login';
-    }, 300);
+
+    const origin = window.location.origin;
+    window.location.href = `${origin}/login?logged_out=true`;
   };
 
   useEffect(() => {
@@ -390,10 +405,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const triggerSsoRedirect = () => {
+  const triggerSsoRedirect = (forcePromptLogin = false) => {
     const origin = window.location.origin;
     const redirectUri = `${origin}/login`;
-    const url = `${SSO_CONFIG.authUrl}?client_id=${SSO_CONFIG.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid`;
+    let url = `${SSO_CONFIG.authUrl}?client_id=${SSO_CONFIG.clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid`;
+
+    const wasLoggedOut = sessionStorage.getItem('just_logged_out') === 'true';
+    if (forcePromptLogin || wasLoggedOut) {
+      sessionStorage.removeItem('just_logged_out');
+      url += '&prompt=login';
+    }
+
     window.location.href = url;
   };
 
