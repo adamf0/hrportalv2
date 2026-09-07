@@ -173,14 +173,47 @@ export const PresensiPage = () => {
     }
   };
 
-  const filteredHistory = history.filter((item) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      (item.tanggal || '').toLowerCase().includes(q) ||
-      (item.note || item.catatan || '').toLowerCase().includes(q) ||
-      (item.status || '').toLowerCase().includes(q)
-    );
-  });
+  const renderStatusBadge = (item) => {
+    const checkIn = item.absen_masuk || item.check_in;
+    const checkOut = item.absen_keluar || item.check_out;
+
+    const hasMasuk = !!(checkIn && checkIn !== '-' && checkIn !== '');
+    const hasKeluar = !!(checkOut && checkOut !== '-' && checkOut !== '');
+
+    const rawStatus = (item.status || item.type || item.note || item.catatan || item.alasan || '').toString().toLowerCase();
+
+    if (rawStatus.includes('cuti')) {
+      return <Badge variant="purple">Cuti</Badge>;
+    }
+    if (rawStatus.includes('izin') || rawStatus.includes('sakit')) {
+      return <Badge variant="info">Izin</Badge>;
+    }
+    if (rawStatus.includes('sppd')) {
+      return <Badge variant="info">SPPD</Badge>;
+    }
+    if (rawStatus.includes('libur')) {
+      return <Badge variant="secondary">Libur</Badge>;
+    }
+    if (rawStatus.includes('tidak masuk') || rawStatus.includes('alpha') || rawStatus.includes('tanpa keterangan')) {
+      return <Badge variant="danger">Tidak Masuk</Badge>;
+    }
+
+    if (!hasMasuk && !hasKeluar) {
+      return <Badge variant="danger">Tidak Masuk</Badge>;
+    }
+
+    const txtCatatanTelat = item.catatan_telat || item.alasan_telat;
+    const txtCatatanPulang = item.catatan_pulang || item.alasan_pulang;
+
+    if ((txtCatatanTelat && txtCatatanTelat !== '-') || rawStatus.includes('telat') || rawStatus.includes('terlambat')) {
+      return <Badge variant="warning">Terlambat</Badge>;
+    }
+    if ((txtCatatanPulang && txtCatatanPulang !== '-') || rawStatus.includes('pulang cepat')) {
+      return <Badge variant="warning">Pulang Cepat</Badge>;
+    }
+
+    return <Badge variant="success">Hadir</Badge>;
+  };
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -481,13 +514,7 @@ export const PresensiPage = () => {
                       {row.note || row.catatan || row.alasan || '-'}
                     </td>
                     <td style={{ padding: '14px 16px' }}>
-                      {(row.note || '').toLowerCase().includes('telat') ? (
-                        <Badge variant="warning">Terlambat</Badge>
-                      ) : (row.note || '').toLowerCase().includes('pulang cepat') ? (
-                        <Badge variant="danger">Pulang Cepat</Badge>
-                      ) : (
-                        <Badge variant="success">Hadir</Badge>
-                      )}
+                      {renderStatusBadge(row)}
                     </td>
                   </tr>
                 ))}

@@ -412,7 +412,10 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     return isDateInPeriod(d);
   });
 
-  const totalAbsen = filteredAttendance.length;
+  const totalAbsen = filteredAttendance.filter((item) => {
+    const checkIn = item.absen_masuk || item.check_in;
+    return !!(checkIn && checkIn !== '-' && checkIn !== '');
+  }).length;
 
   const totalCutiTerima = cutiList.filter((item) => {
     const d = item.tanggal_mulai || item.created_at;
@@ -480,8 +483,11 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
   const attendanceDateSet = useMemo(() => {
     const set = new Set();
     attendanceHistory.forEach((a) => {
-      const d = a.tanggal || (a.absen_masuk ? a.absen_masuk.split('T')[0] : '');
-      if (d) set.add(d);
+      const checkIn = a.absen_masuk || a.check_in;
+      if (checkIn && checkIn !== '-' && checkIn !== '') {
+        const d = a.tanggal || (a.absen_masuk ? a.absen_masuk.split('T')[0] : '');
+        if (d) set.add(d);
+      }
     });
     return set;
   }, [attendanceHistory]);
@@ -636,6 +642,48 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     const matchDate = d.includes(q) || formatIndonesianDate(d).toLowerCase().includes(q);
     return matchNote || matchDate;
   });
+
+  const renderStatusBadge = (item) => {
+    const checkIn = item.absen_masuk || item.check_in;
+    const checkOut = item.absen_keluar || item.check_out;
+
+    const hasMasuk = !!(checkIn && checkIn !== '-' && checkIn !== '');
+    const hasKeluar = !!(checkOut && checkOut !== '-' && checkOut !== '');
+
+    const rawStatus = (item.status || item.type || item.note || item.catatan || item.alasan || '').toString().toLowerCase();
+
+    if (rawStatus.includes('cuti')) {
+      return <Badge variant="purple">Cuti</Badge>;
+    }
+    if (rawStatus.includes('izin') || rawStatus.includes('sakit')) {
+      return <Badge variant="info">Izin</Badge>;
+    }
+    if (rawStatus.includes('sppd')) {
+      return <Badge variant="info">SPPD</Badge>;
+    }
+    if (rawStatus.includes('libur')) {
+      return <Badge variant="secondary">Libur</Badge>;
+    }
+    if (rawStatus.includes('tidak masuk') || rawStatus.includes('alpha') || rawStatus.includes('tanpa keterangan')) {
+      return <Badge variant="danger">Tidak Masuk</Badge>;
+    }
+
+    if (!hasMasuk && !hasKeluar) {
+      return <Badge variant="danger">Tidak Masuk</Badge>;
+    }
+
+    const txtCatatanTelat = item.catatan_telat || item.alasan_telat;
+    const txtCatatanPulang = item.catatan_pulang || item.alasan_pulang;
+
+    if ((txtCatatanTelat && txtCatatanTelat !== '-') || rawStatus.includes('telat') || rawStatus.includes('terlambat')) {
+      return <Badge variant="warning">Terlambat</Badge>;
+    }
+    if ((txtCatatanPulang && txtCatatanPulang !== '-') || rawStatus.includes('pulang cepat')) {
+      return <Badge variant="warning">Pulang Cepat</Badge>;
+    }
+
+    return <Badge variant="success">Hadir</Badge>;
+  };
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -1281,7 +1329,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
                         {txtCatatanPulang}
                       </td>
                       <td style={{ padding: '16px 18px' }}>
-                        <Badge variant="success">Hadir</Badge>
+                        {renderStatusBadge(item)}
                       </td>
                     </tr>
                   );
