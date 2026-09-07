@@ -37,6 +37,45 @@ export const apiClient = {
     return `${baseUrl}${path}`;
   },
 
+  async refreshAccessToken() {
+    try {
+      const refreshToken = localStorage.getItem('refresh') || localStorage.getItem('refresh_token');
+      if (!refreshToken) return null;
+
+      const body = new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: 'unpak_link_gate',
+        refresh_token: refreshToken,
+      });
+
+      const response = await fetch('https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      });
+
+      if (!response.ok) return null;
+
+      const tokenData = await response.json();
+      const newAccessToken = tokenData.access_token;
+      const newRefreshToken = tokenData.refresh_token || refreshToken;
+      const newIdToken = tokenData.id_token || '';
+
+      if (newAccessToken) {
+        localStorage.setItem('token', newAccessToken);
+        if (newRefreshToken) localStorage.setItem('refresh', newRefreshToken);
+        if (newIdToken) localStorage.setItem('id_token', newIdToken);
+        window.dispatchEvent(new CustomEvent('token-refreshed', { detail: newAccessToken }));
+        return newAccessToken;
+      }
+    } catch (e) {
+      console.warn('apiClient auto-refresh error:', e);
+    }
+    return null;
+  },
+
   async request(endpoint, options = {}) {
     const url = this.resolveUrl(endpoint);
     const isFormData = options.body instanceof FormData || options.isFormData;
@@ -52,9 +91,25 @@ export const apiClient = {
     try {
       const response = await fetch(url, config);
       
-      if (response.status === 401 && !endpoint.includes('login')) {
-        // Token expired or invalid
+      if (response.status === 401 && !endpoint.includes('login') && !options._isRetry) {
+        // Attempt auto-refresh using refresh_token
+        const newToken = await this.refreshAccessToken();
+        if (newToken) {
+          const retryHeaders = {
+            ...this.getHeaders(isFormData),
+            ...(options.headers || {}),
+            'Authorization': `Bearer ${newToken}`,
+          };
+          return this.request(endpoint, {
+            ...options,
+            _isRetry: true,
+            headers: retryHeaders,
+          });
+        }
+
+        // Token expired and refresh failed
         localStorage.removeItem('token');
+        localStorage.removeItem('refresh');
         localStorage.removeItem('user');
         window.dispatchEvent(new Event('auth-logout'));
         throw new Error('Sesi login telah berakhir. Silakan login kembali.');

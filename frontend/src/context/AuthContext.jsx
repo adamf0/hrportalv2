@@ -195,14 +195,104 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth-logout', handleLogout);
   }, []);
 
+  const refreshAccessToken = async () => {
+    try {
+      const refreshToken = localStorage.getItem('refresh') || localStorage.getItem('refresh_token');
+      if (!refreshToken) return { success: false, error: 'Refresh token tidak ditemukan' };
+
+      const body = new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: SSO_CONFIG.clientId,
+        refresh_token: refreshToken,
+      });
+
+      const response = await fetch(SSO_CONFIG.tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: body.toString(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Refresh token Gagal (${response.status})`);
+      }
+
+      const tokenData = await response.json();
+      const newAccessToken = tokenData.access_token;
+      const newRefreshToken = tokenData.refresh_token || refreshToken;
+      const newIdToken = tokenData.id_token || localStorage.getItem('id_token') || '';
+
+      if (!newAccessToken) {
+        throw new Error('Access Token baru tidak diterima dari Keycloak');
+      }
+
+      setToken(newAccessToken);
+      localStorage.setItem('token', newAccessToken);
+      localStorage.setItem('refresh', newRefreshToken);
+      if (newIdToken) {
+        localStorage.setItem('id_token', newIdToken);
+      }
+
+      window.dispatchEvent(new CustomEvent('token-refreshed', { detail: newAccessToken }));
+      return { success: true, accessToken: newAccessToken };
+    } catch (err) {
+      console.warn('Auto refresh token gagal:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
+  useEffect(() => {
+    const handleTokenRefreshed = (e) => {
+      if (e.detail) {
+        setToken(e.detail);
+      }
+    };
+    window.addEventListener('token-refreshed', handleTokenRefreshed);
+    return () => window.removeEventListener('token-refreshed', handleTokenRefreshed);
+  }, []);
+
+  // Periodic Auto Refresh Token (Every 3.5 minutes if user logged in)
+  useEffect(() => {
+    console.log("==periodic refresh session==")
+    if (!token) return;
+
+    const interval = setInterval(async () => {
+      const refreshToken = localStorage.getItem('refresh') || localStorage.getItem('refresh_token');
+      if (refreshToken) {
+        await refreshAccessToken();
+        console.log("sesi sudah diupdate")
+      }
+    }, 210000); // 210,000 ms = 3.5 minutes
+
+    return () => clearInterval(interval);
+  }, [token]);
+
   useEffect(() => {
     const initAuth = async () => {
       const savedToken = localStorage.getItem('token');
       const savedUser = localStorage.getItem('user');
+      const refreshToken = localStorage.getItem('refresh') || localStorage.getItem('refresh_token');
+
       if (savedToken && savedUser) {
         try {
           const parsedUser = JSON.parse(savedUser);
-          if (parsedUser) {
+          const decoded = decodeJwt(savedToken);
+          const nowInSec = Math.floor(Date.now() / 1000);
+
+          // Proactive check: if access token is expired or expires in less than 30s
+          if (decoded.exp && decoded.exp < nowInSec + 30 && refreshToken) {
+            console.log('Access token expired saat initAuth, mencoba auto-refresh...');
+            const refreshRes = await refreshAccessToken();
+            if (refreshRes.success) {
+              setUser(parsedUser);
+            } else {
+              // Refresh token juga kedaluwarsa -> bersihkan sesi & redirect ke login
+              setUser(null);
+              setToken('');
+              localStorage.clear();
+            }
+          } else {
             setUser(parsedUser);
             setToken(savedToken);
           }
@@ -469,6 +559,7 @@ export const AuthProvider = ({ children }) => {
     exchangeSsoCode,
     loginWithSsoToken,
     triggerSsoRedirect,
+    refreshAccessToken,
     logout,
   };
 
