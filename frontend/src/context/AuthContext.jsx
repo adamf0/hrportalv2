@@ -22,11 +22,11 @@ export const OFFICIAL_SDM_GROUPS = ['adm_sdm', 'inherit_adm_sdm', 'adm_hr'];
 // Role BAUM (Biro Administrasi Umum) HANYA:
 export const OFFICIAL_BAUM_GROUPS = ['baum', 'inherit_baum'];
 
-// Role Dosen (Tenaga Pendidik / Dosen) HANYA CN: Dosen
-export const OFFICIAL_DOSEN_GROUPS = ['dosen'];
+// Role Dosen (Tenaga Pendidik / Dosen) CN di Keycloak: Dosen
+export const OFFICIAL_DOSEN_GROUPS = ['Dosen', 'dosen'];
 
-// Role Tendik (Tenaga Kependidikan) HANYA CN: Tendik
-export const OFFICIAL_TENDIK_GROUPS = ['tendik'];
+// Role Tendik (Tenaga Kependidikan) CN di Keycloak: Tendik
+export const OFFICIAL_TENDIK_GROUPS = ['Tendik', 'tendik'];
 
 export const showAccessDeniedAlert = (onConfirm) => {
   Swal.fire({
@@ -86,17 +86,22 @@ export const getUserRole = (userInfo) => {
 
   let detectedRole = 'tendik';
 
+  const normSdm = OFFICIAL_SDM_GROUPS.map((x) => x.toLowerCase());
+  const normBaum = OFFICIAL_BAUM_GROUPS.map((x) => x.toLowerCase());
+  const normDosen = OFFICIAL_DOSEN_GROUPS.map((x) => x.toLowerCase());
+  const normTendik = OFFICIAL_TENDIK_GROUPS.map((x) => x.toLowerCase());
+
   // 1. Prioritaskan SDM jika memiliki salah satu grup resmi SDM (adm_sdm, inherit_adm_sdm, adm_hr)
-  if (allGroups.some((g) => OFFICIAL_SDM_GROUPS.includes(g)) || normLevel === 'sdm' || normRole === 'sdm') {
+  if (allGroups.some((g) => normSdm.includes(g)) || normLevel === 'sdm' || normRole === 'sdm') {
     detectedRole = 'sdm';
   // 2. BAUM jika memiliki grup BAUM
-  } else if (allGroups.some((g) => OFFICIAL_BAUM_GROUPS.includes(g)) || normLevel === 'baum' || normRole === 'baum') {
+  } else if (allGroups.some((g) => normBaum.includes(g)) || normLevel === 'baum' || normRole === 'baum') {
     detectedRole = 'baum';
-  // 3. Dosen jika memiliki grup Dosen
-  } else if (allGroups.some((g) => OFFICIAL_DOSEN_GROUPS.includes(g)) || normLevel === 'dosen' || normRole === 'dosen') {
+  // 3. Dosen jika memiliki grup Dosen (Dosen / dosen)
+  } else if (allGroups.some((g) => normDosen.includes(g)) || normLevel === 'dosen' || normRole === 'dosen') {
     detectedRole = 'dosen';
-  // 4. Tendik jika memiliki grup Tendik
-  } else if (allGroups.some((g) => OFFICIAL_TENDIK_GROUPS.includes(g)) || normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai') {
+  // 4. Tendik jika memiliki grup Tendik (Tendik / tendik)
+  } else if (allGroups.some((g) => normTendik.includes(g)) || normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai') {
     detectedRole = 'tendik';
   }
 
@@ -152,16 +157,16 @@ export const getAvailableRoles = (userInfo) => {
 
   normGroups.forEach((g) => {
     if (!g) return;
-    if (OFFICIAL_SDM_GROUPS.includes(g)) {
+    if (OFFICIAL_SDM_GROUPS.some((s) => s.toLowerCase() === g)) {
       availableSet.add('sdm');
     }
-    if (OFFICIAL_BAUM_GROUPS.includes(g)) {
+    if (OFFICIAL_BAUM_GROUPS.some((b) => b.toLowerCase() === g)) {
       availableSet.add('baum');
     }
-    if (OFFICIAL_DOSEN_GROUPS.includes(g)) {
+    if (OFFICIAL_DOSEN_GROUPS.some((d) => d.toLowerCase() === g)) {
       availableSet.add('dosen');
     }
-    if (OFFICIAL_TENDIK_GROUPS.includes(g)) {
+    if (OFFICIAL_TENDIK_GROUPS.some((t) => t.toLowerCase() === g)) {
       availableSet.add('tendik');
     }
   });
@@ -197,10 +202,10 @@ export const isUserAuthorized = (userInfo) => {
     ...safeRoles.map((r) => (typeof r === 'string' ? r.toLowerCase().trim() : '')),
   ].filter(Boolean);
 
-  const hasSdm = allGroups.some((g) => OFFICIAL_SDM_GROUPS.includes(g));
-  const hasBaum = allGroups.some((g) => OFFICIAL_BAUM_GROUPS.includes(g));
-  const hasDosen = allGroups.some((g) => OFFICIAL_DOSEN_GROUPS.includes(g));
-  const hasTendik = allGroups.some((g) => OFFICIAL_TENDIK_GROUPS.includes(g));
+  const hasSdm = allGroups.some((g) => OFFICIAL_SDM_GROUPS.some((s) => s.toLowerCase() === g));
+  const hasBaum = allGroups.some((g) => OFFICIAL_BAUM_GROUPS.some((b) => b.toLowerCase() === g));
+  const hasDosen = allGroups.some((g) => OFFICIAL_DOSEN_GROUPS.some((d) => d.toLowerCase() === g));
+  const hasTendik = allGroups.some((g) => OFFICIAL_TENDIK_GROUPS.some((t) => t.toLowerCase() === g));
 
   return hasSdm || hasBaum || hasDosen || hasTendik;
 };
