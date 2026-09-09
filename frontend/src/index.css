@@ -551,7 +551,7 @@ button[disabled] {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 8mm 10mm;
+    margin: 12mm 15mm;
   }
 
   html, body {
@@ -601,19 +601,17 @@ button[disabled] {
     transform: none !important;
   }
 
-  /* Target slip gaji document container (compact & scaled down) */
+  /* Target slip gaji document container */
   #official-slip-gaji {
     width: 100% !important;
-    max-width: 520px !important;
-    margin: 10px auto !important;
-    padding: 14px 18px !important;
+    max-width: 560px !important;
+    margin: 0 auto !important;
+    padding: 16px 20px !important;
     border: 1.5px solid #000000 !important;
     box-shadow: none !important;
     box-sizing: border-box !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    font-size: 0.8rem !important;
-    line-height: 1.25 !important;
   }
 
   #official-slip-gaji table,
