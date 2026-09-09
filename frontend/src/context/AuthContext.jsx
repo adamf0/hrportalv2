@@ -36,8 +36,11 @@ export const showAccessDeniedAlert = (onConfirm) => {
       <div style="font-size: 0.95rem; color: #374151; line-height: 1.5; margin-top: 8px;">
         Akun Anda tidak memiliki <strong>Group Resmi</strong> di lingkungan kepegawaian Universitas Pakuan untuk mengakses HR Portal.
       </div>
-      <div style="font-size: 0.8rem; color: #6b7280; margin-top: 12px; background: #fef2f2; padding: 10px; border-radius: 8px; border: 1px solid #fee2e2;">
-        Silakan hubungi <strong>Administrator SDM / PUTIK UNPAK</strong> jika status kepegawaian Anda belum terdaftar di Keycloak SSO.
+      <div style="font-size: 0.85rem; color: #4b5563; margin-top: 12px; background: #fef2f2; padding: 12px; border-radius: 8px; border: 1px solid #fee2e2; text-align: center;">
+        Silakan buat laporan ke <strong>Helpdesk UNPAK</strong>:<br />
+        <a href="https://helpdesk.unpak.ac.id" target="_blank" rel="noopener noreferrer" style="color: #dc2626; font-weight: 600; text-decoration: underline; margin-top: 4px; display: inline-block;">
+          https://helpdesk.unpak.ac.id
+        </a>
       </div>
     `,
     confirmButtonColor: '#ef4444',
