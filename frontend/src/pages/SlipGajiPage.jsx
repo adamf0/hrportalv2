@@ -16,13 +16,13 @@ export const SlipGajiPegawai = ({
   data = {},
   formatRupiah = defaultFormatRupiah
 }) => {
-  const bpjs = toNum(data.bpjs);
-  const astek = toNum(data.astekP) + toNum(data.astekY) + bpjs + (bpjs > 0 ? bpjs / 2 : 0);
-  const dlpk = toNum(data.dplkP) + toNum(data.dplkY);
+  const bpjs = Math.round(toNum(data.bpjs));
+  const astek = Math.round(toNum(data.astekP) + toNum(data.astekY) + bpjs + (bpjs > 0 ? bpjs / 2 : 0));
+  const dlpk = Math.round(toNum(data.dplkP) + toNum(data.dplkY));
 
-  const astek_dlpk = toNum(data.gajikotor) > 0
+  const astek_dlpk = Math.round(toNum(data.gajikotor) > 0
     ? toNum(data.gajikotor) - toNum(data.gajibersih)
-    : 0;
+    : 0);
 
   return (
     <div style={{ width: '100%', fontSize: '12px', fontFamily: "'Times New Roman', Times, serif, Arial", color: '#000000' }}>
@@ -238,13 +238,13 @@ export const SlipGajiDosen = ({
   data = {},
   formatRupiah = defaultFormatRupiah
 }) => {
-  const bpjs = toNum(data.bpjs);
-  const astek = toNum(data.astekP) + toNum(data.astekY) + bpjs + (bpjs > 0 ? bpjs / 2 : 0);
-  const dlpk = toNum(data.dplkP) + toNum(data.dplkY);
+  const bpjs = Math.round(toNum(data.bpjs));
+  const astek = Math.round(toNum(data.astekP) + toNum(data.astekY) + bpjs + (bpjs > 0 ? bpjs / 2 : 0));
+  const dlpk = Math.round(toNum(data.dplkP) + toNum(data.dplkY));
 
-  const astek_dlpk = toNum(data.gajikotor) > 0
+  const astek_dlpk = Math.round(toNum(data.gajikotor) > 0
     ? toNum(data.gajikotor) - toNum(data.gajibersih)
-    : 0;
+    : 0);
 
   return (
     <div style={{ width: '100%', fontSize: '12px', fontFamily: "'Times New Roman', Times, serif, Arial", color: '#000000' }}>
@@ -346,7 +346,7 @@ export const SlipGajiDosen = ({
           <tr>
             <td style={{ padding: '1px 6px 1px 18px' }}>-S1</td>
             <td>Rp.</td>
-            <td style={{ textAlign: 'right' }}>{formatRupiah(data.mengajar_s1 ?? 0)}</td>
+            <td style={{ textAlign: 'right' }}>{formatRupiah(data.mengajar ?? 0)}</td>
             <td colSpan={2}></td>
           </tr>
           <tr>
@@ -358,13 +358,13 @@ export const SlipGajiDosen = ({
           <tr>
             <td style={{ padding: '1px 6px 1px 18px' }}>-Vokasi</td>
             <td>Rp.</td>
-            <td style={{ textAlign: 'right' }}>{formatRupiah(data.mengajar_vokasi ?? 0)}</td>
+            <td style={{ textAlign: 'right' }}>{formatRupiah(data.D3regular ?? 0)}</td>
             <td colSpan={2}></td>
           </tr>
           <tr>
             <td style={{ padding: '1px 6px 1px 18px' }}>-Vokasi-NonReg</td>
             <td>Rp.</td>
-            <td style={{ textAlign: 'right' }}>{formatRupiah(data.mengajar_vokasi_nonreg ?? 0)}</td>
+            <td style={{ textAlign: 'right' }}>{formatRupiah(data.D3nonregular ?? 0)}</td>
             <td colSpan={2}></td>
           </tr>
           <tr>
@@ -404,7 +404,7 @@ export const SlipGajiDosen = ({
             <td colSpan={3} style={{ padding: '6px 6px', fontWeight: 'bold', fontSize: '12.5px' }}>Jumlah Pendapatan</td>
             <td style={{ padding: '6px 0', fontWeight: 'bold', fontSize: '12.5px', width: '30px' }}>Rp.</td>
             <td style={{ textAlign: 'right', padding: '6px 8px 6px 0', fontWeight: 'bold', fontSize: '12.5px', width: '130px' }}>
-              {formatRupiah(data.gajikotor ?? data.jumlah_pendapatan ?? 0)}
+              {formatRupiah(data.gajikotor ?? 0)}
             </td>
           </tr>
 
