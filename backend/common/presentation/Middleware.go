@@ -530,9 +530,9 @@ func accountFromToken(tokenStr string) *Account {
 				hasSdm = true
 			} else if lowerG == "baum" || lowerG == "inherit_baum" {
 				hasBaum = true
-			} else if strings.Contains(lowerG, "dosen") {
+			} else if lowerG == "dosen" {
 				hasDosen = true
-			} else if lowerG == "tendik" || lowerG == "pegawai" || lowerG == "rektorat" || lowerG == "putik" || lowerG == "warek1" || lowerG == "warek2" || strings.HasPrefix(lowerG, "adm_") {
+			} else if lowerG == "tendik" || lowerG == "pegawai" {
 				hasTendik = true
 			}
 		}
