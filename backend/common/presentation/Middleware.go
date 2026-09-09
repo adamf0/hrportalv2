@@ -504,30 +504,43 @@ func accountFromToken(tokenStr string) *Account {
 			}
 		}
 
+		hasSdm := false
+		hasBaum := false
+		hasDosen := false
+		hasTendik := false
+
 		for _, g := range allGroups {
-			if g == "tendik" {
-				role = "tendik"
-				level = "tendik"
-				break
-			} else if g == "dosen" {
-				role = "dosen"
-				level = "dosen"
-				break
-			} else if g == "sdm" || g == "baum" || g == "adm_hr" || g == "inherit_sdm" || g == "inherit_baum" {
-				role = "sdm"
-				level = "sdm"
-				break
+			lowerG := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(g, "/")))
+			if lowerG == "adm_sdm" || lowerG == "inherit_adm_sdm" || lowerG == "adm_hr" {
+				hasSdm = true
+			} else if lowerG == "baum" || lowerG == "inherit_baum" {
+				hasBaum = true
+			} else if strings.Contains(lowerG, "dosen") {
+				hasDosen = true
+			} else if lowerG == "tendik" || lowerG == "pegawai" || lowerG == "rektorat" || lowerG == "putik" || lowerG == "warek1" || lowerG == "warek2" || strings.HasPrefix(lowerG, "adm_") {
+				hasTendik = true
 			}
 		}
-		if role != "sdm" {
-			for _, g := range allGroups {
-				if g == "dosen" {
-					source = "simak"
-					role = "dosen"
-					level = "dosen"
-					break
-				}
-			}
+
+		if hasSdm {
+			role = "sdm"
+			level = "sdm"
+			source = "simpeg"
+		} else if hasBaum {
+			role = "baum"
+			level = "baum"
+			source = "simpeg"
+		} else if hasDosen {
+			role = "dosen"
+			level = "dosen"
+			source = "simak"
+		} else if hasTendik {
+			role = "tendik"
+			level = "tendik"
+			source = "simpeg"
+		} else {
+			role = "unauthorized"
+			level = "unauthorized"
 		}
 	} else {
 		// Local login token: e.g. {"sid":"10","source":"local"}
@@ -616,6 +629,11 @@ func RBACMiddleware() fiber.Handler {
 		if user == nil {
 			return c.Status(401).
 				JSON(commoninfra.NewResponseError(logCommonRbac, "Unauthenticated or invalid token"))
+		}
+
+		if user.Role == "unauthorized" {
+			return c.Status(403).
+				JSON(commoninfra.NewResponseError(logCommonRbac, "Akses ditolak: Akun Anda tidak memiliki group resmi di lingkungan HR Portal"))
 		}
 
 		activeRole := strings.ToLower(strings.TrimSpace(c.Get("X-Active-Role")))

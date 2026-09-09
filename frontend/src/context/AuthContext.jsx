@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
 import { apiClient } from '../api/client';
 
 const AuthContext = createContext(null);
@@ -7,10 +8,64 @@ export const SSO_CONFIG = {
   authUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/auth',
   tokenUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/token',
   logoutUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout',
+  userInfoUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/userinfo',
   clientId: 'hrportal',
   get redirectUri() {
     return "http://gerbang.unpak.ac.id";
   },
+};
+
+// --- DEFINISI GROUP RESMI KEPEGAWAIAN UNPAK ---
+// Role SDM (Administrator Kepegawaian & SDM) HANYA:
+export const OFFICIAL_SDM_GROUPS = ['adm_sdm', 'inherit_adm_sdm', 'adm_hr'];
+
+// Role BAUM (Biro Administrasi Umum) HANYA:
+export const OFFICIAL_BAUM_GROUPS = ['baum', 'inherit_baum'];
+
+// Role Dosen (Tenaga Pendidik / Dosen)
+export const OFFICIAL_DOSEN_KEYWORDS = ['dosen'];
+
+// Role Tendik / Staf (Tenaga Kependidikan & Pejabat)
+export const OFFICIAL_TENDIK_GROUPS = [
+  'tendik',
+  'pegawai',
+  'rektorat',
+  'putik',
+  'warek1',
+  'warek2',
+  'adm_fakultas',
+  'adm_prodi',
+  'adm_pusat',
+  'adm_server',
+  'adm_jaringan',
+  'adm_helpdesk',
+  'adm_lms',
+  '55201',
+];
+
+export const showAccessDeniedAlert = (onConfirm) => {
+  Swal.fire({
+    icon: 'error',
+    title: 'Akses Ditolak!',
+    html: `
+      <div style="font-size: 0.95rem; color: #374151; line-height: 1.5; margin-top: 8px;">
+        Akun Anda tidak memiliki <strong>Group Resmi</strong> di lingkungan kepegawaian Universitas Pakuan untuk mengakses HR Portal.
+      </div>
+      <div style="font-size: 0.8rem; color: #6b7280; margin-top: 12px; background: #fef2f2; padding: 10px; border-radius: 8px; border: 1px solid #fee2e2;">
+        Silakan hubungi <strong>Administrator SDM / PUTIK UNPAK</strong> jika status kepegawaian Anda belum terdaftar di Keycloak SSO.
+      </div>
+    `,
+    confirmButtonColor: '#ef4444',
+    confirmButtonText: 'Keluar ke SSO',
+    allowOutsideClick: false,
+    allowEscapeKey: false,
+    customClass: {
+      popup: 'rounded-2xl shadow-2xl',
+      confirmButton: 'rounded-xl px-6 py-2.5 font-bold',
+    },
+  }).then(() => {
+    if (onConfirm) onConfirm();
+  });
 };
 
 export const decodeJwt = (token) => {
@@ -37,29 +92,27 @@ export const getUserRole = (userInfo) => {
   const normLevel = (level || '').toLowerCase();
   const normRole = (role || '').toLowerCase();
 
-  const safeGroups = Array.isArray(groups) ? groups : [];
+  const safeGroups = Array.isArray(groups) ? groups : (typeof groups === 'string' ? groups.split(/[\s,]+/) : []);
   const safeRoles = Array.isArray(realmRoles) ? realmRoles : [];
   const allGroups = [
-    ...safeGroups.map((g) => (typeof g === 'string' ? g.toLowerCase() : '')),
-    ...safeRoles.map((r) => (typeof r === 'string' ? r.toLowerCase() : '')),
-  ];
+    ...safeGroups.map((g) => (typeof g === 'string' ? g.toLowerCase().trim().replace(/^\//, '') : '')),
+    ...safeRoles.map((r) => (typeof r === 'string' ? r.toLowerCase().trim() : '')),
+  ].filter(Boolean);
 
   let detectedRole = 'tendik';
 
-  if (normLevel === 'sdm' || normRole === 'sdm') {
+  // 1. Prioritaskan SDM jika memiliki salah satu grup resmi SDM
+  if (normLevel === 'sdm' || normRole === 'sdm' || allGroups.some((g) => OFFICIAL_SDM_GROUPS.includes(g))) {
     detectedRole = 'sdm';
-  } else if (normLevel === 'baum' || normRole === 'baum') {
+  // 2. BAUM jika memiliki grup BAUM
+  } else if (normLevel === 'baum' || normRole === 'baum' || allGroups.some((g) => OFFICIAL_BAUM_GROUPS.includes(g))) {
     detectedRole = 'baum';
-  } else if (normLevel === 'dosen' || normRole === 'dosen') {
+  // 3. Dosen jika memiliki kata dosen
+  } else if (normLevel === 'dosen' || normRole === 'dosen' || allGroups.some((g) => g.includes('dosen'))) {
     detectedRole = 'dosen';
-  } else if (normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai') {
+  // 4. Tendik untuk staf resmi
+  } else if (normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai' || allGroups.some((g) => OFFICIAL_TENDIK_GROUPS.includes(g) || g.startsWith('adm_'))) {
     detectedRole = 'tendik';
-  } else if (allGroups.some((g) => ['sdm', 'inherit_sdm', 'adm_hr'].includes(g) || g.includes('sdm_'))) {
-    detectedRole = 'sdm';
-  } else if (allGroups.some((g) => ['baum', 'inherit_baum'].includes(g) || g.includes('baum_'))) {
-    detectedRole = 'baum';
-  } else if (allGroups.some((g) => g.includes('dosen'))) {
-    detectedRole = 'dosen';
   }
 
   // Validate active_role override against available roles
@@ -110,21 +163,20 @@ export const getAvailableRoles = (userInfo) => {
   }
 
   const normGroups = collectGroups.map((g) => (typeof g === 'string' ? g.toLowerCase().trim().replace(/^\//, '') : ''));
-
   const availableSet = new Set();
 
   normGroups.forEach((g) => {
     if (!g) return;
-    if (g === 'sdm' || g === 'inherit_sdm' || g === 'adm_hr' || g.includes('sdm_') || g.endsWith('_sdm')) {
+    if (OFFICIAL_SDM_GROUPS.includes(g)) {
       availableSet.add('sdm');
     }
-    if (g === 'baum' || g === 'inherit_baum' || g.includes('baum_') || g.endsWith('_baum')) {
+    if (OFFICIAL_BAUM_GROUPS.includes(g)) {
       availableSet.add('baum');
     }
     if (g === 'dosen' || g.includes('dosen')) {
       availableSet.add('dosen');
     }
-    if (g === 'tendik' || g.includes('tendik') || g.includes('pegawai')) {
+    if (OFFICIAL_TENDIK_GROUPS.includes(g) || g.startsWith('adm_')) {
       availableSet.add('tendik');
     }
   });
@@ -141,10 +193,31 @@ export const canSwitchRole = (userInfo) => {
   return roles.length > 1;
 };
 
+// Cek Otorisasi: Pengguna HANYA diizinkan masuk jika memiliki Group Resmi Kepegawaian UNPAK
 export const isUserAuthorized = (userInfo) => {
   if (!userInfo || typeof userInfo !== 'object') return false;
-  // Allow all logged in users (SDM, Dosen, Tendik) to access HR Portal Panel
-  return true;
+  const { level, role, groups = [], realmRoles = [] } = userInfo;
+  const normLevel = (level || '').toLowerCase();
+  const normRole = (role || '').toLowerCase();
+
+  // Jika level / role profil database sudah terdaftar resmi
+  if (['sdm', 'baum', 'dosen', 'tendik'].includes(normLevel) || ['sdm', 'baum', 'dosen', 'tendik', 'pegawai'].includes(normRole)) {
+    return true;
+  }
+
+  const safeGroups = Array.isArray(groups) ? groups : (typeof groups === 'string' ? groups.split(/[\s,]+/) : []);
+  const safeRoles = Array.isArray(realmRoles) ? realmRoles : [];
+  const allGroups = [
+    ...safeGroups.map((g) => (typeof g === 'string' ? g.toLowerCase().trim().replace(/^\//, '') : '')),
+    ...safeRoles.map((r) => (typeof r === 'string' ? r.toLowerCase().trim() : '')),
+  ].filter(Boolean);
+
+  const hasSdm = allGroups.some((g) => OFFICIAL_SDM_GROUPS.includes(g));
+  const hasBaum = allGroups.some((g) => OFFICIAL_BAUM_GROUPS.includes(g));
+  const hasDosen = allGroups.some((g) => g.includes('dosen'));
+  const hasTendik = allGroups.some((g) => OFFICIAL_TENDIK_GROUPS.includes(g) || g.startsWith('adm_'));
+
+  return hasSdm || hasBaum || hasDosen || hasTendik;
 };
 
 export const isSdmAuthorized = (userInfo) => {
@@ -280,22 +353,77 @@ export const AuthProvider = ({ children }) => {
           const decoded = decodeJwt(savedToken);
           const nowInSec = Math.floor(Date.now() / 1000);
 
-          // Proactive check: if access token is expired or expires in less than 30s
+          let activeToken = savedToken;
+
+          // 1. Proactive check: if access token is expired or expires in less than 30s
           if (decoded.exp && decoded.exp < nowInSec + 30 && refreshToken) {
             console.log('Access token expired saat initAuth, mencoba auto-refresh...');
             const refreshRes = await refreshAccessToken();
-            if (refreshRes.success) {
-              setUser(parsedUser);
+            if (refreshRes.success && refreshRes.accessToken) {
+              activeToken = refreshRes.accessToken;
             } else {
-              // Refresh token juga kedaluwarsa -> bersihkan sesi & redirect ke login
+              // Refresh token juga kedaluwarsa / di-revoke -> bersihkan sesi & redirect ke login
               setUser(null);
               setToken('');
               localStorage.clear();
+              setLoading(false);
+              return;
             }
-          } else {
-            setUser(parsedUser);
-            setToken(savedToken);
           }
+
+          // 2. Real-time Token Introspection ke Keycloak (UserInfo) Setiap Refresh Halaman
+          try {
+            const introRes = await fetch(SSO_CONFIG.userInfoUrl, {
+              headers: { Authorization: `Bearer ${activeToken}` },
+            });
+
+            if (!introRes.ok) {
+              console.warn(`Keycloak userinfo invalid (${introRes.status}), mencoba refresh token...`);
+              if (refreshToken) {
+                const retryRefresh = await refreshAccessToken();
+                if (retryRefresh.success && retryRefresh.accessToken) {
+                  const retryIntro = await fetch(SSO_CONFIG.userInfoUrl, {
+                    headers: { Authorization: `Bearer ${retryRefresh.accessToken}` },
+                  });
+                  if (!retryIntro.ok) {
+                    console.warn('Sesi Keycloak telah berakhir. Menghancurkan sesi lokal...');
+                    setUser(null);
+                    setToken('');
+                    localStorage.clear();
+                    setLoading(false);
+                    return;
+                  }
+                  activeToken = retryRefresh.accessToken;
+                } else {
+                  setUser(null);
+                  setToken('');
+                  localStorage.clear();
+                  setLoading(false);
+                  return;
+                }
+              } else {
+                setUser(null);
+                setToken('');
+                localStorage.clear();
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (netErr) {
+            console.warn('Network issue during Keycloak userinfo verification:', netErr);
+          }
+
+          // 3. Validasi Hak Akses Group Resmi
+          if (!isUserAuthorized(parsedUser)) {
+            showAccessDeniedAlert(() => {
+              logout();
+            });
+            setLoading(false);
+            return;
+          }
+
+          setUser(parsedUser);
+          setToken(activeToken);
         } catch (e) {
           console.warn('Error parsing saved user from localStorage:', e);
         }
@@ -435,6 +563,15 @@ export const AuthProvider = ({ children }) => {
       const realmRoles = decoded.realm_access?.roles || [];
 
       const tempUser = { groups, realmRoles, level: decoded.level || decoded.role };
+
+      // Validasi Hak Akses Group Resmi
+      if (!isUserAuthorized(tempUser)) {
+        showAccessDeniedAlert(() => {
+          logout();
+        });
+        return { success: false, error: 'Akses Ditolak: Anda tidak memiliki Group Resmi di HR Portal.' };
+      }
+
       const role = getUserRole(tempUser);
 
       const userInfo = {
@@ -471,6 +608,15 @@ export const AuthProvider = ({ children }) => {
       const realmRoles = decoded.realm_access?.roles || [];
 
       const tempUser = { groups, realmRoles, level: decoded.level || decoded.role };
+
+      // Validasi Hak Akses Group Resmi
+      if (!isUserAuthorized(tempUser)) {
+        showAccessDeniedAlert(() => {
+          logout();
+        });
+        return { success: false, error: 'Akses Ditolak: Anda tidak memiliki Group Resmi di HR Portal.' };
+      }
+
       const role = getUserRole(tempUser);
 
       const userInfo = {
