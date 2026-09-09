@@ -264,65 +264,66 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
 
   const fetchActiveKuesioners = async () => {
     try {
-      const jwt = localStorage.getItem('token') || localStorage.getItem('sso_token') || localStorage.getItem('jwt_token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuaXAiOiIxMDQxMTAwNjUyMCIsIm5hbWEiOiJBREFNIEZVUlFPTiJ9.sign';
-      const response = await fetch('https://api-simonev-lpm.unpak.ac.id/api/v2/kuesioners/active', {
-        headers: {
-          'Authorization': `Bearer ${jwt}`,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
+      // const jwt = localStorage.getItem('token') || localStorage.getItem('sso_token') || localStorage.getItem('jwt_token') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuaXAiOiIxMDQxMTAwNjUyMCIsIm5hbWEiOiJBREFNIEZVUlFPTiJ9.sign';
+      // const response = await fetch('https://api-simonev-lpm.unpak.ac.id/api/v2/kuesioners/active', {
+      //   headers: {
+      //     'Authorization': `Bearer ${jwt}`,
+      //     'Accept': 'application/json',
+      //     'Content-Type': 'application/json',
+      //   },
+      // });
 
-      if (!response.ok) throw new Error(`Simonev API status ${response.status}`);
-      const resData = await response.json();
-      const rawList = Array.isArray(resData) ? resData : (resData?.data || resData?.kuesioners || []);
+      // if (!response.ok) throw new Error(`Simonev API status ${response.status}`);
+      // const resData = await response.json();
+      // const rawList = Array.isArray(resData) ? resData : (resData?.data || resData?.kuesioners || []);
 
-      if (rawList && rawList.length > 0) {
-        const profile = getUserProfile();
+      // if (rawList && rawList.length > 0) {
+      //   const profile = getUserProfile();
 
-        // Filter by Status active, Active Date Range, Peruntukan (profile.role / local.role), TotalPertanyaan != TotalInput & TotalPertanyaan > 0, & KodeFakultas/KodeProdi
-        const activeFiltered = rawList.filter((k) => {
-          const statusActive = (k.Status || k.status || 'active').toLowerCase() === 'active' && !k.DeletedAt;
-          const dateActive = isKuesionerDateActive(k);
-          const peruntukanMatch = isPeruntukanMatching(k, profile);
-          const fakProdiMatch = isFakultasProdiMatching(k, profile);
+      //   // Filter by Status active, Active Date Range, Peruntukan (profile.role / local.role), TotalPertanyaan != TotalInput & TotalPertanyaan > 0, & KodeFakultas/KodeProdi
+      //   const activeFiltered = rawList.filter((k) => {
+      //     const statusActive = (k.Status || k.status || 'active').toLowerCase() === 'active' && !k.DeletedAt;
+      //     const dateActive = isKuesionerDateActive(k);
+      //     const peruntukanMatch = isPeruntukanMatching(k, profile);
+      //     const fakProdiMatch = isFakultasProdiMatching(k, profile);
 
-          const targetPertanyaan = k?.TotalPertanyaan ?? k?.total_pertanyaan ?? 0;
-          const totalInput = k?.TotalInput ?? k?.total_input ?? 0;
-          const questionsMatch = targetPertanyaan > 0 && targetPertanyaan != totalInput;
+      //     const targetPertanyaan = k?.TotalPertanyaan ?? k?.total_pertanyaan ?? 0;
+      //     const totalInput = k?.TotalInput ?? k?.total_input ?? 0;
+      //     const questionsMatch = targetPertanyaan > 0 && targetPertanyaan != totalInput;
 
-          return statusActive && dateActive && peruntukanMatch && fakProdiMatch && questionsMatch;
-        });
+      //     return statusActive && dateActive && peruntukanMatch && fakProdiMatch && questionsMatch;
+      //   });
 
-        const mappedList = activeFiltered.map((k, idx) => {
-          const rawDesc = k.Deskripsi || k.Content || k.deskripsi || k.description || '';
-          const cleanDesc = stripHtml(rawDesc) || 'Evaluasi penjaminan mutu internal Universitas Pakuan.';
-          const rawJudul = k.Judul || k.judul || k.nama || k.title || `Kuesioner Simonev LPM ${idx + 1}`;
-          const targetPertanyaan = k?.TotalPertanyaan ?? 0;
-          const totalInput = k?.TotalInput ?? 0;
+      //   const mappedList = activeFiltered.map((k, idx) => {
+      //     const rawDesc = k.Deskripsi || k.Content || k.deskripsi || k.description || '';
+      //     const cleanDesc = stripHtml(rawDesc) || 'Evaluasi penjaminan mutu internal Universitas Pakuan.';
+      //     const rawJudul = k.Judul || k.judul || k.nama || k.title || `Kuesioner Simonev LPM ${idx + 1}`;
+      //     const targetPertanyaan = k?.TotalPertanyaan ?? 0;
+      //     const totalInput = k?.TotalInput ?? 0;
 
-          return {
-            id: k.UUID || k.id || k.UUIDKuesioner || `simonev-${idx + 1}`,
-            uuid: k.UUID || k.id || '',
-            uuidkuesioner: k.UUIDKuesioner || k.uuidkuesioner || k.uuid_kuesioner || '00000000-0000-0000-0000-000000000000',
-            judul: rawJudul,
-            kategori: k.Peruntukan ? `Peruntukan: ${k.Peruntukan.toUpperCase()}` : 'Penjaminan Mutu LPM',
-            deskripsi: cleanDesc,
-            semester: k.Semester || '202601',
-            totalPertanyaan: targetPertanyaan,
-            isFilled: targetPertanyaan == totalInput,
-            tahun: k.tahun || 2026,
-            iconBg: idx % 3 === 0 ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : (idx % 3 === 1 ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)' : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'),
-            IconComponent: idx % 3 === 0 ? ClipboardList : (idx % 3 === 1 ? Laptop : Smile)
-          };
-        });
+      //     return {
+      //       id: k.UUID || k.id || k.UUIDKuesioner || `simonev-${idx + 1}`,
+      //       uuid: k.UUID || k.id || '',
+      //       uuidkuesioner: k.UUIDKuesioner || k.uuidkuesioner || k.uuid_kuesioner || '00000000-0000-0000-0000-000000000000',
+      //       judul: rawJudul,
+      //       kategori: k.Peruntukan ? `Peruntukan: ${k.Peruntukan.toUpperCase()}` : 'Penjaminan Mutu LPM',
+      //       deskripsi: cleanDesc,
+      //       semester: k.Semester || '202601',
+      //       totalPertanyaan: targetPertanyaan,
+      //       isFilled: targetPertanyaan == totalInput,
+      //       tahun: k.tahun || 2026,
+      //       iconBg: idx % 3 === 0 ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)' : (idx % 3 === 1 ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)' : 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)'),
+      //       IconComponent: idx % 3 === 0 ? ClipboardList : (idx % 3 === 1 ? Laptop : Smile)
+      //     };
+      //   });
 
-        // setKuesionerList(mappedList);
-        setKuesionerList([]);
-      } else {
-        setKuesionerList([]);
-      }
-    } catch (err) {
+      //   // setKuesionerList(mappedList);
+      //   setKuesionerList([]);
+      // } else {
+      //   setKuesionerList([]);
+      // }
+      setKuesionerList([]);
+    } catch (err) { 
       console.warn('Simonev API fetch note:', err);
       setKuesionerList([]);
     }
