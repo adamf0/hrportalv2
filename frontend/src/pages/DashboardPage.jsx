@@ -59,21 +59,73 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     return formatIndonesianDate(date, true);
   };
 
-  // --- Fetch IP Address from api.ipify.org ---
-  const [ipAddress, setIpAddress] = useState('180.252.80.1');
+  // --- Fetch Client IP Address (IPv6 prioritized with dual-stack IPv4) ---
+  const [ipAddress, setIpAddress] = useState('Mendeteksi IP...');
+  const [ipv6Address, setIpv6Address] = useState('');
+  const [ipv4Address, setIpv4Address] = useState('');
+
   useEffect(() => {
-    const getIp = async () => {
+    let isMounted = true;
+    const detectClientIps = async () => {
+      let foundIpv6 = '';
+      let foundIpv4 = '';
+
+      // 1. Coba deteksi IPv6 terlebih dahulu (timeout 3 detik jika ISP tidak punya IPv6)
       try {
-        const res = await fetch('https://api.ipify.org?format=json');
-        const data = await res.json();
-        if (data && data.ip) {
-          setIpAddress(data.ip);
+        const controller6 = new AbortController();
+        const timeout6 = setTimeout(() => controller6.abort(), 3000);
+        const res6 = await fetch('https://api6.ipify.org?format=json', { signal: controller6.signal });
+        clearTimeout(timeout6);
+        const data6 = await res6.json();
+        if (data6?.ip && data6.ip.includes(':')) {
+          foundIpv6 = data6.ip;
+          if (isMounted) setIpv6Address(data6.ip);
         }
-      } catch (err) {
-        console.warn('Gagal fetch IP dari ipify, menggunakan fallback:', err);
+      } catch (_) {
+        // ISP / jaringan klien tidak memiliki routing IPv6
+      }
+
+      // 2. Deteksi IPv4
+      try {
+        const controller4 = new AbortController();
+        const timeout4 = setTimeout(() => controller4.abort(), 3000);
+        const res4 = await fetch('https://api4.ipify.org?format=json', { signal: controller4.signal });
+        clearTimeout(timeout4);
+        const data4 = await res4.json();
+        if (data4?.ip) {
+          foundIpv4 = data4.ip;
+          if (isMounted) setIpv4Address(data4.ip);
+        }
+      } catch (_) {}
+
+      // 3. Fallback dual-stack api64 jika langkah 1 & 2 belum terisi
+      if (!foundIpv6 && !foundIpv4) {
+        try {
+          const res64 = await fetch('https://api64.ipify.org?format=json');
+          const data64 = await res64.json();
+          if (data64?.ip) {
+            if (data64.ip.includes(':')) {
+              foundIpv6 = data64.ip;
+              if (isMounted) setIpv6Address(data64.ip);
+            } else {
+              foundIpv4 = data64.ip;
+              if (isMounted) setIpv4Address(data64.ip);
+            }
+          }
+        } catch (err) {
+          console.warn('Gagal fetch IP:', err);
+        }
+      }
+
+      // Prioritaskan IPv6 jika klien memiliki IPv6, fallback ke IPv4
+      const primaryIp = foundIpv6 || foundIpv4 || '103.169.192.29';
+      if (isMounted) {
+        setIpAddress(primaryIp);
       }
     };
-    getIp();
+
+    detectClientIps();
+    return () => { isMounted = false; };
   }, []);
 
   // --- Data States ---
@@ -1171,9 +1223,21 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
                 <MapPin size={15} color="#10b981" />
                 <span>Lokasi: Kampus UNPAK (Lat: -6.5976, Long: 106.8066)</span>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <Wifi size={15} color="#0284c7" />
-                <span>IP Address: <strong>{ipAddress}</strong></span>
+                <span>
+                  IP Address: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{ipAddress}</strong>
+                  {ipv6Address && (
+                    <span style={{ marginLeft: '6px', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '4px', background: '#dcfce7', color: '#15803d' }}>
+                      IPv6
+                    </span>
+                  )}
+                  {ipv4Address && ipv4Address !== ipAddress && (
+                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#94a3b8' }}>
+                      (IPv4: <span style={{ fontFamily: 'monospace' }}>{ipv4Address}</span>)
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
           </div>

@@ -166,7 +166,7 @@ class LocationWifiHelper {
     _isFetchingPublicIp = true;
 
     http
-        .get(Uri.parse('https://api.ipify.org'))
+        .get(Uri.parse('https://api64.ipify.org'))
         .timeout(
           const Duration(seconds: 120),
         )
@@ -184,7 +184,7 @@ class LocationWifiHelper {
   static Future<String> getPublicIpWithTimeoutFallback() async {
     try {
       final response =
-          await http.get(Uri.parse('https://api.ipify.org')).timeout(
+          await http.get(Uri.parse('https://api64.ipify.org')).timeout(
                 const Duration(milliseconds: 120),
               );
       if (response.statusCode == 200) {
