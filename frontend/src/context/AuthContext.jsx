@@ -101,14 +101,14 @@ export const getUserRole = (userInfo) => {
 
   let detectedRole = 'tendik';
 
-  // 1. Prioritaskan SDM jika memiliki salah satu grup resmi SDM
-  if (normLevel === 'sdm' || normRole === 'sdm' || allGroups.some((g) => OFFICIAL_SDM_GROUPS.includes(g))) {
+  // 1. Prioritaskan SDM jika memiliki salah satu grup resmi SDM (adm_sdm, inherit_adm_sdm, adm_hr)
+  if (allGroups.some((g) => OFFICIAL_SDM_GROUPS.includes(g)) || normLevel === 'sdm' || normRole === 'sdm') {
     detectedRole = 'sdm';
   // 2. BAUM jika memiliki grup BAUM
-  } else if (normLevel === 'baum' || normRole === 'baum' || allGroups.some((g) => OFFICIAL_BAUM_GROUPS.includes(g))) {
+  } else if (allGroups.some((g) => OFFICIAL_BAUM_GROUPS.includes(g)) || normLevel === 'baum' || normRole === 'baum') {
     detectedRole = 'baum';
   // 3. Dosen jika memiliki kata dosen
-  } else if (normLevel === 'dosen' || normRole === 'dosen' || allGroups.some((g) => g.includes('dosen'))) {
+  } else if (allGroups.some((g) => g.includes('dosen')) || normLevel === 'dosen' || normRole === 'dosen') {
     detectedRole = 'dosen';
   // 4. Tendik untuk staf resmi
   } else if (normLevel === 'tendik' || normRole === 'tendik' || normRole === 'pegawai' || allGroups.some((g) => OFFICIAL_TENDIK_GROUPS.includes(g) || g.startsWith('adm_'))) {
@@ -371,13 +371,56 @@ export const AuthProvider = ({ children }) => {
             }
           }
 
-          // 2. Real-time Token Introspection ke Keycloak (UserInfo) Setiap Refresh Halaman
+          // 2. Real-time Token Introspection & Auto Group Sync ke Keycloak Setiap Refresh Halaman
           try {
             const introRes = await fetch(SSO_CONFIG.userInfoUrl, {
               headers: { Authorization: `Bearer ${activeToken}` },
             });
 
-            if (!introRes.ok) {
+            if (introRes.ok) {
+              const liveUserInfo = await introRes.json();
+              const liveRawGroups = liveUserInfo.groups || liveUserInfo.group || [];
+              const liveGroups = Array.isArray(liveRawGroups)
+                ? liveRawGroups
+                : (typeof liveRawGroups === 'string' ? liveRawGroups.split(/[\s,]+/) : []);
+
+              if (liveGroups.length > 0) {
+                parsedUser.groups = liveGroups;
+              }
+              if (liveUserInfo.name) parsedUser.name = liveUserInfo.name;
+              if (liveUserInfo.email) parsedUser.email = liveUserInfo.email;
+              if (liveUserInfo.preferred_username) parsedUser.username = liveUserInfo.preferred_username;
+
+              // Hitung ulang role secara real-time berdasarkan group terbaru dari Keycloak
+              const updatedRole = getUserRole(parsedUser);
+              parsedUser.role = updatedRole;
+              parsedUser.level = updatedRole;
+              localStorage.setItem('user', JSON.stringify(parsedUser));
+
+              // Selalu perbarui JWT access token via refresh token agar backend API juga menerima token baru berisi adm_hr
+              if (refreshToken) {
+                try {
+                  const refreshed = await refreshAccessToken();
+                  if (refreshed.success && refreshed.accessToken) {
+                    activeToken = refreshed.accessToken;
+                    const newlyDecoded = decodeJwt(refreshed.accessToken);
+                    const freshRawGroups = newlyDecoded.groups || newlyDecoded.group || [];
+                    const freshGroups = Array.isArray(freshRawGroups)
+                      ? freshRawGroups
+                      : (typeof freshRawGroups === 'string' ? freshRawGroups.split(/[\s,]+/) : []);
+                    if (freshGroups.length > 0) {
+                      parsedUser.groups = freshGroups;
+                      const freshRole = getUserRole(parsedUser);
+                      parsedUser.role = freshRole;
+                      parsedUser.level = freshRole;
+                      localStorage.setItem('user', JSON.stringify(parsedUser));
+                    }
+                  }
+                } catch (e) {
+                  console.warn('Background token refresh note:', e);
+                }
+              }
+            } else {
               console.warn(`Keycloak userinfo invalid (${introRes.status}), mencoba refresh token...`);
               if (refreshToken) {
                 const retryRefresh = await refreshAccessToken();
@@ -455,7 +498,12 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('profile', JSON.stringify(res));
         setUser((currentUser) => {
           const baseUser = currentUser || {};
-          const detectedRole = res.level || res.role || baseUser.role || 'tendik';
+          // Jaga role SDM / BAUM / Dosen dari SSO agar TIDAK DITIMPA oleh level pegawai SIMPEG lokal
+          const ssoRole = getUserRole(baseUser);
+          const detectedRole = (ssoRole === 'sdm' || ssoRole === 'baum' || ssoRole === 'dosen')
+            ? ssoRole
+            : (res.level || res.role || baseUser.role || 'tendik');
+
           const updatedUser = {
             ...baseUser,
             name: res.name || baseUser.name || 'Pengguna HR Portal',
@@ -559,7 +607,8 @@ export const AuthProvider = ({ children }) => {
       const name = decoded.name || decoded.preferred_username || decoded.employeeid || 'User SSO';
       const email = decoded.email || '';
       const employeeId = decoded.employeeid || decoded.sub || '-';
-      const groups = Array.isArray(decoded.group) ? decoded.group : [];
+      const rawGroups = decoded.groups || decoded.group || [];
+      const groups = Array.isArray(rawGroups) ? rawGroups : (typeof rawGroups === 'string' ? rawGroups.split(/[\s,]+/) : []);
       const realmRoles = decoded.realm_access?.roles || [];
 
       const tempUser = { groups, realmRoles, level: decoded.level || decoded.role };
@@ -604,7 +653,8 @@ export const AuthProvider = ({ children }) => {
       const name = decoded.name || decoded.preferred_username || 'User SSO';
       const email = decoded.email || '';
       const employeeId = decoded.employeeid || decoded.sub || '-';
-      const groups = Array.isArray(decoded.group) ? decoded.group : [];
+      const rawGroups = decoded.groups || decoded.group || [];
+      const groups = Array.isArray(rawGroups) ? rawGroups : (typeof rawGroups === 'string' ? rawGroups.split(/[\s,]+/) : []);
       const realmRoles = decoded.realm_access?.roles || [];
 
       const tempUser = { groups, realmRoles, level: decoded.level || decoded.role };

@@ -487,12 +487,27 @@ func accountFromToken(tokenStr string) *Account {
 		level = "tendik"
 
 		var allGroups []string
-		if groupRaw, ok := claims["group"].([]interface{}); ok {
-			for _, g := range groupRaw {
-				if gStr, ok := g.(string); ok {
-					allGroups = append(allGroups, strings.ToLower(gStr))
+		extractGroups := func(val interface{}) {
+			if arr, ok := val.([]interface{}); ok {
+				for _, g := range arr {
+					if gStr, ok := g.(string); ok {
+						allGroups = append(allGroups, strings.ToLower(gStr))
+					}
+				}
+			} else if str, ok := val.(string); ok {
+				for _, part := range strings.Split(str, ",") {
+					if trimmed := strings.TrimSpace(part); trimmed != "" {
+						allGroups = append(allGroups, strings.ToLower(trimmed))
+					}
 				}
 			}
+		}
+
+		if groupRaw, exists := claims["group"]; exists {
+			extractGroups(groupRaw)
+		}
+		if groupsRaw, exists := claims["groups"]; exists {
+			extractGroups(groupsRaw)
 		}
 		if realmAccess, ok := claims["realm_access"].(map[string]interface{}); ok {
 			if rolesRaw, ok := realmAccess["roles"].([]interface{}); ok {
