@@ -13,7 +13,7 @@ import 'api_client.dart';
 import 'auto_attendance_service.dart';
 
 class SsoHelper {
-  static const String _clientId = "unpak_link_gate";
+  static const String _clientId = "hrportal";
   static const String _logoutUrl =
       "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout";
 

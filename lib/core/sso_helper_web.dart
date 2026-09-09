@@ -6,7 +6,7 @@ import 'dart:html' as html;
 import 'api_client.dart';
 
 class SsoHelper {
-  static const String _clientId = "unpak_link_gate";
+  static const String _clientId = "hrportal";
   static const String _authUrl =
       "https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/auth";
   static const String _tokenUrl =

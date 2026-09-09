@@ -7,7 +7,7 @@ export const SSO_CONFIG = {
   authUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/auth',
   tokenUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/token',
   logoutUrl: 'https://gerbang.unpak.ac.id/realms/gateway/protocol/openid-connect/logout',
-  clientId: 'unpak_link_gate',
+  clientId: 'hrportal',
   get redirectUri() {
     return "http://gerbang.unpak.ac.id";
   },

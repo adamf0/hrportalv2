@@ -47,7 +47,7 @@ export const apiClient = {
 
       const body = new URLSearchParams({
         grant_type: 'refresh_token',
-        client_id: 'unpak_link_gate',
+        client_id: 'hrportal',
         refresh_token: refreshToken,
       });
 
