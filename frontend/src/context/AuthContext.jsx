@@ -166,6 +166,7 @@ export const getAvailableRoles = (userInfo) => {
     if (OFFICIAL_DOSEN_GROUPS.some((d) => d.toLowerCase() === g)) {
       availableSet.add('dosen');
     }
+
     if (OFFICIAL_TENDIK_GROUPS.some((t) => t.toLowerCase() === g)) {
       availableSet.add('tendik');
     }
@@ -174,6 +175,8 @@ export const getAvailableRoles = (userInfo) => {
   if (availableSet.size === 0) {
     availableSet.add('tendik');
   }
+
+  console.log(normGroups, availableSet)
 
   return Array.from(availableSet);
 };
@@ -645,6 +648,8 @@ export const AuthProvider = ({ children }) => {
       const employeeId = decoded.employeeid || decoded.sub || '-';
       const rawGroups = decoded.groups || decoded.group || [];
       const groups = Array.isArray(rawGroups) ? rawGroups : (typeof rawGroups === 'string' ? rawGroups.split(/[\s,]+/) : []);
+
+
       const realmRoles = decoded.realm_access?.roles || [];
 
       const tempUser = { groups, realmRoles, level: decoded.level || decoded.role };
