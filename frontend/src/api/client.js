@@ -1,4 +1,7 @@
-const LOCAL_API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+const rawApiBase = import.meta.env.VITE_API_BASE_URL;
+const LOCAL_API_BASE = (rawApiBase !== undefined && rawApiBase !== null && rawApiBase !== '')
+  ? rawApiBase
+  : (import.meta.env.PROD ? '' : 'http://localhost:3000');
 
 export const apiClient = {
   getToken() {
