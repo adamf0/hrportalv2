@@ -503,7 +503,7 @@ export const AuthProvider = ({ children }) => {
           const updatedUser = {
             ...baseUser,
             name: res.name || baseUser.name || 'Pengguna HR Portal',
-            email: res.email || baseUser.email || '',
+            email: baseUser.email || '',
             username: res.nip || res.sid || baseUser.username || '',
             nip: res.nip || baseUser.nip || '',
             nidn: res.nidn || baseUser.nidn || '',
