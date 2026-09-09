@@ -185,7 +185,7 @@ class LocationWifiHelper {
     try {
       final response =
           await http.get(Uri.parse('https://api64.ipify.org')).timeout(
-                const Duration(milliseconds: 120),
+                const Duration(seconds: 3),
               );
       if (response.statusCode == 200) {
         final ip = response.body.trim();

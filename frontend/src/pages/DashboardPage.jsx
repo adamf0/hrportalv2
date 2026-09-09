@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Clock, 
   MapPin, 
@@ -59,74 +59,121 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     return formatIndonesianDate(date, true);
   };
 
-  // --- Fetch Client IP Address (IPv6 prioritized with dual-stack IPv4) ---
+  // --- Fetch Client IP Address (Prioritize IPv6 with Dual-Stack Support) ---
   const [ipAddress, setIpAddress] = useState('Mendeteksi IP...');
   const [ipv6Address, setIpv6Address] = useState('');
   const [ipv4Address, setIpv4Address] = useState('');
 
-  useEffect(() => {
-    let isMounted = true;
-    const detectClientIps = async () => {
-      let foundIpv6 = '';
-      let foundIpv4 = '';
+  const detectClientIps = useCallback(async () => {
+    let currentV6 = '';
+    let currentV4 = '';
 
-      // 1. Coba deteksi IPv6 terlebih dahulu (timeout 3 detik jika ISP tidak punya IPv6)
-      try {
-        const controller6 = new AbortController();
-        const timeout6 = setTimeout(() => controller6.abort(), 3000);
-        const res6 = await fetch('https://api6.ipify.org?format=json', { signal: controller6.signal });
-        clearTimeout(timeout6);
-        const data6 = await res6.json();
-        if (data6?.ip && data6.ip.includes(':')) {
-          foundIpv6 = data6.ip;
-          if (isMounted) setIpv6Address(data6.ip);
-        }
-      } catch (_) {
-        // ISP / jaringan klien tidak memiliki routing IPv6
+    const updateState = (v6, v4) => {
+      if (v6) {
+        currentV6 = v6;
+        setIpv6Address(v6);
+        setIpAddress(v6); // IPv6 diprioritaskan sebagai IP utama
       }
-
-      // 2. Deteksi IPv4
-      try {
-        const controller4 = new AbortController();
-        const timeout4 = setTimeout(() => controller4.abort(), 3000);
-        const res4 = await fetch('https://api4.ipify.org?format=json', { signal: controller4.signal });
-        clearTimeout(timeout4);
-        const data4 = await res4.json();
-        if (data4?.ip) {
-          foundIpv4 = data4.ip;
-          if (isMounted) setIpv4Address(data4.ip);
+      if (v4) {
+        currentV4 = v4;
+        setIpv4Address(v4);
+        if (!currentV6) {
+          setIpAddress(v4);
         }
-      } catch (_) {}
-
-      // 3. Fallback dual-stack api64 jika langkah 1 & 2 belum terisi
-      if (!foundIpv6 && !foundIpv4) {
-        try {
-          const res64 = await fetch('https://api64.ipify.org?format=json');
-          const data64 = await res64.json();
-          if (data64?.ip) {
-            if (data64.ip.includes(':')) {
-              foundIpv6 = data64.ip;
-              if (isMounted) setIpv6Address(data64.ip);
-            } else {
-              foundIpv4 = data64.ip;
-              if (isMounted) setIpv4Address(data64.ip);
-            }
-          }
-        } catch (err) {
-          console.warn('Gagal fetch IP:', err);
-        }
-      }
-
-      // Prioritaskan IPv6 jika klien memiliki IPv6, fallback ke IPv4
-      const primaryIp = foundIpv6 || foundIpv4 || '103.169.192.29';
-      if (isMounted) {
-        setIpAddress(primaryIp);
       }
     };
 
-    detectClientIps();
-    return () => { isMounted = false; };
+    // 1. Prioritas Utama: /cdn-cgi/trace langsung dari domain hrportal.unpak.ac.id
+    // Ini metode tercepat & paling akurat karena membaca alamat IP koneksi HTTPS nyata dari browser ke Cloudflare
+    // (Bebas dari pemblokiran adblocker & tanpa kendala CORS)
+    try {
+      const traceRes = await fetch('/cdn-cgi/trace', { cache: 'no-store' });
+      if (traceRes.ok) {
+        const text = await traceRes.text();
+        const match = text.match(/ip=([^\r\n]+)/);
+        if (match && match[1]) {
+          const rawIp = match[1].trim();
+          if (rawIp.includes(':')) {
+            updateState(rawIp, currentV4);
+          } else if (rawIp.includes('.')) {
+            updateState(currentV6, rawIp);
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 2. Query paralel ke endpoint eksternal untuk melengkapi status dual-stack
+    const promises = [];
+
+    // Jika IPv6 belum terdeteksi dari CDN trace, periksa api6 & api64
+    if (!currentV6) {
+      promises.push(
+        (async () => {
+          try {
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 3500);
+            const res = await fetch('https://api6.ipify.org?format=json', { signal: ctrl.signal });
+            clearTimeout(tid);
+            const data = await res.json();
+            if (data?.ip && data.ip.includes(':')) {
+              updateState(data.ip, currentV4);
+            }
+          } catch (_) {}
+        })()
+      );
+
+      promises.push(
+        (async () => {
+          try {
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 3500);
+            const res = await fetch('https://api64.ipify.org?format=json', { signal: ctrl.signal });
+            clearTimeout(tid);
+            const data = await res.json();
+            if (data?.ip) {
+              if (data.ip.includes(':')) {
+                updateState(data.ip, currentV4);
+              } else if (data.ip.includes('.') && !currentV4) {
+                updateState(currentV6, data.ip);
+              }
+            }
+          } catch (_) {}
+        })()
+      );
+    }
+
+    // Ambil IPv4 untuk pelengkap informasi dual-stack
+    if (!currentV4) {
+      promises.push(
+        (async () => {
+          try {
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 3500);
+            const res = await fetch('https://api4.ipify.org?format=json', { signal: ctrl.signal });
+            clearTimeout(tid);
+            const data = await res.json();
+            if (data?.ip && data.ip.includes('.')) {
+              updateState(currentV6, data.ip);
+            }
+          } catch (_) {}
+        })()
+      );
+    }
+
+    await Promise.allSettled(promises);
+
+    // Fallback jika sama sekali tidak ada jaringan luar yang bisa dijangkau
+    setIpAddress((prev) => {
+      if (prev === 'Mendeteksi IP...') {
+        return currentV6 || currentV4 || '103.169.192.29';
+      }
+      return prev;
+    });
   }, []);
+
+  useEffect(() => {
+    detectClientIps();
+  }, [detectClientIps]);
 
   // --- Data States ---
   const [todayAbsen, setTodayAbsen] = useState(null);
@@ -214,6 +261,8 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         return dateStr === todayStr;
       });
       setTodayAbsen(foundToday || null);
+      // Refresh status IP client saat refresh dashboard
+      detectClientIps();
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
     } finally {
@@ -1227,14 +1276,18 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
                 <Wifi size={15} color="#0284c7" />
                 <span>
                   IP Address: <strong style={{ color: '#0f172a', fontFamily: 'monospace' }}>{ipAddress}</strong>
-                  {ipv6Address && (
+                  {(ipv6Address || (ipAddress && ipAddress.includes(':'))) ? (
                     <span style={{ marginLeft: '6px', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '4px', background: '#dcfce7', color: '#15803d' }}>
                       IPv6
                     </span>
-                  )}
+                  ) : (ipAddress && ipAddress.includes('.')) ? (
+                    <span style={{ marginLeft: '6px', padding: '2px 6px', fontSize: '0.7rem', fontWeight: 700, borderRadius: '4px', background: '#e0f2fe', color: '#0369a1' }}>
+                      IPv4
+                    </span>
+                  ) : null}
                   {ipv4Address && ipv4Address !== ipAddress && (
-                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#94a3b8' }}>
-                      (IPv4: <span style={{ fontFamily: 'monospace' }}>{ipv4Address}</span>)
+                    <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#64748b' }}>
+                      (IPv4: <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{ipv4Address}</span>)
                     </span>
                   )}
                 </span>
