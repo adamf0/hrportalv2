@@ -1,8 +1,785 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, RefreshCw, Download, FileText } from 'lucide-react';
+import { Printer, RefreshCw } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
+
+export const defaultFormatRupiah = (val) => {
+  if (val === undefined || val === null) return '0';
+  const num = typeof val === 'number' ? val : (parseFloat(val) || 0);
+  return new Intl.NumberFormat('id-ID').format(num);
+};
+
+export const toNum = (val) => Number(val) || 0;
+
+export const SlipGajiPegawai = ({
+  data = {},
+  formatRupiah = defaultFormatRupiah
+}) => {
+  const bpjs = toNum(data.bpjs);
+  const astek = toNum(data.astekP) + toNum(data.astekY) + bpjs + (bpjs > 0 ? bpjs / 2 : 0);
+  const dlpk = toNum(data.dplkP) + toNum(data.dplkY);
+
+  const astek_dlpk = toNum(data.gajikotor) > 0
+    ? toNum(data.gajikotor) - toNum(data.gajibersih)
+    : 0;
+
+  return (
+    <div style={{ fontSize: '12px', fontFamily: 'Arial, sans-serif', background: '#fff', padding: '16px', border: '1px solid #000' }}>
+      <table
+        width="355px"
+        style={{
+          fontWeight: 'bold',
+          borderCollapse: 'collapse',
+          border: '1px solid #000',
+          marginBottom: '3px'
+        }}
+      >
+        <tbody>
+          <tr align="center">
+            <td style={{ paddingTop: '5px' }}>
+              <h4 style={{ fontWeight: 'bold', margin: '0px', fontSize: '14px' }}>
+                UNIT KERJA/FAKULTAS {data.prodi ? data.prodi : 'REKTORAT'}
+              </h4>
+              <h4 style={{ fontWeight: 'bold', margin: '0px', fontSize: '14px' }}>
+                UNIVERSITAS PAKUAN
+              </h4>
+              <h3 style={{ fontWeight: 'bold', margin: '0px', fontSize: '16px' }}>
+                <u>GAJI dan TUNJANGAN</u>
+              </h3>
+              <h4 style={{ fontWeight: 'bold', margin: '3px', fontSize: '14px' }}>
+                Bulan/Tahun : {data.bulan}/{data.tahun}
+              </h4>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table
+        width="355px"
+        cellPadding="0"
+        cellSpacing="0"
+        style={{
+          borderCollapse: 'collapse',
+          border: '1px solid #000',
+          fontSize: '12px'
+        }}
+      >
+        <tbody>
+          <tr align="center">
+            <td align="left" style={{ width: '100px', verticalAlign: 'top' }}>
+              &nbsp;<b>No. Urut</b>
+            </td>
+            <td align="left" colSpan={5}>
+              : {data.no_mesin || data.no_urut || ''}
+              <label style={{ margin: 0, float: 'right' }}>Hari&nbsp;</label>
+            </td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Nama</b>
+            </td>
+            <td align="left" colSpan={5}>
+              : {data.nama || ''}
+            </td>
+          </tr>
+
+          {/* Gaji Pokok */}
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top', paddingTop: '10px' }}>
+              &nbsp;<b>Gaji Pokok</b>
+            </td>
+            <td width="20px"></td>
+            <td width="110px" align="left" style={{ paddingTop: '10px' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.gaji_pokok ?? data.gajiPokok)}&nbsp;
+              </label>
+            </td>
+            <td width="10px"></td>
+            <td width="110px" align="left" style={{ paddingTop: '10px' }}></td>
+            <td></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Suami/istri</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tkeluarga ?? data.suami_istri)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Anak</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tanak ?? data.anak)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Pangan</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tpangan ?? data.pangan)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Struktural</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tstruktural ?? data.struktural)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Fungsional</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tfungsional ?? data.fungsional)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Transpot</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.transpot ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Khusus</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tkhusus ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Astek/DPLK</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.astekY ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>BPJS</b>
+            </td>
+            <td style={{ borderBottom: '1px solid #000' }}></td>
+            <td align="left" style={{ borderBottom: '1px solid #000' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.bpjs)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" colSpan={4} style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Jumlah Pendapatan</b>
+            </td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.gajikotor ?? 0)}
+              </label>
+            </td>
+            <td></td>
+          </tr>
+
+          {/* Potongan */}
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top', paddingTop: '10px' }}>
+              &nbsp;<b>Astek</b>
+            </td>
+            <td></td>
+            <td align="left" style={{ paddingTop: '10px' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(astek)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top', paddingTop: '10px' }}>
+              &nbsp;<b>DPLK</b>
+            </td>
+            <td></td>
+            <td align="left" style={{ paddingTop: '10px' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(dlpk)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Koperasi</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.pkoperasi ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Yayasan</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.pyayasan ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Zakat 2.5%</b>
+            </td>
+            <td style={{ borderBottom: '1px solid #000' }}></td>
+            <td align="left" style={{ borderBottom: '1px solid #000' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.pzakat ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" colSpan={4} style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Jumlah Potongan</b>
+            </td>
+            <td align="left" style={{ borderBottom: '1px solid #000' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(astek_dlpk)}
+              </label>
+            </td>
+            <td></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" colSpan={4} style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Pendapatan Bersih</b>
+            </td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.gajibersih ?? 0)}
+              </label>
+            </td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table
+        width="355px"
+        cellPadding="0"
+        cellSpacing="0"
+        style={{ padding: '0px 30px', fontSize: '12px', marginTop: '4px' }}
+      >
+        <tbody>
+          <tr align="center">
+            <td align="left" style={{ width: '45%', verticalAlign: 'top' }}>&nbsp;</td>
+            <td align="center" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Bogor, {data.bulan} {data.tahun}</b>
+            </td>
+          </tr>
+          <tr align="center">
+            <td align="center" style={{ verticalAlign: 'top' }}>&nbsp;<b>Yang Menerima,</b></td>
+            <td align="center" style={{ verticalAlign: 'top' }}>&nbsp;<b>Yang Menyerahkan,</b></td>
+          </tr>
+          <tr align="center">
+            <td align="center" style={{ verticalAlign: 'top' }}>
+              <br /><br />
+              <b>({data.nama || ''})</b>
+            </td>
+            <td align="center" style={{ verticalAlign: 'top' }}></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export const SlipGajiDosen = ({
+  data = {},
+  formatRupiah = defaultFormatRupiah
+}) => {
+  const bpjs = toNum(data.bpjs);
+  const astek = toNum(data.astekP) + toNum(data.astekY) + bpjs + (bpjs > 0 ? bpjs / 2 : 0);
+  const dlpk = toNum(data.dplkP) + toNum(data.dplkY);
+
+  const astek_dlpk = toNum(data.gajikotor) > 0
+    ? toNum(data.gajikotor) - toNum(data.gajibersih)
+    : 0;
+
+  return (
+    <div style={{ fontSize: '12px', fontFamily: 'Arial, sans-serif', background: '#fff', padding: '16px', border: '1px solid #000' }}>
+      <table
+        width="355px"
+        style={{
+          fontWeight: 'bold',
+          borderCollapse: 'collapse',
+          border: '1px solid #000',
+          marginBottom: '3px'
+        }}
+      >
+        <tbody>
+          <tr align="center">
+            <td style={{ paddingTop: '5px' }}>
+              <h4 style={{ fontWeight: 'bold', margin: '0px', fontSize: '14px' }}>
+                UNIT KERJA/FAKULTAS {data.prodi ? data.prodi : ''}
+              </h4>
+              <h4 style={{ fontWeight: 'bold', margin: '0px', fontSize: '14px' }}>
+                UNIVERSITAS PAKUAN
+              </h4>
+              <h3 style={{ fontWeight: 'bold', margin: '0px', fontSize: '16px' }}>
+                <u>GAJI dan TUNJANGAN</u>
+              </h3>
+              <h4 style={{ fontWeight: 'bold', margin: '3px', fontSize: '14px' }}>
+                Bulan/Tahun : {data.bulan}/{data.tahun}
+              </h4>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table
+        width="355px"
+        cellPadding="0"
+        cellSpacing="0"
+        style={{
+          borderCollapse: 'collapse',
+          border: '1px solid #000',
+          fontSize: '12px'
+        }}
+      >
+        <tbody>
+          <tr align="center">
+            <td align="left" style={{ width: '100px', verticalAlign: 'top' }}>
+              &nbsp;<b>No. Urut</b>
+            </td>
+            <td align="left" colSpan={5}>
+              : {data.no_mesin || data.no_urut || ''}
+              <label style={{ margin: 0, float: 'right' }}>Hari&nbsp;</label>
+            </td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Nama</b>
+            </td>
+            <td align="left" colSpan={5}>
+              : {data.nama || ''}
+            </td>
+          </tr>
+
+          {/* Gaji Pokok */}
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top', paddingTop: '10px' }}>
+              &nbsp;<b>Gaji Pokok</b>
+            </td>
+            <td width="20px"></td>
+            <td width="110px" align="left" style={{ paddingTop: '10px' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.gaji_pokok ?? data.gajiPokok)}&nbsp;
+              </label>
+            </td>
+            <td width="10px"></td>
+            <td width="110px" align="left" style={{ paddingTop: '10px' }}></td>
+            <td></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Suami/istri</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tkeluarga ?? data.suami_istri)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Anak</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tanak ?? data.anak)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Pangan</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tpangan ?? data.pangan)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Struktural</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tstruktural ?? data.struktural)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Fungsional</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tfungsional ?? data.fungsional)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+
+          {/* Mengajar Breakdown */}
+          <tr align="center">
+            <td align="left" colSpan={6} style={{ fontWeight: 'bold', paddingTop: '4px' }}>
+              &nbsp;Mengajar :
+            </td>
+          </tr>
+          <tr align="center">
+            <td align="left">&nbsp;&nbsp;-S1</td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.mengajar ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left">&nbsp;&nbsp;-S1-NonReg</td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.nonregular ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left">&nbsp;&nbsp;-Vokasi</td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.D3regular ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left">&nbsp;&nbsp;-Vokasi-NonReg</td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.D3nonregular ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left">&nbsp;&nbsp;-Pasca</td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.pascasarjana ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Transpot</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.transpot ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Khusus</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.tkhusus ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Astek/DPLK</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.astekY ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>BPJS</b>
+            </td>
+            <td style={{ borderBottom: '1px solid #000' }}></td>
+            <td align="left" style={{ borderBottom: '1px solid #000' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.bpjs)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" colSpan={4} style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Jumlah Pendapatan</b>
+            </td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.gajikotor ?? 0)}
+              </label>
+            </td>
+            <td></td>
+          </tr>
+
+          {/* Potongan */}
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top', paddingTop: '10px' }}>
+              &nbsp;<b>Astek</b>
+            </td>
+            <td></td>
+            <td align="left" style={{ paddingTop: '10px' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(astek)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top', paddingTop: '10px' }}>
+              &nbsp;<b>DPLK</b>
+            </td>
+            <td></td>
+            <td align="left" style={{ paddingTop: '10px' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(dlpk)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Koperasi</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.pkoperasi ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Yayasan</b>
+            </td>
+            <td></td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.pyayasan ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+          <tr align="center">
+            <td align="left" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Zakat 2.5%</b>
+            </td>
+            <td style={{ borderBottom: '1px solid #000' }}></td>
+            <td align="left" style={{ borderBottom: '1px solid #000' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.pzakat ?? 0)}&nbsp;
+              </label>
+            </td>
+            <td colSpan={3}></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" colSpan={4} style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Jumlah Potongan</b>
+            </td>
+            <td align="left" style={{ borderBottom: '1px solid #000' }}>
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(astek_dlpk)}
+              </label>
+            </td>
+            <td></td>
+          </tr>
+
+          <tr align="center">
+            <td align="left" colSpan={4} style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Pendapatan Bersih</b>
+            </td>
+            <td align="left">
+              Rp.&nbsp;
+              <label style={{ margin: 0, float: 'right', fontWeight: 'normal' }}>
+                {formatRupiah(data.gajibersih ?? 0)}
+              </label>
+            </td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table
+        width="355px"
+        cellPadding="0"
+        cellSpacing="0"
+        style={{ padding: '0px 30px', fontSize: '12px', marginTop: '4px' }}
+      >
+        <tbody>
+          <tr align="center">
+            <td align="left" style={{ width: '45%', verticalAlign: 'top' }}>&nbsp;</td>
+            <td align="center" style={{ verticalAlign: 'top' }}>
+              &nbsp;<b>Bogor, {data.bulan} {data.tahun}</b>
+            </td>
+          </tr>
+          <tr align="center">
+            <td align="center" style={{ verticalAlign: 'top' }}>&nbsp;<b>Yang Menerima,</b></td>
+            <td align="center" style={{ verticalAlign: 'top' }}>&nbsp;<b>Yang Menyerahkan,</b></td>
+          </tr>
+          <tr align="center">
+            <td align="center" style={{ verticalAlign: 'top' }}>
+              <br /><br />
+              <b>({data.nama || ''})</b>
+            </td>
+            <td align="center" style={{ verticalAlign: 'top' }}></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+export const SlipGajiAdapter = ({
+  apiResponse,
+  tipe = '',
+  formatRupiah = defaultFormatRupiah
+}) => {
+  const payload = apiResponse?.data ?? apiResponse ?? {};
+
+  console.log(payload, tipe)
+  if (tipe === 'dosen') {
+    return <SlipGajiDosen data={payload} formatRupiah={formatRupiah} />;
+  }
+
+  return <SlipGajiPegawai data={payload} formatRupiah={formatRupiah} />;
+};
 
 export const SlipGajiPage = () => {
   const { user } = useAuth();
@@ -31,9 +808,8 @@ export const SlipGajiPage = () => {
     { value: 12, label: 'Desember' },
   ];
 
-  const yearsList = [2024, 2025, 2026, 2027];
+  const yearsList = Array.from({ length: currentYearNum - 2000 + 1 }, (_, i) => currentYearNum - i);
 
-  // Fetch Payroll Data from Backend API
   const fetchPayroll = async () => {
     setLoading(true);
     try {
@@ -59,20 +835,19 @@ export const SlipGajiPage = () => {
     fetchPayroll();
   }, [selectedMonth, selectedYear]);
 
-  const formatRupiah = (val) => {
-    if (val === undefined || val === null) return '0';
-    const num = typeof val === 'number' ? val : (parseFloat(val) || 0);
-    return new Intl.NumberFormat('id-ID').format(num);
-  };
-
   const selectedMonthName = monthNames.find((m) => m.value === selectedMonth)?.label || 'Januari';
 
   const handlePrint = () => {
     window.print();
-    showToast('Mencetak Slip Gaji Resmi UNPAK...', 'info');
+    if (showToast) showToast('Mencetak Slip Gaji Resmi UNPAK...', 'info');
   };
 
-  const p = payrollData || {};
+  const payloadWithFallback = {
+    bulan: selectedMonthName,
+    tahun: selectedYear,
+    nama: user?.name,
+    ...payrollData
+  };
 
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center' }}>
@@ -138,220 +913,12 @@ export const SlipGajiPage = () => {
         </div>
       </div>
 
-      {/* STRICT GAMBAR 2 OFFICIAL UNPAK SLIP GAJI PAPER DOCUMENT TEMPLATE */}
-      <div
-        id="official-slip-gaji"
-        style={{
-          width: '100%',
-          maxWidth: '540px',
-          background: '#ffffff',
-          border: '1.5px solid #000000',
-          padding: '16px 20px',
-          fontFamily: "'Times New Roman', Times, serif, Arial",
-          color: '#000000',
-          boxShadow: '0 8px 20px rgba(0, 0, 0, 0.06)',
-          fontSize: '0.85rem',
-          lineHeight: 1.3,
-        }}
-      >
-        {/* Document Header Box */}
-        <div style={{ border: '1.5px solid #000000', textAlign: 'center', padding: '8px 10px', marginBottom: '12px' }}>
-          <div style={{ fontSize: '0.92rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.01em' }}>
-            UNIT KERJA/FAKULTAS SEKOLAH VOKASI
-          </div>
-          <div style={{ fontSize: '0.92rem', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.01em' }}>
-            UNIVERSITAS PAKUAN
-          </div>
-          <div style={{ fontSize: '1.05rem', fontWeight: 'bold', textDecoration: 'underline', marginTop: '2px', letterSpacing: '0.02em' }}>
-            GAJI dan TUNJANGAN
-          </div>
-          <div style={{ fontSize: '0.88rem', fontWeight: 'bold', marginTop: '2px' }}>
-            Bulan/Tahun : {selectedMonthName}/{selectedYear}
-          </div>
-        </div>
-
-        {/* Pegawai Details Rows */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px', fontSize: '0.85rem', fontFamily: 'inherit' }}>
-          <tbody>
-            <tr>
-              <td style={{ width: '90px', padding: '1px 0', fontWeight: 'bold' }}>No. Urut</td>
-              <td style={{ width: '12px' }}>:</td>
-              <td style={{ fontWeight: 'bold' }}>{p.no_urut || p.no_mesin || ''}</td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold' }}>Hari</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Nama</td>
-              <td>:</td>
-              <td colSpan={2} style={{ fontWeight: 'bold' }}>{p.nama || user?.name || ''}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Breakdown Items Table */}
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.82rem', fontFamily: 'inherit' }}>
-          <tbody>
-            {/* Income items */}
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Gaji Pokok</td>
-              <td style={{ width: '35px' }}>Rp.</td>
-              <td style={{ textAlign: 'right', width: '120px' }}>{formatRupiah(p.gaji_pokok ?? p.gajiPokok ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Suami/istri</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.suami_istri ?? p.tkeluarga ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Anak</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.anak ?? p.tanak ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Pangan</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.pangan ?? p.tpangan ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Struktural</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.struktural ?? p.tstruktural ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Fungsional</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.fungsional ?? p.tfungsional ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td colSpan={4} style={{ padding: '1px 0', fontWeight: 'bold' }}>Mengajar :</td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0 1px 12px' }}>-S1</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_s1 ?? p.mengajar ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0 1px 12px' }}>-Vokasi</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_vokasi ?? p.d3regular ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0 1px 12px' }}>-Vokasi-NonReg</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.mengajar_vokasi_nonreg ?? p.d3nonregular ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Transpot</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.transpot ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Khusus</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.khusus ?? p.tkhusus ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Astek/DPLK</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.astek_dplk ?? p.astekY ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '1px 0 4px 0', fontWeight: 'bold' }}>BPJS</td>
-              <td style={{ paddingBottom: '4px' }}>Rp.</td>
-              <td style={{ textAlign: 'right', paddingBottom: '4px' }}>{formatRupiah(p.bpjs ?? 0)}</td>
-              <td></td>
-            </tr>
-
-            {/* Jumlah Pendapatan Row */}
-            <tr>
-              <td style={{ padding: '6px 0', fontWeight: 'bold', fontSize: '0.88rem' }}>Jumlah Pendapatan</td>
-              <td></td>
-              <td></td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '0.88rem' }}>
-                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.jumlah_pendapatan ?? p.gajikotor ?? 0)}
-              </td>
-            </tr>
-
-            {/* Deductions items */}
-            <tr>
-              <td style={{ padding: '2px 0 1px 0', fontWeight: 'bold' }}>Astek</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.astek ?? p.astekP ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>DPLK</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.dplk ?? p.dplkP ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Koperasi</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.koperasi ?? p.pkoperasi ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style={{ padding: '1px 0', fontWeight: 'bold' }}>Yayasan</td>
-              <td>Rp.</td>
-              <td style={{ textAlign: 'right' }}>{formatRupiah(p.yayasan ?? p.pyayasan ?? 0)}</td>
-              <td></td>
-            </tr>
-            <tr style={{ borderBottom: '1px solid #000000' }}>
-              <td style={{ padding: '1px 0 4px 0', fontWeight: 'bold' }}>Zakat 2.5%</td>
-              <td style={{ paddingBottom: '4px' }}>Rp.</td>
-              <td style={{ textAlign: 'right', paddingBottom: '4px' }}>{formatRupiah(p.zakat ?? p.pzakat ?? 0)}</td>
-              <td></td>
-            </tr>
-
-            {/* Summary Net Totals */}
-            <tr>
-              <td style={{ padding: '4px 0 1px 0', fontWeight: 'bold', fontSize: '0.88rem' }}>Jumlah Potongan</td>
-              <td></td>
-              <td></td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '0.88rem' }}>
-                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.jumlah_potongan ?? 0)}
-              </td>
-            </tr>
-
-            <tr>
-              <td style={{ padding: '1px 0 6px 0', fontWeight: 'bold', fontSize: '0.88rem' }}>Pendapatan Bersih</td>
-              <td></td>
-              <td></td>
-              <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '0.88rem' }}>
-                Rp. &nbsp;&nbsp;&nbsp;&nbsp;{formatRupiah(p.pendapatan_bersih ?? p.gajibersih ?? 0)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Signature Footer */}
-        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-          <div style={{ textAlign: 'center', minWidth: '220px' }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '6px', fontSize: '0.82rem' }}>
-              Bogor, {selectedMonthName} {selectedYear}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '24px', fontWeight: 'bold', marginBottom: '40px', fontSize: '0.82rem' }}>
-              <span>Yang Menerima,</span>
-              <span>Yang Menyerahkan,</span>
-            </div>
-            <div style={{ fontWeight: 'bold', textDecoration: 'underline', fontSize: '0.82rem' }}>
-              ({p.nama || user?.name || ''})
-            </div>
-          </div>
-        </div>
+      {/* Slip Gaji Output Paper Document */}
+      <div id="official-slip-gaji">
+        <SlipGajiAdapter apiResponse={payloadWithFallback} tipe={payloadWithFallback.status=="DOSEN"? "dosen":"pegawai"} />
       </div>
     </div>
   );
 };
+
+export default SlipGajiPage;
