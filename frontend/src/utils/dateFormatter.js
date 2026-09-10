@@ -1,4 +1,4 @@
-// Utility for formatting dates and times in standard Indonesian format
+// Utility for formatting dates and times in standard Indonesian format (WIB / Asia/Jakarta)
 
 const MONTHS_ID = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -8,15 +8,41 @@ const MONTHS_ID = [
 const DAYS_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
 /**
- * Format a date string or Date object into "17 Agustus 2026" or "Senin, 17 Agustus 2026"
+ * Get current or given date as YYYY-MM-DD string in WIB (Asia/Jakarta) timezone
+ */
+export const getLocalDateStr = (dateInput = new Date()) => {
+  if (!dateInput) return '';
+  let dObj = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(dObj.getTime())) {
+    if (typeof dateInput === 'string') {
+      const match = dateInput.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match) return match[1];
+    }
+    return '';
+  }
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return formatter.format(dObj);
+};
+
+/**
+ * Format a date string or Date object into "17 Agustus 2026" or "Senin, 17 Agustus 2026" in WIB timezone
  */
 export const formatIndonesianDate = (dateInput, includeDayName = false) => {
-  if (!dateInput) return '-';
+  if (!dateInput || dateInput === '-') return '-';
 
   let dateObj;
   if (typeof dateInput === 'string') {
     const cleaned = dateInput.trim();
-    dateObj = new Date(cleaned);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+      dateObj = new Date(`${cleaned}T00:00:00+07:00`);
+    } else {
+      dateObj = new Date(cleaned);
+    }
   } else if (dateInput instanceof Date) {
     dateObj = dateInput;
   } else {
@@ -27,30 +53,30 @@ export const formatIndonesianDate = (dateInput, includeDayName = false) => {
     return String(dateInput);
   }
 
-  const dayName = DAYS_ID[dateObj.getDay()];
-  const dateNum = dateObj.getDate();
-  const monthName = MONTHS_ID[dateObj.getMonth()];
-  const yearNum = dateObj.getFullYear();
+  const dtf = new Intl.DateTimeFormat('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    weekday: includeDayName ? 'long' : undefined,
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
 
-  if (includeDayName) {
-    return `${dayName}, ${dateNum} ${monthName} ${yearNum}`;
-  }
-
-  return `${dateNum} ${monthName} ${yearNum}`;
+  return dtf.format(dateObj);
 };
 
 /**
- * Format a timestamp into time format "17:45 WIB"
+ * Format a timestamp into time format "17:45 WIB" in WIB timezone
  */
 export const formatIndonesianTime = (dateInput) => {
   if (!dateInput || dateInput === '-') return '-';
 
   let dateObj;
   if (typeof dateInput === 'string') {
-    if (/^\d{2}:\d{2}(:\d{2})?$/.test(dateInput.trim())) {
-      return dateInput.trim().substring(0, 5) + ' WIB';
+    const trimmed = dateInput.trim();
+    if (/^\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+      return trimmed.substring(0, 5) + ' WIB';
     }
-    dateObj = new Date(dateInput.trim());
+    dateObj = new Date(trimmed);
   } else if (dateInput instanceof Date) {
     dateObj = dateInput;
   } else {
@@ -61,9 +87,14 @@ export const formatIndonesianTime = (dateInput) => {
     return String(dateInput);
   }
 
-  const hours = String(dateObj.getHours()).padStart(2, '0');
-  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes} WIB`;
+  const timeStr = dateObj.toLocaleTimeString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).replace('.', ':');
+
+  return `${timeStr} WIB`;
 };
 
 /**
@@ -84,16 +115,16 @@ export const calculateDurationDays = (startDateInput, endDateInput) => {
 };
 
 /**
- * Normalize any date input string to standard HTML5 date input format "YYYY-MM-DD"
+ * Normalize any date input string to standard HTML5 date input format "YYYY-MM-DD" in WIB timezone
  */
 export const formatInputDate = (dateInput) => {
   if (!dateInput) return '';
   const str = String(dateInput).trim();
   if (!str) return '';
 
-  // Case 1: YYYY-MM-DD... (e.g. "2026-09-04" or "2026-09-04 00:00:00" or "2026-09-04T00:00:00Z")
+  // Case 1: YYYY-MM-DD... (e.g. "2026-09-04" or "2026-09-04 00:00:00")
   const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
-  if (ymdMatch) {
+  if (ymdMatch && !str.includes('T')) {
     const y = ymdMatch[1];
     const m = ymdMatch[2].padStart(2, '0');
     const d = ymdMatch[3].padStart(2, '0');
@@ -109,16 +140,8 @@ export const formatInputDate = (dateInput) => {
     return `${y}-${m}-${d}`;
   }
 
-  // Case 3: Try Date object parsing
-  const dObj = new Date(str);
-  if (!isNaN(dObj.getTime())) {
-    const year = dObj.getFullYear();
-    const month = String(dObj.getMonth() + 1).padStart(2, '0');
-    const day = String(dObj.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-
-  return '';
+  // Case 3: ISO timestamps or Date object parsing with Asia/Jakarta timezone
+  return getLocalDateStr(str);
 };
 
 /**

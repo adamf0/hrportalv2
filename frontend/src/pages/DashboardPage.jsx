@@ -38,7 +38,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import { Modal } from '../components/Modal';
 import { Badge } from '../components/Badge';
-import { formatIndonesianDate, formatIndonesianTime } from '../utils/dateFormatter';
+import { formatIndonesianDate, formatIndonesianTime, getLocalDateStr } from '../utils/dateFormatter';
 
 export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPeriodTypeChange }) => {
   const { user, isSdm, userRole } = useAuth();
@@ -254,10 +254,10 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
       setSppdList(sppdData);
       setHolidayList(holData);
 
-      // Today Absen Check
-      const todayStr = new Date().toISOString().split('T')[0];
+      // Today Absen Check (WIB timezone safe)
+      const todayStr = getLocalDateStr();
       const foundToday = attData.find((item) => {
-        const dateStr = item.tanggal || (item.absen_masuk ? item.absen_masuk.split('T')[0] : '');
+        const dateStr = item.tanggal || (item.absen_masuk ? getLocalDateStr(item.absen_masuk) : '');
         return dateStr === todayStr;
       });
       setTodayAbsen(foundToday || null);
@@ -511,7 +511,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
 
   // --- Stat Metrics ---
   const filteredAttendance = attendanceHistory.filter((item) => {
-    const d = item.tanggal || (item.absen_masuk ? item.absen_masuk.split('T')[0] : '');
+    const d = item.tanggal || (item.absen_masuk ? getLocalDateStr(item.absen_masuk) : '');
     return isDateInPeriod(d);
   });
 
@@ -578,7 +578,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
   const holidayDateSet = useMemo(() => {
     const set = new Set();
     holidayList.forEach((h) => {
-      if (h.tanggal) set.add(h.tanggal.split('T')[0]);
+      if (h.tanggal) set.add(getLocalDateStr(h.tanggal));
     });
     return set;
   }, [holidayList]);
@@ -588,7 +588,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     attendanceHistory.forEach((a) => {
       const checkIn = a.absen_masuk || a.check_in;
       if (checkIn && checkIn !== '-' && checkIn !== '') {
-        const d = a.tanggal || (a.absen_masuk ? a.absen_masuk.split('T')[0] : '');
+        const d = a.tanggal || (a.absen_masuk ? getLocalDateStr(a.absen_masuk) : '');
         if (d) set.add(d);
       }
     });
@@ -646,19 +646,19 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     setSubmitting(true);
     try {
       const payload = {
-        nip: user?.nip || user?.username || '198501012010011001',
-        nidn: user?.nidn || '0401018501',
-        nama: user?.name || 'ADAM FURQON',
-        unit: user?.unit || 'Fakultas Teknik',
-        fakultas: user?.fakultas || 'Teknik',
-        prodi: user?.prodi || 'Ilmu Komputer',
-        latitude: -6.5976,
-        longitude: 106.8066,
+        nip: user?.nip || "",
+        nidn: user?.nidn || '',
+        nama: user?.name || '',
+        unit: user?.unit || '=',
+        fakultas: user?.fakultas || '',
+        prodi: user?.prodi || '',
+        latitude: 0,
+        longitude: 0,
         ip_address: ipAddress,
         ip: ipAddress,
         catatan_telat: isLate ? noteParam : '',
         catatan_pulang: '',
-        note: isLate ? noteParam : 'Tepat waktu',
+        note: isLate ? noteParam : '',
       };
 
       await apiClient.post('/api/v2/attendance/check-in', payload);
@@ -740,7 +740,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
   const filteredAttendanceHistory = filteredAttendance.filter((item) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    const d = item.tanggal || (item.absen_masuk ? item.absen_masuk.split('T')[0] : '');
+    const d = item.tanggal || (item.absen_masuk ? getLocalDateStr(item.absen_masuk) : '');
     const matchNote = (item.catatan_telat || item.catatan_pulang || item.alasan_telat || item.alasan_pulang || '').toLowerCase().includes(q);
     const matchDate = d.includes(q) || formatIndonesianDate(d).toLowerCase().includes(q);
     return matchNote || matchDate;
@@ -1424,7 +1424,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
                 </tr>
               ) : (
                 filteredAttendanceHistory.map((item, idx) => {
-                  const rawDate = item.tanggal || (item.absen_masuk ? item.absen_masuk.split('T')[0] : '');
+                  const rawDate = item.tanggal || (item.absen_masuk ? getLocalDateStr(item.absen_masuk) : '');
                   
                   // STRICT SPEC: Read strictly from item.catatan_telat / item.alasan_telat and item.catatan_pulang / item.alasan_pulang
                   const txtCatatanTelat = item.catatan_telat || item.alasan_telat || '-';

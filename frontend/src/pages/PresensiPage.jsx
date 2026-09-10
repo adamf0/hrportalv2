@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
+import { getLocalDateStr } from '../utils/dateFormatter';
 
 export const PresensiPage = () => {
   const { user } = useAuth();
@@ -56,8 +57,11 @@ export const PresensiPage = () => {
 
       setHistory(items);
 
-      const todayStr = new Date().toISOString().split('T')[0];
-      const todayRecord = items.find((item) => (item.tanggal || '').includes(todayStr));
+      const todayStr = getLocalDateStr();
+      const todayRecord = items.find((item) => {
+        const dateStr = item.tanggal || (item.absen_masuk ? getLocalDateStr(item.absen_masuk) : '');
+        return dateStr === todayStr;
+      });
 
       if (todayRecord) {
         setTodayCheckIn(todayRecord.absen_masuk || todayRecord.check_in || null);
