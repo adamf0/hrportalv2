@@ -1,39 +1,11 @@
-const BULAN_INDO = [
-  'Januari',
-  'Februari',
-  'Maret',
-  'April',
-  'Mei',
-  'Juni',
-  'Juli',
-  'Agustus',
-  'September',
-  'Oktober',
-  'November',
-  'Desember',
-];
+import { formatIndonesianDate } from './dateFormatter';
 
 /**
- * Mengubah string tanggal Y-m-d atau ISO 8601 menjadi format "01 Januari 2026"
+ * Mengubah string tanggal Y-m-d atau ISO 8601 menjadi format "01 Januari 2026" dalam WIB (Asia/Jakarta)
  */
 export const formatTanggalIndo = (dateStr) => {
   if (!dateStr) return '-';
-  try {
-    const cleanDate = dateStr.split('T')[0];
-    const parts = cleanDate.split('-');
-    if (parts.length !== 3) return dateStr;
-
-    const year = parts[0];
-    const monthIndex = parseInt(parts[1], 10) - 1;
-    const day = parts[2].padStart(2, '0');
-
-    if (monthIndex >= 0 && monthIndex < 12) {
-      return `${day} ${BULAN_INDO[monthIndex]} ${year}`;
-    }
-    return dateStr;
-  } catch {
-    return dateStr;
-  }
+  return formatIndonesianDate(dateStr);
 };
 
 /**

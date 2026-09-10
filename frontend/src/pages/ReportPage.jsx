@@ -22,7 +22,7 @@ import { Pagination } from '../components/Pagination';
 import { Modal } from '../components/Modal';
 import { Badge } from '../components/Badge';
 import { SearchableSelect } from '../components/SearchableSelect';
-import { formatIndonesianDate } from '../utils/dateFormatter';
+import { formatIndonesianDate, getLocalDateStr } from '../utils/dateFormatter';
 
 const BULAN_LIST = [
   { value: 1, name: 'Januari', short: 'Jan' },
@@ -39,7 +39,7 @@ const BULAN_LIST = [
   { value: 12, name: 'Desember', short: 'Des' },
 ];
 
-const TAHUN_LIST = [2024, 2025, 2026, 2027];
+const TAHUN_LIST = Array.from({ length: Math.max(1, currentYearNum - 2020 + 1) }, (_, i) => 2020 + i);
 
 const formatJamMasuk = (str) => {
   if (!str) return '';
@@ -206,7 +206,7 @@ export const ReportPage = ({ globalPeriodType = 'cutoff', onPeriodTypeChange }) 
       if (holidayRes.status === 'fulfilled' && holidayRes.value) {
         const hList = Array.isArray(holidayRes.value) ? holidayRes.value : (holidayRes.value?.data || []);
         hList.forEach((h) => {
-          if (h.tanggal) holidaySet.add(h.tanggal.split('T')[0]);
+          if (h.tanggal) holidaySet.add(getLocalDateStr(h.tanggal));
         });
       }
 

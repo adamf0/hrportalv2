@@ -228,7 +228,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     { value: 12, label: 'Desember' },
   ];
 
-  const yearsList = [2024, 2025, 2026, 2027];
+  const yearsList = Array.from({ length: Math.max(1, currentYearNum - 2020 + 1) }, (_, i) => 2020 + i);
 
   // Fetch All Dashboard Data
   const fetchDashboardData = async () => {
