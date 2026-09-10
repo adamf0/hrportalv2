@@ -122,7 +122,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 	}
 
 	existing.AbsenMasuk = &now
-	existing.CatatanPulang = &cmd.Note
+	existing.CatatanTelat = &cmd.Note
 	existing.UpdatedAt = &now
 	existing.IsCreated = false
 	if err := h.attendanceRepo.UpdateAbsen(ctxTx, existing); err != nil {
