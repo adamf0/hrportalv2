@@ -178,183 +178,186 @@ func ModuleAttendance(app *fiber.App) {
 
 	registerAttendanceRoutes := func(group fiber.Router) {
 
-	group.Post("/check-in", func(c *fiber.Ctx) error {
-		lat, _ := strconv.ParseFloat(c.FormValue("latitude"), 64)
-		lon, _ := strconv.ParseFloat(c.FormValue("longitude"), 64)
+		group.Post("/check-in", func(c *fiber.Ctx) error {
+			lat, _ := strconv.ParseFloat(c.FormValue("latitude"), 64)
+			lon, _ := strconv.ParseFloat(c.FormValue("longitude"), 64)
 
-		nip := strings.TrimSpace(c.FormValue("nip"))
-		nidn := strings.TrimSpace(c.FormValue("nidn"))
-		if nip == "" && nidn != "" {
-			nip = nidn
-		} else if nidn == "" && nip != "" {
-			nidn = nip
-		}
-
-		command := CheckIn.CheckInCommand{
-			Nip:         nip,
-			Nidn:        nidn,
-			NamaPegawai: c.FormValue("nama"),
-			Unit:        c.FormValue("unit"),
-			Fakultas:    c.FormValue("fakultas"),
-			Prodi:       c.FormValue("prodi"),
-			Latitude:    lat,
-			Longitude:   lon,
-			Note:        c.FormValue("note"),
-		}
-
-		res, err := mediatr.Send[*CheckIn.CheckInCommand, common.ResultValue[*domain.Absen]](c.UserContext(), &command)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-
-		// Trigger FCM Notification & WebSocket Broadcast for Check-In Success (Only when CREATED, not updated)
-		if res.Value != nil && res.Value.IsCreated {
-			absenData := res.Value
-			// targetNips := []string{}
-			// if absenData.Nip != "" {
-			// 	targetNips = append(targetNips, absenData.Nip)
-			// }
-			// if absenData.Nidn != "" && absenData.Nidn != absenData.Nip {
-			// 	targetNips = append(targetNips, absenData.Nidn)
-			// }
-			// if len(targetNips) > 0 {
-			// 	helper.GlobalFcmManager.DispatchNotification(
-			// 		targetNips,
-			// 		"Presensi Otomatis Berhasil",
-			// 		"Sistem sudah melakukan absensi otomatis",
-			// 		"attendance",
-			// 		map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
-			// 	)
-			// }
-
-			masukStr := ""
-			if absenData.AbsenMasuk != nil {
-				masukStr = absenData.AbsenMasuk.Format("2006-01-02 15:04:05")
+			nip := strings.TrimSpace(c.FormValue("nip"))
+			nidn := strings.TrimSpace(c.FormValue("nidn"))
+			if nip == "" && nidn != "" {
+				nip = nidn
+			} else if nidn == "" && nip != "" {
+				nidn = nip
 			}
-			GlobalAttendanceWsHub.BroadcastToUser(absenData.Nip, absenData.Nidn, RealtimeAttendancePayload{
-				Type:       "check_in",
-				Nip:        absenData.Nip,
-				Nidn:       absenData.Nidn,
-				Tanggal:    absenData.Tanggal,
-				AbsenMasuk: masukStr,
-			})
-		}
 
-		return c.JSON(res.Value)
-	})
-
-	group.Post("/check-out", func(c *fiber.Ctx) error {
-		nip := strings.TrimSpace(c.FormValue("nip"))
-		nidn := strings.TrimSpace(c.FormValue("nidn"))
-		if nip == "" && nidn != "" {
-			nip = nidn
-		} else if nidn == "" && nip != "" {
-			nidn = nip
-		}
-
-		command := CheckOut.CheckOutCommand{
-			Nip:  nip,
-			Nidn: nidn,
-		}
-
-		res, err := mediatr.Send[*CheckOut.CheckOutCommand, common.ResultValue[*domain.Absen]](c.UserContext(), &command)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-
-		// Trigger FCM Notification & WebSocket Broadcast for Check-Out Success (Only when CREATED, not updated)
-		if res.Value != nil && res.Value.IsCreated {
-			absenData := res.Value
-			keluarStr := ""
-			if absenData.AbsenKeluar != nil {
-				keluarStr = absenData.AbsenKeluar.Format("2006-01-02 15:04:05")
+			command := CheckIn.CheckInCommand{
+				Nip:         nip,
+				Nidn:        nidn,
+				NamaPegawai: c.FormValue("nama"),
+				Unit:        c.FormValue("unit"),
+				Fakultas:    c.FormValue("fakultas"),
+				Prodi:       c.FormValue("prodi"),
+				Latitude:    lat,
+				Longitude:   lon,
+				Note:        c.FormValue("note"),
 			}
-			GlobalAttendanceWsHub.BroadcastToUser(absenData.Nip, absenData.Nidn, RealtimeAttendancePayload{
-				Type:        "check_out",
-				Nip:         absenData.Nip,
-				Nidn:        absenData.Nidn,
-				Tanggal:     absenData.Tanggal,
-				AbsenKeluar: keluarStr,
-			})
-		}
 
-		return c.JSON(res.Value)
-	})
+			res, err := mediatr.Send[*CheckIn.CheckInCommand, common.ResultValue[*domain.Absen]](c.UserContext(), &command)
+			if err != nil {
+				return infrastructure.HandleError(c, err)
+			}
 
-	group.Post("/notify-fail", func(c *fiber.Ctx) error {
-		nip := c.FormValue("nip")
-		reason := c.FormValue("reason")
-		if reason == "" {
-			reason = "sistem gagal melakukan absensi otomatis karena anda berada di luar radius kampus / tidak terkoneksi jaringan, butuh presensi manual"
-		}
+			if !res.IsSuccess {
+				return infrastructure.HandleError(c, res.Error)
+			}
 
-		if nip != "" {
-			_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
-				TargetNips: []string{nip},
-				Title:      "Presensi Otomatis Gagal",
-				Body:       reason,
-				Type:       "attendance_fail",
-				Payload:    map[string]string{"type": "fail"},
-			})
-			return c.JSON(fiber.Map{"status": "ok", "message": "Notification command dispatched"})
-		}
-		return c.Status(400).JSON(fiber.Map{"error": "Missing nip"})
-	})
+			// Trigger FCM Notification & WebSocket Broadcast for Check-In Success (Only when CREATED, not updated)
+			if res.Value != nil && res.Value.IsCreated {
+				absenData := res.Value
+				// targetNips := []string{}
+				// if absenData.Nip != "" {
+				// 	targetNips = append(targetNips, absenData.Nip)
+				// }
+				// if absenData.Nidn != "" && absenData.Nidn != absenData.Nip {
+				// 	targetNips = append(targetNips, absenData.Nidn)
+				// }
+				// if len(targetNips) > 0 {
+				// 	helper.GlobalFcmManager.DispatchNotification(
+				// 		targetNips,
+				// 		"Presensi Otomatis Berhasil",
+				// 		"Sistem sudah melakukan absensi otomatis",
+				// 		"attendance",
+				// 		map[string]string{"type": "check-in", "id": strconv.Itoa(int(absenData.ID))},
+				// 	)
+				// }
 
-	group.Get("/history", func(c *fiber.Ctx) error {
-		nidn := c.FormValue("nidn")
-		if nidn == "" {
-			nidn = c.Query("nidn")
-		}
-		nip := c.FormValue("nip")
-		if nip == "" {
-			nip = c.Query("nip")
-		}
-		query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
-			Nidn:         nidn,
-			Nip:          nip,
-			TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
-			TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
-		}
+				masukStr := ""
+				if absenData.AbsenMasuk != nil {
+					masukStr = absenData.AbsenMasuk.Format("2006-01-02 15:04:05")
+				}
+				GlobalAttendanceWsHub.BroadcastToUser(absenData.Nip, absenData.Nidn, RealtimeAttendancePayload{
+					Type:       "check_in",
+					Nip:        absenData.Nip,
+					Nidn:       absenData.Nidn,
+					Tanggal:    absenData.Tanggal,
+					AbsenMasuk: masukStr,
+				})
+			}
 
-		res, err := mediatr.Send[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](c.UserContext(), query)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-
-		return c.JSON(res.Value)
-	})
-
-	group.Delete("/empty-masuk", func(c *fiber.Ctx) error {
-		command := DeleteEmptyAttendance.DeleteEmptyAttendanceCommand{}
-
-		res, err := mediatr.Send[*DeleteEmptyAttendance.DeleteEmptyAttendanceCommand, common.ResultValue[int64]](c.UserContext(), &command)
-		if err != nil {
-			return infrastructure.HandleError(c, err)
-		}
-
-		if !res.IsSuccess {
-			return infrastructure.HandleError(c, res.Error)
-		}
-
-		return c.JSON(fiber.Map{
-			"status":        "success",
-			"message":       "Data absen dengan absen_masuk kosong berhasil dihapus",
-			"deleted_count": res.Value,
+			return c.JSON(res.Value)
 		})
-	})
+
+		group.Post("/check-out", func(c *fiber.Ctx) error {
+			nip := strings.TrimSpace(c.FormValue("nip"))
+			nidn := strings.TrimSpace(c.FormValue("nidn"))
+			catatan_pulang := c.FormValue("catatan_pulang")
+
+			if nip == "" && nidn != "" {
+				nip = nidn
+			} else if nidn == "" && nip != "" {
+				nidn = nip
+			}
+
+			command := CheckOut.CheckOutCommand{
+				Nip:  nip,
+				Nidn: nidn,
+				Note: catatan_pulang,
+			}
+
+			res, err := mediatr.Send[*CheckOut.CheckOutCommand, common.ResultValue[*domain.Absen]](c.UserContext(), &command)
+			if err != nil {
+				return infrastructure.HandleError(c, err)
+			}
+
+			if !res.IsSuccess {
+				return infrastructure.HandleError(c, res.Error)
+			}
+
+			// Trigger FCM Notification & WebSocket Broadcast for Check-Out Success (Only when CREATED, not updated)
+			if res.Value != nil && res.Value.IsCreated {
+				absenData := res.Value
+				keluarStr := ""
+				if absenData.AbsenKeluar != nil {
+					keluarStr = absenData.AbsenKeluar.Format("2006-01-02 15:04:05")
+				}
+				GlobalAttendanceWsHub.BroadcastToUser(absenData.Nip, absenData.Nidn, RealtimeAttendancePayload{
+					Type:        "check_out",
+					Nip:         absenData.Nip,
+					Nidn:        absenData.Nidn,
+					Tanggal:     absenData.Tanggal,
+					AbsenKeluar: keluarStr,
+				})
+			}
+
+			return c.JSON(res.Value)
+		})
+
+		group.Post("/notify-fail", func(c *fiber.Ctx) error {
+			nip := c.FormValue("nip")
+			reason := c.FormValue("reason")
+			if reason == "" {
+				reason = "sistem gagal melakukan absensi otomatis karena anda berada di luar radius kampus / tidak terkoneksi jaringan, butuh presensi manual"
+			}
+
+			if nip != "" {
+				_, _ = mediatr.Send[*CreateNotification.CreateNotificationCommand, common.ResultValue[bool]](c.UserContext(), &CreateNotification.CreateNotificationCommand{
+					TargetNips: []string{nip},
+					Title:      "Presensi Otomatis Gagal",
+					Body:       reason,
+					Type:       "attendance_fail",
+					Payload:    map[string]string{"type": "fail"},
+				})
+				return c.JSON(fiber.Map{"status": "ok", "message": "Notification command dispatched"})
+			}
+			return c.Status(400).JSON(fiber.Map{"error": "Missing nip"})
+		})
+
+		group.Get("/history", func(c *fiber.Ctx) error {
+			nidn := c.FormValue("nidn")
+			if nidn == "" {
+				nidn = c.Query("nidn")
+			}
+			nip := c.FormValue("nip")
+			if nip == "" {
+				nip = c.Query("nip")
+			}
+			query := &GetAttendanceHistory.GetAttendanceHistoryQuery{
+				Nidn:         nidn,
+				Nip:          nip,
+				TanggalMulai: helper.StrPtr(c.Query("tanggal_mulai")),
+				TanggalAkhir: helper.StrPtr(c.Query("tanggal_akhir")),
+			}
+
+			res, err := mediatr.Send[*GetAttendanceHistory.GetAttendanceHistoryQuery, common.ResultValue[[]domain.Absen]](c.UserContext(), query)
+			if err != nil {
+				return infrastructure.HandleError(c, err)
+			}
+
+			if !res.IsSuccess {
+				return infrastructure.HandleError(c, res.Error)
+			}
+
+			return c.JSON(res.Value)
+		})
+
+		group.Delete("/empty-masuk", func(c *fiber.Ctx) error {
+			command := DeleteEmptyAttendance.DeleteEmptyAttendanceCommand{}
+
+			res, err := mediatr.Send[*DeleteEmptyAttendance.DeleteEmptyAttendanceCommand, common.ResultValue[int64]](c.UserContext(), &command)
+			if err != nil {
+				return infrastructure.HandleError(c, err)
+			}
+
+			if !res.IsSuccess {
+				return infrastructure.HandleError(c, res.Error)
+			}
+
+			return c.JSON(fiber.Map{
+				"status":        "success",
+				"message":       "Data absen dengan absen_masuk kosong berhasil dihapus",
+				"deleted_count": res.Value,
+			})
+		})
 	}
 
 	groupV2 := app.Group("/api/v2/attendance", commonpresentation.JWTMiddleware(), commonpresentation.RBACMiddleware())

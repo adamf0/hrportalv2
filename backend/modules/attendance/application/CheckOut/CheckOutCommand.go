@@ -6,6 +6,7 @@ import (
 	"time"
 
 	common "hrportal_backend/common/domain"
+	"hrportal_backend/common/helper"
 	"hrportal_backend/common/infrastructure"
 	"hrportal_backend/modules/attendance/domain"
 	"hrportal_backend/modules/notification/application/CreateNotification"
@@ -17,6 +18,7 @@ import (
 type CheckOutCommand struct {
 	Nip  string `json:"nip"`
 	Nidn string `json:"nidn"`
+	Note string `json:"catatan_pulang"`
 }
 
 func (c CheckOutCommand) Validate() error {
@@ -65,6 +67,7 @@ func (h *CheckOutCommandHandler) Handle(ctx context.Context, cmd *CheckOutComman
 	existing.AbsenKeluar = &now
 	existing.UpdatedAt = &now
 	existing.IsCreated = isFirstCheckOut
+	existing.CatatanPulang = helper.StrPtr(cmd.Note)
 
 	if err := h.attendanceRepo.UpdateAbsen(ctx, existing); err != nil {
 		return common.FailureValue[*domain.Absen](domain.AttendanceNotFound()), err

@@ -101,7 +101,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 			Prodi:          cmd.Prodi,
 			Tanggal:        targetDate,
 			AbsenMasuk:     &now,
-			Note:           cmd.Note,
+			CatatanTelat:   &cmd.Note,
 			OtomatisKeluar: false,
 			CreatedAt:      &now,
 			UpdatedAt:      &now,
@@ -122,7 +122,7 @@ func (h *CheckInCommandHandler) Handle(ctx context.Context, cmd *CheckInCommand)
 	}
 
 	existing.AbsenMasuk = &now
-	existing.Note = cmd.Note
+	existing.CatatanPulang = &cmd.Note
 	existing.UpdatedAt = &now
 	existing.IsCreated = false
 	if err := h.attendanceRepo.UpdateAbsen(ctxTx, existing); err != nil {

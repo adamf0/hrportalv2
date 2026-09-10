@@ -111,7 +111,10 @@ export const PresensiPage = () => {
     const now = new Date();
     const diffMinutes = Math.floor((now - checkInTime) / (1000 * 60));
 
-    if (diffMinutes < 30) {
+    const isFriday = now.getDay() === 5;
+    const requiredHours = isFriday ? 6 : 7;
+
+    if (diffMinutes < (requiredHours * 60)) {
       setModalType('early');
       setReasonText('');
       setIsModalOpen(true);
@@ -552,13 +555,17 @@ export const PresensiPage = () => {
             <div>
               {modalType === 'late'
                 ? 'Waktu masuk Anda melebihi 08:03 WIB. Harap berikan alasan keterlambatan Anda.'
-                : 'Durasi kerja kurang dari 30 menit. Harap beri alasan mendesak untuk pulang cepat.'}
+                : `Durasi kerja kurang dari ${new Date().getDay() === 5 ? '6 jam (Hari Jumat)' : '7 jam'}. Harap beri alasan mendesak untuk pulang cepat.`}
             </div>
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#0f172a', marginBottom: '6px' }}>
-              {modalType === 'late' ? 'Alasan Telat Masuk *' : 'Alasan Pulang Cepat *'}
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 800, color: '#ef4444', marginBottom: '6px' }}>
+              {modalType === 'late' ? (
+                <>Catatan Telat Masuk <span style={{ color: '#ef4444', fontWeight: 800 }}>*</span></>
+              ) : (
+                <>Catatan Pulang Cepat <span style={{ color: '#ef4444', fontWeight: 800 }}>*</span></>
+              )}
             </label>
             <textarea
               className="form-textarea"

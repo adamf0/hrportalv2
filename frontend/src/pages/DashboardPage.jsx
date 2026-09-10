@@ -689,7 +689,10 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     const now = new Date();
     const diffMinutes = Math.floor((now - checkInTime) / (1000 * 60));
 
-    const isEarly = diffMinutes < 30;
+    const isFriday = now.getDay() === 5;
+    const requiredHours = isFriday ? 6 : 7;
+    const isEarly = diffMinutes < (requiredHours * 60);
+
     if (isEarly && !noteParam) {
       setShowEarlyExitModal(true);
       return;
@@ -704,8 +707,8 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         longitude: 106.8066,
         ip_address: ipAddress,
         ip: ipAddress,
-        catatan_pulang: noteParam || (isEarly ? 'Pulang cepat kurang dari 30 menit' : 'Absen keluar reguler'),
-        note: noteParam || (isEarly ? 'Pulang cepat kurang dari 30 menit' : 'Absen keluar reguler'),
+        catatan_pulang: noteParam || (isEarly ? `Pulang cepat kurang dari ${requiredHours} jam` : 'Absen keluar reguler'),
+        note: noteParam || (isEarly ? `Pulang cepat kurang dari ${requiredHours} jam` : 'Absen keluar reguler'),
       };
 
       await apiClient.post('/api/v2/attendance/check-out', payload);
@@ -1461,15 +1464,15 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
 
       {/* LATE MODAL (>08:03) */}
       <Modal isOpen={showLateModal} onClose={() => setShowLateModal(false)} title="Alasan Telat Masuk Presensi">
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2.5 p-3.5 bg-red-50 rounded-xl text-red-700 text-xs font-medium">
-            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: '10px', padding: '14px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '0.825rem', fontWeight: 500, alignItems: 'flex-start' }}>
+            <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>Jam masuk Anda melebihi <strong>08:03 WIB</strong>. Harap cantumkan alasan keterlambatan Anda.</div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-900 mb-1.5">
-              Catatan Telat Masuk *
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#ef4444', marginBottom: '6px' }}>
+              Catatan Telat Masuk <span style={{ color: '#ef4444', fontWeight: 800 }}>*</span>
             </label>
             <textarea
               className="bm-input"
@@ -1481,9 +1484,10 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
             />
           </div>
 
-          <div className="flex justify-end gap-2.5 mt-2">
-            <button onClick={() => setShowLateModal(false)} className="bm-btn-outline">Batal</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+            <button type="button" onClick={() => setShowLateModal(false)} className="bm-btn-outline" style={{ padding: '9px 18px' }}>Batal</button>
             <button
+              type="button"
               onClick={() => {
                 if (!lateReason.trim()) {
                   showToast('Harap isi alasan keterlambatan terlebih dahulu.', 'warning');
@@ -1493,6 +1497,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
               }}
               disabled={submitting}
               className="bm-btn-emerald"
+              style={{ padding: '9px 20px' }}
             >
               Simpan &amp; Absen Masuk
             </button>
@@ -1502,15 +1507,15 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
 
       {/* EARLY EXIT MODAL (<30 MIN) */}
       <Modal isOpen={showEarlyExitModal} onClose={() => setShowEarlyExitModal(false)} title="Alasan Pulang Cepat Presensi">
-        <div className="flex flex-col gap-4">
-          <div className="flex gap-2.5 p-3.5 bg-red-50 rounded-xl text-red-700 text-xs font-medium">
-            <AlertCircle size={18} className="shrink-0 mt-0.5" />
-            <div>Durasi presensi baru <strong>kurang dari 30 menit</strong>. Harap masukkan alasan pulang cepat.</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ display: 'flex', gap: '10px', padding: '14px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', fontSize: '0.825rem', fontWeight: 500, alignItems: 'flex-start' }}>
+            <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>Durasi presensi Anda <strong>kurang dari {new Date().getDay() === 5 ? '6 jam (Hari Jumat)' : '7 jam'}</strong>. Harap masukkan alasan pulang cepat.</div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-900 mb-1.5">
-              Catatan Pulang Cepat *
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#ef4444', marginBottom: '6px' }}>
+              Catatan Pulang Cepat <span style={{ color: '#ef4444', fontWeight: 800 }}>*</span>
             </label>
             <textarea
               className="bm-input"
@@ -1522,9 +1527,10 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
             />
           </div>
 
-          <div className="flex justify-end gap-2.5 mt-2">
-            <button onClick={() => setShowEarlyExitModal(false)} className="bm-btn-outline">Batal</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+            <button type="button" onClick={() => setShowEarlyExitModal(false)} className="bm-btn-outline" style={{ padding: '9px 18px' }}>Batal</button>
             <button
+              type="button"
               onClick={() => {
                 if (!earlyExitReason.trim()) {
                   showToast('Harap isi alasan pulang cepat terlebih dahulu.', 'warning');
@@ -1534,6 +1540,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
               }}
               disabled={submitting}
               className="bm-btn-emerald"
+              style={{ padding: '9px 20px' }}
             >
               Simpan &amp; Absen Keluar
             </button>
