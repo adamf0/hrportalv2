@@ -39,7 +39,8 @@ const BULAN_LIST = [
   { value: 12, name: 'Desember', short: 'Des' },
 ];
 
-const TAHUN_LIST = [2024, 2025, 2026, 2027];
+const currentYearNum = new Date().getFullYear();
+const TAHUN_LIST = Array.from({ length: Math.max(1, currentYearNum - 2000 + 1) }, (_, i) => 2000 + i);
 
 const formatJamMasuk = (str) => {
   if (!str) return '';

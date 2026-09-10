@@ -228,7 +228,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
     { value: 12, label: 'Desember' },
   ];
 
-  const yearsList = [2024, 2025, 2026, 2027];
+  const yearsList = Array.from({ length: Math.max(1, currentYearNum - 2000 + 1) }, (_, i) => 2000 + i);
 
   // Fetch All Dashboard Data
   const fetchDashboardData = async () => {
@@ -256,7 +256,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
 
       // Today Absen Check (WIB timezone safe)
       const todayStr = getLocalDateStr();
-      const foundToday = attData.find((item) => {
+      const foundToday = attData.find((item) => { //[pr] belum ada pengecekan jam 04:00 untuk shif malam absen keluar
         const dateStr = item.tanggal || (item.absen_masuk ? getLocalDateStr(item.absen_masuk) : '');
         return dateStr === todayStr;
       });

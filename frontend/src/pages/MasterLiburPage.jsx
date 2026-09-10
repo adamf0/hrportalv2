@@ -29,7 +29,10 @@ export const MasterLiburPage = () => {
   const [loading, setLoading] = useState(true);
   const [syncingApi, setSyncingApi] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedYear, setSelectedYear] = useState(2026);
+  const currentYearNum = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYearNum);
+  const yearsList = Array.from({ length: Math.max(1, currentYearNum - 2000 + 1) }, (_, i) => 2000 + i);
+  console.log(yearsList)
   const [pageSize, setPageSize] = useState(10);
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -267,7 +270,7 @@ export const MasterLiburPage = () => {
               onChange={(e) => { setSelectedYear(Number(e.target.value)); setCurrentPage(1); }}
               style={{ width: '110px', height: '38px', fontSize: '0.85rem', borderRadius: '8px' }}
             >
-              {[2024, 2025, 2026, 2027].map((y) => (
+              {yearsList.map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
