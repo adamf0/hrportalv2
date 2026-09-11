@@ -418,8 +418,8 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
           };
         });
 
-        // setKuesionerList(mappedList);
-        setKuesionerList([]);
+        setKuesionerList(mappedList);
+        // setKuesionerList([]);
       } else {
         setKuesionerList([]);
       }
