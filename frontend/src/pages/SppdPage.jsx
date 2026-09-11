@@ -50,6 +50,22 @@ const parseFilesList = (filesData) => {
   return [];
 };
 
+const getFileName = (f, i) => {
+  if (!f) return `File ${i + 1}`;
+  if (typeof f === 'string') return f;
+  return f.file || f.nama || f.name || f.filename || `File ${i + 1}`;
+};
+
+const getFileUrl = (f) => {
+  if (!f) return '#';
+  if (typeof f === 'string') return f.startsWith('http') ? f : `/uploads/sppd/${f}`;
+  if (f.url) return f.url;
+  if (f.file_url) return f.file_url;
+  if (f.path) return f.path;
+  if (f.file) return f.file.startsWith('http') ? f.file : `/uploads/sppd/${f.file}`;
+  return '#';
+};
+
 const CompactListDisplay = ({ items, renderItem, typeName = 'item', initialVisible = 2 }) => {
   const [expanded, setExpanded] = useState(false);
   if (!items || items.length === 0) return <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>-</span>;
@@ -313,7 +329,16 @@ export const SppdPage = () => {
     setTanggalKembali(formatInputDate(item.tanggal_kembali || item.tanggal_akhir || item.tanggal_selesai || item.tanggal_berangkat));
     setTujuan(item.tujuan || '');
     setKeterangan(item.keterangan || '');
-    setVerifikasi(item.verifikasi || item.nip_atasan || null);
+    setVerifikasi(item.verifikasi || item.nip_atasan || item.verifikator || null);
+
+    const rawAnggota = parseAnggotaList(item.anggota);
+    const parsedAnggota = rawAnggota.map((m) => ({
+      nip: m.nip || m.Nip || '',
+      nama: m.nama || m.name || m.Nama || '',
+      unit: m.unit || '',
+    }));
+    setAnggotaList(parsedAnggota);
+
     showToast('Form diisi dengan data SPPD. Silakan edit dan simpan.', 'info');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -904,11 +929,35 @@ export const SppdPage = () => {
                           items={files}
                           typeName="file"
                           initialVisible={2}
-                          renderItem={(f, i) => (
-                            <a key={i} href={f.url || f.path || f.file_url || '#'} target="_blank" rel="noopener noreferrer" style={{ padding: '3px 8px', borderRadius: '6px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                              📎 {f.nama || f.name || f.filename || `File ${i + 1}`}
-                            </a>
-                          )}
+                          renderItem={(f, i) => {
+                            const name = getFileName(f, i);
+                            return (
+                              <span
+                                key={i}
+                                title={name}
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: '#ecfdf5',
+                                  border: '1px solid #a7f3d0',
+                                  color: '#047857',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  maxWidth: '220px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  cursor: 'default',
+                                  userSelect: 'none',
+                                }}
+                              >
+                                📎 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                              </span>
+                            );
+                          }}
                         />
                       </div>
 
@@ -1035,11 +1084,35 @@ export const SppdPage = () => {
                           items={files}
                           typeName="file"
                           initialVisible={2}
-                          renderItem={(f, i) => (
-                            <a key={i} href={f.url || f.path || f.file_url || '#'} target="_blank" rel="noopener noreferrer" style={{ padding: '3px 8px', borderRadius: '6px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
-                              📎 {f.nama || f.name || f.filename || `File ${i + 1}`}
-                            </a>
-                          )}
+                          renderItem={(f, i) => {
+                            const name = getFileName(f, i);
+                            return (
+                              <span
+                                key={i}
+                                title={name}
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: '6px',
+                                  background: '#ecfdf5',
+                                  border: '1px solid #a7f3d0',
+                                  color: '#047857',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  maxWidth: '220px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  cursor: 'default',
+                                  userSelect: 'none',
+                                }}
+                              >
+                                📎 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                              </span>
+                            );
+                          }}
                         />
                       </td>
                       <td style={{ padding: '14px 16px' }}>
