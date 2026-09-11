@@ -20,6 +20,7 @@ import { Modal } from '../components/Modal';
 import { Badge } from '../components/Badge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { formatIndonesianDateRange, calculateDurationDays, formatInputDate } from '../utils/dateFormatter';
+import { Pagination } from '../components/Pagination';
 
 const parseAnggotaList = (anggotaData) => {
   if (!anggotaData) return [];
