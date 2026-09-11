@@ -707,8 +707,7 @@ export const DashboardPage = ({ onNavigate, globalPeriodType = 'cutoff', onPerio
         longitude: 106.8066,
         ip_address: ipAddress,
         ip: ipAddress,
-        catatan_pulang: noteParam || (isEarly ? `Pulang cepat kurang dari ${requiredHours} jam` : 'Absen keluar reguler'),
-        note: noteParam || (isEarly ? `Pulang cepat kurang dari ${requiredHours} jam` : 'Absen keluar reguler'),
+        catatan_pulang: noteParam || (isEarly ? `Pulang cepat kurang dari ${requiredHours} jam` : ''),
       };
 
       await apiClient.post('/api/v2/attendance/check-out', payload);
