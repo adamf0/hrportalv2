@@ -67,10 +67,6 @@ func (r *LeaveRepository) GetHistoryByNip(ctx context.Context, nip string, nidn 
 		if nip != "" || nidn != "" {
 			verifIDs := commonhelper.ResolveVerifikatorIDs(ctx, r.db, nip, nidn)
 			query = query.Where("verifikasi IN ?", verifIDs)
-			if len(verifIDs) > 0 {
-				query = query.Where("(nip NOT IN ? OR nip IS NULL OR nip = '')", verifIDs).
-					Where("(nidn NOT IN ? OR nidn IS NULL OR nidn = '')", verifIDs)
-			}
 		} else {
 			query = query.Where("verifikasi IS NOT NULL AND verifikasi != ''")
 		}
