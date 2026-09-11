@@ -21,7 +21,73 @@ import { Badge } from '../components/Badge';
 import { SearchableSelect } from '../components/SearchableSelect';
 import { formatIndonesianDateRange, calculateDurationDays, formatInputDate } from '../utils/dateFormatter';
 
-import { Pagination } from '../components/Pagination';
+const parseAnggotaList = (anggotaData) => {
+  if (!anggotaData) return [];
+  if (Array.isArray(anggotaData)) return anggotaData;
+  if (typeof anggotaData === 'string') {
+    try {
+      const parsed = JSON.parse(anggotaData);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+};
+
+const parseFilesList = (filesData) => {
+  if (!filesData) return [];
+  if (Array.isArray(filesData)) return filesData;
+  if (typeof filesData === 'string') {
+    try {
+      const parsed = JSON.parse(filesData);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  return [];
+};
+
+const CompactListDisplay = ({ items, renderItem, typeName = 'item', initialVisible = 2 }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!items || items.length === 0) return <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>-</span>;
+
+  const visibleItems = expanded ? items : items.slice(0, initialVisible);
+  const remainingCount = items.length - initialVisible;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxWidth: '240px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+        {visibleItems.map((item, idx) => renderItem(item, idx))}
+      </div>
+      {items.length > initialVisible && (
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            fontSize: '0.72rem',
+            color: '#4338ca',
+            fontWeight: 700,
+            background: '#e0e7ff',
+            border: '1px solid #c7d2fe',
+            borderRadius: '12px',
+            padding: '2px 8px',
+            cursor: 'pointer',
+            width: 'fit-content',
+            marginTop: '2px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          {expanded ? '▲ Sembunyikan' : `+ ${remainingCount} ${typeName} lainnya`}
+        </button>
+      )}
+    </div>
+  );
+};
 
 export const SppdPage = () => {
   const { user, userRole, isSdm, isBaum } = useAuth();
@@ -783,6 +849,8 @@ export const SppdPage = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '500px', overflowY: 'auto' }}>
                 {filteredList.map((item, idx) => {
                   const duration = calculateDurationDays(item.tanggal_berangkat, item.tanggal_kembali);
+                  const anggota = parseAnggotaList(item.anggota);
+                  const files = parseFilesList(item.files || item.file_list || item.lampiran);
                   return (
                     <div key={idx} style={{ padding: '14px 16px', borderRadius: '10px', background: '#f9fafb', border: '1px solid #e5e7eb' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -802,6 +870,44 @@ export const SppdPage = () => {
                       </div>
                       <div style={{ fontSize: '0.8rem', color: '#6b7280', marginBottom: '8px' }}>
                         Keterangan: {item.keterangan || '-'}
+                      </div>
+
+                      {/* Anggota Rombongan */}
+                      {anggota.length > 0 && (
+                        <div style={{ marginBottom: '8px', fontSize: '0.78rem' }}>
+                          <div style={{ fontWeight: 700, color: '#374151', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Users size={13} color="#4f46e5" />
+                            <span>Anggota Rombongan ({anggota.length} orang):</span>
+                          </div>
+                          <CompactListDisplay
+                            items={anggota}
+                            typeName="anggota"
+                            initialVisible={2}
+                            renderItem={(m, i) => (
+                              <span key={i} style={{ padding: '3px 8px', borderRadius: '6px', background: '#e0e7ff', border: '1px solid #c7d2fe', color: '#3730a3', fontSize: '0.75rem', fontWeight: 600 }}>
+                                👤 {m.nama || m.name} {m.nip ? `(${m.nip})` : ''}
+                              </span>
+                            )}
+                          />
+                        </div>
+                      )}
+
+                      {/* File Lampiran */}
+                      <div style={{ marginBottom: '8px', fontSize: '0.78rem' }}>
+                        <div style={{ fontWeight: 700, color: '#374151', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <FileText size={13} color="#059669" />
+                          <span>File Lampiran ({files.length}):</span>
+                        </div>
+                        <CompactListDisplay
+                          items={files}
+                          typeName="file"
+                          initialVisible={2}
+                          renderItem={(f, i) => (
+                            <a key={i} href={f.url || f.path || f.file_url || '#'} target="_blank" rel="noopener noreferrer" style={{ padding: '3px 8px', borderRadius: '6px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              📎 {f.nama || f.name || f.filename || `File ${i + 1}`}
+                            </a>
+                          )}
+                        />
                       </div>
 
                       {/* Always show Edit and Hapus buttons regardless of status */}
@@ -877,9 +983,11 @@ export const SppdPage = () => {
               <thead>
                 <tr style={{ borderBottom: '1px solid #e5e7eb', color: '#6b7280' }}>
                   <th style={{ padding: '12px 16px' }}>Pemohon</th>
+                  <th style={{ padding: '12px 16px' }}>Anggota</th>
                   <th style={{ padding: '12px 16px' }}>Tujuan &amp; Tanggal SPPD</th>
                   <th style={{ padding: '12px 16px' }}>Lama Perjalanan</th>
                   <th style={{ padding: '12px 16px' }}>Keterangan</th>
+                  <th style={{ padding: '12px 16px' }}>File</th>
                   <th style={{ padding: '12px 16px' }}>Status</th>
                   <th style={{ padding: '12px 16px' }}>Aksi</th>
                 </tr>
@@ -887,11 +995,25 @@ export const SppdPage = () => {
               <tbody>
                 {filteredList.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, idx) => {
                   const duration = calculateDurationDays(item.tanggal_berangkat, item.tanggal_kembali);
+                  const anggota = parseAnggotaList(item.anggota);
+                  const files = parseFilesList(item.files || item.file_list || item.lampiran);
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ padding: '14px 16px', fontWeight: 600, color: '#111827' }}>
                         {item.nama_pemohon || item.nama || 'Pegawai UNPAK'}
                         <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>NIP: {item.nip}</div>
+                      </td>
+                      <td style={{ padding: '14px 16px', minWidth: '160px' }}>
+                        <CompactListDisplay
+                          items={anggota}
+                          typeName="anggota"
+                          initialVisible={2}
+                          renderItem={(m, i) => (
+                            <span key={i} style={{ padding: '3px 8px', borderRadius: '6px', background: '#e0e7ff', border: '1px solid #c7d2fe', color: '#3730a3', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                              👤 {m.nama || m.name} {m.nip ? `(${m.nip})` : ''}
+                            </span>
+                          )}
+                        />
                       </td>
                       <td style={{ padding: '14px 16px', color: '#4f46e5', fontWeight: 600 }}>
                         {item.tujuan}
@@ -905,7 +1027,19 @@ export const SppdPage = () => {
                           <span>{duration} Hari</span>
                         </span>
                       </td>
-                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>{item.keterangan}</td>
+                      <td style={{ padding: '14px 16px', color: '#4b5563' }}>{item.keterangan || '-'}</td>
+                      <td style={{ padding: '14px 16px', minWidth: '130px' }}>
+                        <CompactListDisplay
+                          items={files}
+                          typeName="file"
+                          initialVisible={2}
+                          renderItem={(f, i) => (
+                            <a key={i} href={f.url || f.path || f.file_url || '#'} target="_blank" rel="noopener noreferrer" style={{ padding: '3px 8px', borderRadius: '6px', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
+                              📎 {f.nama || f.name || f.filename || `File ${i + 1}`}
+                            </a>
+                          )}
+                        />
+                      </td>
                       <td style={{ padding: '14px 16px' }}>
                         <Badge variant={(item.status || '').toLowerCase().includes('terima') ? 'success' : (item.status || '').toLowerCase().includes('tolak') ? 'danger' : 'warning'}>
                           {item.status || 'Menunggu'}
