@@ -235,6 +235,7 @@ export const SppdPage = () => {
       } else if (res?.data && Array.isArray(res.data)) {
         list = res.data;
       }
+      console.log(isVerifTab? "verif":"data",list)
       setSppdList(list);
     } catch (err) {
       showToast('Gagal memuat data pengajuan SPPD', 'error');
