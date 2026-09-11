@@ -162,7 +162,7 @@ export const SppdPage = () => {
   useEffect(() => {
     const fetchSupervisors = async () => {
       try {
-        const res = await apiClient.get('/api/v2/masterdata/verifikator');
+        const res = await apiClient.get('/api/v2/masterdata/people');
         let list = [];
         if (Array.isArray(res)) {
           list = res;
