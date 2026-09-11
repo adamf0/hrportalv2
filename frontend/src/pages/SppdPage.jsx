@@ -284,7 +284,7 @@ export const SppdPage = () => {
           tanggal_berangkat: formatInputDate(tanggalBerangkat),
           tanggal_kembali: formatInputDate(tanggalKembali),
           tujuan: tujuan.trim(),
-          keterangan: `Atasan: ${verifikasi} | ${keterangan.trim()}`,
+          keterangan: `${keterangan.trim()}`,
           verifikasi: verifikasi,
           anggota: JSON.stringify(anggotaList),
         });
@@ -301,7 +301,7 @@ export const SppdPage = () => {
           tanggal_berangkat: formatInputDate(tanggalBerangkat),
           tanggal_kembali: formatInputDate(tanggalKembali),
           tujuan: tujuan.trim(),
-          keterangan: `Atasan: ${verifikasi} | ${keterangan.trim()}`,
+          keterangan: `${keterangan.trim()}`,
           verifikasi: verifikasi,
           anggota: JSON.stringify(anggotaList),
         });
